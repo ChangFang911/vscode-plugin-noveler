@@ -1,0 +1,94 @@
+{
+  "name": "noveler",
+  "displayName": "Noveler - 中文小说写作助手",
+  "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
+  "version": "0.1.0",
+  "publisher": "noveler",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Other"
+  ],
+  "keywords": [
+    "chinese",
+    "novel",
+    "writing",
+    "中文",
+    "小说",
+    "写作"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "text.html.markdown.noveler",
+        "path": "./syntaxes/chinese-novel.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "noveler.formatDocument",
+        "title": "Noveler: 格式化文档"
+      },
+      {
+        "command": "noveler.showWordCount",
+        "title": "Noveler: 显示字数统计"
+      },
+      {
+        "command": "noveler.createChapter",
+        "title": "Noveler: 创建新章节"
+      }
+    ],
+    "configuration": {
+      "title": "Noveler",
+      "properties": {
+        "noveler.autoFormat": {
+          "type": "boolean",
+          "default": true,
+          "description": "保存时自动格式化文档"
+        },
+        "noveler.showWordCountInStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "在状态栏显示字数统计"
+        },
+        "noveler.chineseQuoteStyle": {
+          "type": "string",
+          "enum": [
+            "「」",
+            "\"\""
+          ],
+          "default": "「」",
+          "description": "中文引号样式"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^4.9.0"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  }
+}

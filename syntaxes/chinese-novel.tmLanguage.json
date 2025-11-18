@@ -1,0 +1,96 @@
+{
+  "name": "Chinese Novel",
+  "scopeName": "text.html.markdown.noveler",
+  "injectionSelector": "L:text.html.markdown",
+  "patterns": [
+    {
+      "include": "#dialogue-chinese-corner"
+    },
+    {
+      "include": "#dialogue-chinese-double"
+    },
+    {
+      "include": "#dialogue-english"
+    },
+    {
+      "include": "#thought"
+    },
+    {
+      "include": "#noveler-comments"
+    },
+    {
+      "include": "#character-name"
+    },
+    {
+      "include": "#ellipsis"
+    },
+    {
+      "include": "#emphasis-chinese"
+    }
+  ],
+  "repository": {
+    "dialogue-chinese-corner": {
+      "name": "string.quoted.double.dialogue.chinese.noveler",
+      "match": "「([^」]*)」",
+      "captures": {
+        "0": {
+          "name": "string.quoted.double.dialogue.chinese.noveler"
+        }
+      }
+    },
+    "dialogue-chinese-double": {
+      "name": "string.quoted.double.dialogue.chinese.noveler",
+      "match": ""([^""]*)"|"([^""].*?)"",
+      "captures": {
+        "0": {
+          "name": "string.quoted.double.dialogue.chinese.noveler"
+        }
+      }
+    },
+    "dialogue-english": {
+      "name": "string.quoted.double.dialogue.english.noveler",
+      "match": "\"([^\"]*)\"",
+      "captures": {
+        "0": {
+          "name": "string.quoted.double.dialogue.english.noveler"
+        }
+      }
+    },
+    "thought": {
+      "name": "markup.italic.thought.noveler",
+      "match": "（([^）]*)）",
+      "captures": {
+        "0": {
+          "name": "markup.italic.thought.noveler"
+        }
+      }
+    },
+    "noveler-comments": {
+      "name": "comment.block.noveler",
+      "begin": "<!--\\s*noveler:",
+      "end": "-->",
+      "patterns": [
+        {
+          "name": "keyword.control.noveler",
+          "match": "(scene|character|dialog|note|todo|highlight)"
+        },
+        {
+          "name": "entity.name.tag.noveler",
+          "match": "(name|speaker|emotion)="
+        }
+      ]
+    },
+    "character-name": {
+      "name": "entity.name.character.noveler",
+      "match": "(?<=[，。！？：」\"])([\\u4e00-\\u9fa5]{2,4})(?=[说道问答喊叫笑哭想])"
+    },
+    "ellipsis": {
+      "name": "keyword.operator.ellipsis.noveler",
+      "match": "…+|\\.\\.\\."
+    },
+    "emphasis-chinese": {
+      "name": "markup.bold.emphasis.chinese.noveler",
+      "match": "(?<=[^\\u4e00-\\u9fa5])([\\u4e00-\\u9fa5]+)(?=[！？])"
+    }
+  }
+}
