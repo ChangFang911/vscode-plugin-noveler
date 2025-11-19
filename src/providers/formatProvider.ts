@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { ConfigService } from '../services/configService';
 
 export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(
@@ -9,8 +10,15 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
         const edits: vscode.TextEdit[] = [];
         const text = document.getText();
         const lines = text.split('\n');
-        const config = vscode.workspace.getConfiguration('noveler');
-        const quoteStyle = config.get('chineseQuoteStyle', '「」');
+
+        // 优先使用 novel.json 配置，回退到 VSCode 设置
+        const configService = ConfigService.getInstance();
+        let quoteStyle = configService.getChineseQuoteStyle();
+
+        if (!quoteStyle || quoteStyle === '「」') {
+            const config = vscode.workspace.getConfiguration('noveler');
+            quoteStyle = config.get('chineseQuoteStyle', '「」');
+        }
 
         let formattedLines: string[] = [];
         let inFrontMatter = false;
@@ -73,14 +81,17 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
         }
 
         let formatted = line;
+        const configService = ConfigService.getInstance();
 
-        // 1. 统一引号样式
-        if (quoteStyle === '「」') {
-            // 将英文引号转为中文引号
-            formatted = formatted.replace(/"([^"]*)"/g, '「$1」');
-        } else {
-            // 将中文引号转为英文引号
-            formatted = formatted.replace(/「([^」]*)」/g, '"$1"');
+        // 1. 统一引号样式（如果启用了转换）
+        if (configService.shouldConvertQuotes()) {
+            if (quoteStyle === '「」') {
+                // 将英文引号转为中文引号
+                formatted = formatted.replace(/"([^"]*)"/g, '「$1」');
+            } else {
+                // 将中文引号转为英文引号
+                formatted = formatted.replace(/「([^」]*)」/g, '"$1"');
+            }
         }
 
         // 2. 标点符号规范化

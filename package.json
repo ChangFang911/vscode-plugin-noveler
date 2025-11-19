@@ -36,6 +36,10 @@
     ],
     "commands": [
       {
+        "command": "noveler.initProject",
+        "title": "Noveler: 初始化小说项目"
+      },
+      {
         "command": "noveler.formatDocument",
         "title": "Noveler: 格式化文档"
       },
@@ -46,6 +50,10 @@
       {
         "command": "noveler.createChapter",
         "title": "Noveler: 创建新章节"
+      },
+      {
+        "command": "noveler.createCharacter",
+        "title": "Noveler: 创建人物"
       }
     ],
     "configuration": {

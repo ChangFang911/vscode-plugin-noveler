@@ -1,0 +1,36 @@
+{
+  "chapter": {
+    "frontMatter": {
+      "wordCount": 0,
+      "targetWords": 2500,
+      "characters": [],
+      "locations": [],
+      "tags": [],
+      "status": "草稿"
+    },
+    "statusOptions": ["草稿", "初稿", "修改中", "已完成"],
+    "content": "\n"
+  },
+  "character": {
+    "frontMatter": {
+      "gender": "",
+      "age": "",
+      "appearance": "",
+      "personality": "",
+      "background": "",
+      "relationships": [],
+      "abilities": [],
+      "importance": "主角",
+      "firstAppearance": "",
+      "tags": []
+    },
+    "importanceOptions": ["主角", "重要配角", "次要角色", "路人"],
+    "content": "\n## 基本信息\n\n- **性别**：\n- **年龄**：\n- **身份**：\n- **出场**：\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n"
+  },
+  "outline": {
+    "content": "# {novelName} - 大纲\n\n## 主要角色\n\n-\n\n## 主线剧情\n\n1.\n\n## 世界观设定\n\n-\n"
+  },
+  "readme": {
+    "content": "# {novelName}\n\n## 简介\n\n## 目录\n\n- [第一章](chapters/01-xxx.md)\n\n## 写作进度\n\n- 总字数：\n- 完成章节：\n- 目标字数：\n\n## 备注\n\n"
+  }
+}

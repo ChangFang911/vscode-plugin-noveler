@@ -34,8 +34,8 @@
 
 1. **克隆项目并安装依赖**
 ```bash
-git clone <repository-url>
-cd noveler
+git clone https://github.com/ChangFang911/vscode-plugin-noveler.git
+cd vscode-plugin-noveler
 npm install
 ```
 
@@ -61,22 +61,34 @@ vsce package
 
 ### 创建小说项目
 
-1. **项目结构**
+1. **初始化项目**
+- 打开一个空文件夹作为工作区
+- 按 `Cmd+Shift+P` (Mac) 或 `Ctrl+Shift+P` (Windows/Linux)
+- 输入 "Noveler: 初始化小说项目"
+- 按提示输入小说名称
+- 插件会自动创建以下目录结构：
+
 ```
 my-novel/
-├── .noveler/              # 插件配置（自动生成）
 ├── chapters/              # 章节目录
-│   ├── 01-第一章.md
-│   └── 02-第二章.md
-├── drafts/                # 草稿
+├── characters/            # 人物目录
+├── drafts/                # 草稿和大纲
+│   └── 大纲.md            # 自动创建的大纲模板
 ├── references/            # 参考资料
-└── novel.json            # 小说配置
+├── novel.json            # 小说配置文件
+└── README.md             # 项目说明
 ```
 
 2. **创建新章节**
 - 按 `Cmd+Shift+P` (Mac) 或 `Ctrl+Shift+P` (Windows/Linux)
 - 输入 "Noveler: 创建新章节"
 - 按提示输入章节标题（章节号会自动计算）
+
+3. **创建人物**
+- 按 `Cmd+Shift+P` (Mac) 或 `Ctrl+Shift+P` (Windows/Linux)
+- 输入 "Noveler: 创建人物"
+- 按提示输入人物名称
+- 插件会在 `characters/` 目录下创建人物 MD 文件
 
 ### 章节文件格式
 
@@ -112,15 +124,131 @@ status: "草稿"
 <!-- noveler:note 作者备注：这里需要增加更多环境描写 -->
 ```
 
+### 人物文件格式
+
+```markdown
+---
+name: "张无忌"
+gender: "男"
+age: "20"
+appearance: "眉清目秀，英俊潇洒"
+personality: "善良仁慈，优柔寡断"
+background: "武当派弟子，明教教主"
+relationships: ["周芷若", "赵敏", "谢逊"]
+abilities: ["九阳神功", "乾坤大挪移"]
+importance: "主角"
+firstAppearance: "第一章"
+tags: ["主角", "武林盟主"]
+created: 2025-11-18T10:00:00
+modified: 2025-11-18T10:00:00
+---
+
+# 张无忌
+
+## 基本信息
+
+- **性别**：男
+- **年龄**：20
+- **身份**：明教教主
+- **出场**：第一章
+
+## 外貌描写
+
+眉清目秀，身材修长...
+
+## 性格特点
+
+心地善良，但优柔寡断...
+
+## 背景故事
+
+出身武当，父母被害...
+
+## 人际关系
+
+- **周芷若**：青梅竹马
+- **赵敏**：相爱相杀
+- **谢逊**：义父
+
+## 能力特长
+
+- 九阳神功
+- 乾坤大挪移
+
+## 成长轨迹
+
+从懵懂少年到武林盟主...
+
+## 重要事件
+
+- 冰火岛学艺
+- 光明顶大战
+- 六大派围攻
+
+## 备注
+
+人物塑造的核心是成长与抉择...
+```
+
 ### 常用命令
 
 | 命令 | 说明 | 快捷键 |
 |------|------|--------|
+| `Noveler: 初始化小说项目` | 在空文件夹中初始化项目结构 | - |
+| `Noveler: 创建新章节` | 创建新章节文件 | - |
+| `Noveler: 创建人物` | 创建人物文件 | - |
 | `Noveler: 格式化文档` | 格式化当前文档 | - |
 | `Noveler: 显示字数统计` | 显示详细字数统计 | - |
-| `Noveler: 创建新章节` | 创建新章节文件 | - |
 
 ### 配置选项
+
+Noveler 支持两种配置方式：
+
+#### 1. 项目级配置（推荐）
+
+在项目根目录的 `novel.json` 文件中配置：
+
+```json
+{
+  "name": "我的小说",
+  "noveler": {
+    "highlight": {
+      "dialogue": {
+        "color": "#ce9178",
+        "backgroundColor": "rgba(206, 145, 120, 0.15)"
+      },
+      "thought": {
+        "color": "#608b4e",
+        "backgroundColor": "rgba(96, 139, 78, 0.15)",
+        "fontStyle": "italic"
+      },
+      "character": {
+        "color": "#4ec9b0",
+        "backgroundColor": "rgba(78, 201, 176, 0.15)",
+        "fontWeight": "bold"
+      },
+      "ellipsis": {
+        "color": "#569cd6",
+        "backgroundColor": "rgba(86, 156, 214, 0.15)"
+      }
+    },
+    "format": {
+      "chineseQuoteStyle": "「」",
+      "autoFormat": true,
+      "convertQuotes": true
+    },
+    "wordCount": {
+      "showInStatusBar": true,
+      "includePunctuation": true
+    },
+    "characters": ["张无忌", "周芷若", "赵敏"]
+  }
+}
+```
+
+详细配置说明请查看 [novel.json 配置文档](docs/novel-json配置说明.md)
+
+#### 2. 全局配置（VSCode 设置）
 
 在 VS Code 设置中搜索 "Noveler"：
 
@@ -139,6 +267,8 @@ status: "草稿"
 
 ## Front Matter 字段说明
 
+### 章节文件字段
+
 | 字段 | 类型 | 说明 | 必填 |
 |------|------|------|------|
 | title | string | 章节标题 | ✓ |
@@ -151,6 +281,24 @@ status: "草稿"
 | created | datetime | 创建时间 | - |
 | modified | datetime | 修改时间 | - |
 | status | enum | 状态：草稿/初稿/修改中/完成 | - |
+
+### 人物文件字段
+
+| 字段 | 类型 | 说明 | 必填 |
+|------|------|------|------|
+| name | string | 人物名称 | ✓ |
+| gender | string | 性别 | - |
+| age | string | 年龄 | - |
+| appearance | string | 外貌描述 | - |
+| personality | string | 性格描述 | - |
+| background | string | 背景故事 | - |
+| relationships | string[] | 人际关系 | - |
+| abilities | string[] | 能力特长 | - |
+| importance | enum | 重要性：主角/重要配角/次要角色/路人 | - |
+| firstAppearance | string | 首次出场章节 | - |
+| tags | string[] | 标签 | - |
+| created | datetime | 创建时间 | - |
+| modified | datetime | 修改时间 | - |
 
 ## HTML 注释标记
 
@@ -220,8 +368,8 @@ MIT License
 
 ## 联系方式
 
-- GitHub Issues: [提交问题](https://github.com/your-repo/noveler/issues)
-- Email: your-email@example.com
+- GitHub: [https://github.com/ChangFang911/vscode-plugin-noveler](https://github.com/ChangFang911/vscode-plugin-noveler)
+- Issues: [提交问题](https://github.com/ChangFang911/vscode-plugin-noveler/issues)
 
 ---
 
