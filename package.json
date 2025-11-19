@@ -54,6 +54,10 @@
       {
         "command": "noveler.createCharacter",
         "title": "Noveler: 创建人物"
+      },
+      {
+        "command": "noveler.updateReadme",
+        "title": "Noveler: 更新 README 统计"
       }
     ],
     "configuration": {

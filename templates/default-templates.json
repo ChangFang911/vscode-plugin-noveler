@@ -31,6 +31,6 @@
     "content": "# {novelName} - 大纲\n\n## 主要角色\n\n-\n\n## 主线剧情\n\n1.\n\n## 世界观设定\n\n-\n"
   },
   "readme": {
-    "content": "# {novelName}\n\n## 简介\n\n## 目录\n\n- [第一章](chapters/01-xxx.md)\n\n## 写作进度\n\n- 总字数：\n- 完成章节：\n- 目标字数：\n\n## 备注\n\n"
+    "content": "# {novelName}\n\n## 项目说明\n\n这是使用 Noveler 插件创建的中文小说写作项目。\n\n## 目录\n\n暂无章节\n\n## 写作进度\n\n- **总字数**：0 字\n- **完成章节**：0 / 0 章 (0%)\n- **章节列表**：见上方目录\n\n## 使用说明\n\n- 使用命令 `Noveler: 创建新章节` 来创建新的章节\n- 使用命令 `Noveler: 更新 README 统计` 来刷新章节目录和统计信息\n- 每次保存章节时，字数会自动更新到章节的 Front Matter 中\n\n## 备注\n\n"
   }
 }
