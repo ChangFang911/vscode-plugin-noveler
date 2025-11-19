@@ -65,8 +65,8 @@ abilities: ${JSON.stringify(frontMatter.abilities)}
 importance: "${frontMatter.importance}" # ${importanceOptions.join('/')}
 firstAppearance: "${frontMatter.firstAppearance}"
 tags: ${JSON.stringify(frontMatter.tags)}
-created: ${now}
-modified: ${now}
+created: "${now}"
+modified: "${now}"
 ---
 
 # ${characterName}

@@ -81,8 +81,8 @@ targetWords: ${frontMatter.targetWords}
 characters: ${JSON.stringify(frontMatter.characters)}
 locations: ${JSON.stringify(frontMatter.locations)}
 tags: ${JSON.stringify(frontMatter.tags)}
-created: ${now}
-modified: ${now}
+created: "${now}"
+modified: "${now}"
 status: "${frontMatter.status}"
 ---
 

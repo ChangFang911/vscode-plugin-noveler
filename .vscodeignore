@@ -1,11 +1,35 @@
+# 开发文件和目录
 .vscode/**
 .vscode-test/**
 src/**
+node_modules/**
+.git/**
+.github/**
+
+# 配置文件
 .gitignore
 .yarnrc
-vsc-extension-quickstart.md
-**/tsconfig.json
+tsconfig.json
 **/.eslintrc.json
-**/*.map
+
+# 源代码相关
 **/*.ts
-node_modules/**
+**/*.map
+
+# 文档（仅保留必要的）
+技术方案.md
+vsc-extension-quickstart.md
+
+# 示例项目（可选：如果不想打包示例，取消注释）
+# examples/**
+
+# 测试文件
+test/**
+**/*.test.js
+
+# 临时文件
+*.log
+.DS_Store
+
+# 开发依赖的输出
+.claude/**
