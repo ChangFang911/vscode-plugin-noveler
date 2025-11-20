@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { convertToChineseNumber } from '../utils/chineseNumber';
+import { validateChapterName } from '../utils/inputValidator';
 import { CHAPTERS_FOLDER } from '../constants';
 
 /**
@@ -16,6 +17,24 @@ export async function createChapter(chapterName: string): Promise<void> {
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
         return;
+    }
+
+    // 验证并清理章节名称
+    const sanitizedName = validateChapterName(chapterName);
+    if (!sanitizedName) {
+        vscode.window.showErrorMessage('Noveler: 章节名称无效，请避免使用特殊字符（如 / \\ : * ? " < > |）');
+        return;
+    }
+
+    // 如果清理后的名称与原始名称不同，提示用户
+    if (sanitizedName !== chapterName) {
+        const useCleanedName = await vscode.window.showWarningMessage(
+            `章节名称包含非法字符，将使用清理后的名称："${sanitizedName}"`,
+            '确定', '取消'
+        );
+        if (useCleanedName !== '确定') {
+            return;
+        }
     }
 
     const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
@@ -56,8 +75,8 @@ export async function createChapter(chapterName: string): Promise<void> {
     }
 
     const now = formatDateTime(new Date());
-    const chapterTitle = `第${convertToChineseNumber(nextChapterNumber)}章 ${chapterName}`;
-    const fileName = `${String(nextChapterNumber).padStart(2, '0')}-${chapterName}.md`;
+    const chapterTitle = `第${convertToChineseNumber(nextChapterNumber)}章 ${sanitizedName}`;
+    const fileName = `${String(nextChapterNumber).padStart(2, '0')}-${sanitizedName}.md`;
 
     // 从模板配置读取章节模板
     const templates = await loadTemplates();

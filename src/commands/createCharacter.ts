@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
+import { validateCharacterName } from '../utils/inputValidator';
 import { CHARACTERS_FOLDER } from '../constants';
 
 /**
@@ -15,6 +16,24 @@ export async function createCharacter(characterName: string): Promise<void> {
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
         return;
+    }
+
+    // 验证并清理人物名称
+    const sanitizedName = validateCharacterName(characterName);
+    if (!sanitizedName) {
+        vscode.window.showErrorMessage('Noveler: 人物名称无效或过长（最多50字符），请避免使用特殊字符（如 / \\ : * ? " < > |）');
+        return;
+    }
+
+    // 如果清理后的名称与原始名称不同，提示用户
+    if (sanitizedName !== characterName) {
+        const useCleanedName = await vscode.window.showWarningMessage(
+            `人物名称包含非法字符，将使用清理后的名称："${sanitizedName}"`,
+            '确定', '取消'
+        );
+        if (useCleanedName !== '确定') {
+            return;
+        }
     }
 
     const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
@@ -32,7 +51,7 @@ export async function createCharacter(characterName: string): Promise<void> {
     }
 
     const now = formatDateTime(new Date());
-    const fileName = `${characterName}.md`;
+    const fileName = `${sanitizedName}.md`;
 
     // 从模板配置读取人物模板
     const templates = await loadTemplates();
@@ -58,7 +77,7 @@ export async function createCharacter(characterName: string): Promise<void> {
     const toYamlString = (value: string) => value === "" ? '""' : value;
 
     const template = `---
-name: ${characterName}
+name: ${sanitizedName}
 gender: ${toYamlString(frontMatter.gender)}
 age: ${toYamlString(frontMatter.age)}
 appearance: ${toYamlString(frontMatter.appearance)}
@@ -73,7 +92,7 @@ created: '${now}'
 modified: '${now}'
 ---
 
-# ${characterName}
+# ${sanitizedName}
 ${content}`;
 
     const fileUri = vscode.Uri.joinPath(charactersFolderUri, fileName);
@@ -91,7 +110,7 @@ ${content}`;
         await vscode.workspace.fs.writeFile(fileUri, Buffer.from(template, 'utf8'));
         const doc = await vscode.workspace.openTextDocument(fileUri);
         await vscode.window.showTextDocument(doc);
-        vscode.window.showInformationMessage(`Noveler: 人物文件已创建: ${characterName}`);
+        vscode.window.showInformationMessage(`Noveler: 人物文件已创建: ${sanitizedName}`);
     } catch (error) {
         vscode.window.showErrorMessage(`Noveler: 创建人物失败 - ${error}`);
     }

@@ -10,9 +10,6 @@ export const WORD_COUNT_DEBOUNCE_DELAY = 300;
 /** 高亮更新防抖延迟（毫秒） */
 export const HIGHLIGHT_DEBOUNCE_DELAY = 500;
 
-/** 人物名称缓存有效期（毫秒） */
-export const CHARACTER_CACHE_DURATION = 30000;
-
 // ==================== 正则表达式 ====================
 
 /** 对话引号匹配正则 */

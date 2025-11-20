@@ -4,7 +4,7 @@ import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
 import { ConfigService } from './services/configService';
 import { initTemplateLoader } from './utils/templateLoader';
-import { updateFrontMatter, getContentWithoutFrontMatter } from './utils/frontMatterHelper';
+import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
@@ -268,14 +268,9 @@ function updateHighlights(editor: vscode.TextEditor | undefined) {
  */
 async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<vscode.TextEdit[]> {
     try {
-        // 获取正文内容（不含 Front Matter）
-        const content = getContentWithoutFrontMatter(document);
-
-        // 计算字数（网文标准：总字符数）
-        const stats = wordCountService.getWordCount({
-            getText: () => content,
-            languageId: 'markdown'
-        } as vscode.TextDocument);
+        // 直接使用原始 document 计算字数
+        // wordCountService.getWordCount 内部会自动移除 Front Matter
+        const stats = wordCountService.getWordCount(document);
 
         // 更新 Front Matter（使用总字符数，符合网文计数标准）
         return updateFrontMatter(document, stats.totalChars);

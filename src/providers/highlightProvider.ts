@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import matter = require('gray-matter');
 import {
-    CHARACTER_CACHE_DURATION,
     DIALOGUE_REGEX,
     THOUGHT_REGEX,
     ELLIPSIS_REGEX,
@@ -17,7 +16,6 @@ export class NovelHighlightProvider {
     private configService: ConfigService;
     private characterNamesCache: string[] = [];
     private lastCacheUpdate: number = 0;
-    private readonly CACHE_DURATION = CHARACTER_CACHE_DURATION;
 
     // 文件系统监视器，用于自动更新人物缓存
     private characterFolderWatcher?: vscode.FileSystemWatcher;

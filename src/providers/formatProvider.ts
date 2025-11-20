@@ -95,7 +95,13 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
         }
 
         // 2. 标点符号规范化
-        // 将英文逗号句号转为中文
+        // 将中文前后的英文标点转为中文标点
+        // 中文后面跟英文标点
+        formatted = formatted.replace(/([\u4e00-\u9fa5]),/g, '$1，');
+        formatted = formatted.replace(/([\u4e00-\u9fa5])\./g, '$1。');
+        formatted = formatted.replace(/([\u4e00-\u9fa5])!/g, '$1！');
+        formatted = formatted.replace(/([\u4e00-\u9fa5])\?/g, '$1？');
+        // 英文标点后面跟中文
         formatted = formatted.replace(/,(?=[\u4e00-\u9fa5])/g, '，');
         formatted = formatted.replace(/\.(?=[\u4e00-\u9fa5])/g, '。');
         formatted = formatted.replace(/!(?=[\u4e00-\u9fa5])/g, '！');

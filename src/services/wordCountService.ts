@@ -62,10 +62,19 @@ export class WordCountService {
 
     // 获取选中文本的字数
     getSelectionWordCount(selection: string): WordCountStats {
-        const chineseChars = (selection.match(CHINESE_CHARS_REGEX) || []).length;
-        const totalChars = selection.replace(/[\s]/g, '').length;
-        const words = (selection.match(ENGLISH_WORD_REGEX) || []).length;
-        const paragraphs = selection.split('\n').filter(line => line.trim().length > 0).length;
+        // 移除 HTML 注释
+        const textWithoutComments = selection.replace(HTML_COMMENT_REGEX, '');
+
+        // 移除 Markdown 标题行（整行，包括标题标记和标题文字）
+        const textLines = textWithoutComments.split('\n');
+        const contentLines = textLines.filter(line => !line.trim().match(/^#+\s+/));
+        const textWithoutHeaders = contentLines.join('\n');
+
+        // 计算字数（与 getWordCount 逻辑一致）
+        const chineseChars = (textWithoutHeaders.match(CHINESE_CHARS_REGEX) || []).length;
+        const totalChars = textWithoutHeaders.replace(/[\s]/g, '').length;
+        const words = (textWithoutHeaders.match(ENGLISH_WORD_REGEX) || []).length;
+        const paragraphs = textWithoutHeaders.split('\n').filter(line => line.trim().length > 0).length;
         const selectionLines = selection.split('\n').length;
 
         return {
