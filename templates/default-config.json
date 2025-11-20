@@ -31,6 +31,7 @@
       "showInStatusBar": true,
       "includePunctuation": true
     },
+    "autoEmptyLine": true,
     "characters": []
   }
 }

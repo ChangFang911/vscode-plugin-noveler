@@ -23,6 +23,9 @@ export interface NovelConfig {
         showInStatusBar?: boolean;
         includePunctuation?: boolean;
     };
+    noveler?: {
+        autoEmptyLine?: boolean; // 自动空行功能
+    };
     characters?: string[]; // 全局人物名称列表
 }
 
@@ -197,6 +200,16 @@ export class ConfigService {
 
     public shouldConvertQuotes(): boolean {
         return this.config.format?.convertQuotes !== false;
+    }
+
+    public shouldAutoEmptyLine(): boolean {
+        // 优先使用 novel.json 配置
+        if (this.config.noveler?.autoEmptyLine !== undefined) {
+            return this.config.noveler.autoEmptyLine;
+        }
+        // 回退到 VSCode 设置
+        const vscodeConfig = vscode.workspace.getConfiguration('noveler');
+        return vscodeConfig.get('autoEmptyLine', true);
     }
 
     public dispose() {

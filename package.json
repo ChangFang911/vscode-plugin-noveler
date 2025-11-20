@@ -98,6 +98,11 @@
           ],
           "default": "「」",
           "description": "中文引号样式"
+        },
+        "noveler.autoEmptyLine": {
+          "type": "boolean",
+          "default": true,
+          "description": "在 chapters 目录下的 Markdown 文件中，按回车时自动插入空行（仅在小说项目中生效）"
         }
       }
     }

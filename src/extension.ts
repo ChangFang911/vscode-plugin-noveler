@@ -9,7 +9,7 @@ import { updateReadme } from './utils/readmeUpdater';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER } from './constants';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
@@ -168,6 +168,13 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // 监听文本变化，实现自动空行功能
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument((event) => {
+            handleAutoEmptyLine(event);
+        })
+    );
+
     // 初始更新
     updateWordCountImmediate(vscode.window.activeTextEditor);
     updateHighlightsImmediate(vscode.window.activeTextEditor);
@@ -280,6 +287,71 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
         // 不显示错误提示，因为 updateFrontMatter 内部已经处理了
         return [];
     }
+}
+
+/**
+ * 处理自动空行功能
+ */
+function handleAutoEmptyLine(event: vscode.TextDocumentChangeEvent) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || event.document !== editor.document) {
+        return;
+    }
+
+    // 检查是否应该启用自动空行
+    if (!shouldEnableAutoEmptyLine(event.document)) {
+        return;
+    }
+
+    // 检查是否是单个回车键输入
+    if (event.contentChanges.length !== 1) {
+        return;
+    }
+
+    const change = event.contentChanges[0];
+
+    // 只处理回车键（换行符）
+    if (change.text !== '\n') {
+        return;
+    }
+
+    // 获取插入位置的前一行
+    const line = event.document.lineAt(change.range.start.line);
+    const previousLineText = line.text.trim();
+
+    // 如果前一行为空，不插入空行（避免连续空行）
+    if (previousLineText === '') {
+        return;
+    }
+
+    // 插入额外的空行
+    editor.edit((editBuilder) => {
+        const position = new vscode.Position(change.range.start.line + 1, 0);
+        editBuilder.insert(position, '\n');
+    }, {
+        undoStopBefore: false,
+        undoStopAfter: false
+    });
+}
+
+/**
+ * 检查是否应该启用自动空行功能
+ */
+function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
+    // 1. 必须是 Markdown 文件
+    if (document.languageId !== 'markdown') {
+        return false;
+    }
+
+    // 2. 检查配置是否启用
+    if (!configService.shouldAutoEmptyLine()) {
+        return false;
+    }
+
+    // 3. 必须在 chapters 目录下
+    const filePath = document.uri.fsPath;
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    return normalizedPath.includes(`/${CHAPTERS_FOLDER}/`);
 }
 
 export function deactivate() {
