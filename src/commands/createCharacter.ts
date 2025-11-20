@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
+import { CHARACTERS_FOLDER } from '../constants';
 
 /**
  * 创建人物文件
@@ -16,7 +17,7 @@ export async function createCharacter(characterName: string): Promise<void> {
         return;
     }
 
-    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, 'characters');
+    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
     // 确保 characters 目录存在
     try {
@@ -53,17 +54,20 @@ export async function createCharacter(characterName: string): Promise<void> {
     const importanceOptions = characterTemplate?.importanceOptions || ["主角", "重要配角", "次要角色", "路人"];
     const content = characterTemplate?.content || "\n## 基本信息\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n";
 
+    // 辅助函数：将空字符串转为引号包裹的空字符串，避免 YAML 解析为 null
+    const toYamlString = (value: string) => value === "" ? '""' : value;
+
     const template = `---
 name: ${characterName}
-gender: ${frontMatter.gender}
-age: ${frontMatter.age}
-appearance: ${frontMatter.appearance}
-personality: ${frontMatter.personality}
-background: ${frontMatter.background}
+gender: ${toYamlString(frontMatter.gender)}
+age: ${toYamlString(frontMatter.age)}
+appearance: ${toYamlString(frontMatter.appearance)}
+personality: ${toYamlString(frontMatter.personality)}
+background: ${toYamlString(frontMatter.background)}
 relationships: ${JSON.stringify(frontMatter.relationships)}
 abilities: ${JSON.stringify(frontMatter.abilities)}
 importance: ${frontMatter.importance} # ${importanceOptions.join('/')}
-firstAppearance: ${frontMatter.firstAppearance}
+firstAppearance: ${toYamlString(frontMatter.firstAppearance)}
 tags: ${JSON.stringify(frontMatter.tags)}
 created: '${now}'
 modified: '${now}'

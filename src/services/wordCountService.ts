@@ -1,4 +1,10 @@
 import * as vscode from 'vscode';
+import { getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
+import {
+    HTML_COMMENT_REGEX,
+    CHINESE_CHARS_REGEX,
+    ENGLISH_WORD_REGEX
+} from '../constants';
 
 export interface WordCountStats {
     totalChars: number;      // 总字符数（含标点）
@@ -10,62 +16,64 @@ export interface WordCountStats {
 
 export class WordCountService {
     getWordCount(document: vscode.TextDocument): WordCountStats {
-        const text = this.getContentWithoutFrontMatter(document.getText());
+        // 使用统一的 Front Matter 处理函数
+        const text = getContentWithoutFrontMatter(document);
 
         // 移除 HTML 注释
-        const textWithoutComments = text.replace(/<!--[\s\S]*?-->/g, '');
+        const textWithoutComments = text.replace(HTML_COMMENT_REGEX, '');
 
-        // 移除 Markdown 标题标记
-        const textWithoutHeaders = textWithoutComments.replace(/^#+\s+/gm, '');
+        // 移除 Markdown 标题行（整行，包括标题标记和标题文字）
+        // 这样标题文字就不会被计入字数
+        const textLines = textWithoutComments.split('\n');
+        const contentLines = textLines.filter(line => !line.trim().match(/^#+\s+/));
+        const textWithoutHeaders = contentLines.join('\n');
+
+        // 按照网文字数计数标准：
+        // 1. 中文字符（包括中文标点）：每个算 1 字
+        // 2. 英文字母、数字、英文标点：每个算 1 字
+        // 3. 空格、换行、制表符：不算
 
         // 计算中文字符数（包括中文标点）
-        // 中文字符范围：\u4e00-\u9fa5
-        // 中文标点范围：\u3000-\u303f（CJK符号和标点）\uff00-\uffef（全角ASCII、标点）
-        const chineseChars = (textWithoutHeaders.match(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g) || []).length;
+        const chineseChars = (textWithoutHeaders.match(CHINESE_CHARS_REGEX) || []).length;
 
-        // 计算总字符数（排除空白字符：空格、制表符、换行）
+        // 计算总字符数（网文标准）= 排除空白字符后的所有字符
+        // 这包括：中文字符、中文标点、英文字母、数字、英文标点等
         const totalChars = textWithoutHeaders.replace(/[\s]/g, '').length;
 
         // 计算英文单词数
-        const words = (textWithoutHeaders.match(/\b[a-zA-Z]+\b/g) || []).length;
+        const words = (textWithoutHeaders.match(ENGLISH_WORD_REGEX) || []).length;
 
         // 计算段落数（非空行）
         const paragraphs = textWithoutHeaders
             .split('\n')
             .filter(line => line.trim().length > 0).length;
 
-        // 计算行数
-        const lines = document.lineCount;
+        // 计算行数（原始文档）
+        const lineCount = document.lineCount;
 
         return {
             totalChars,
             chineseChars,
             words,
             paragraphs,
-            lines
+            lines: lineCount
         };
-    }
-
-    private getContentWithoutFrontMatter(text: string): string {
-        // 移除 Front Matter
-        const frontMatterRegex = /^---\s*\n[\s\S]*?\n---\s*\n/;
-        return text.replace(frontMatterRegex, '');
     }
 
     // 获取选中文本的字数
     getSelectionWordCount(selection: string): WordCountStats {
-        const chineseChars = (selection.match(/[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/g) || []).length;
+        const chineseChars = (selection.match(CHINESE_CHARS_REGEX) || []).length;
         const totalChars = selection.replace(/[\s]/g, '').length;
-        const words = (selection.match(/\b[a-zA-Z]+\b/g) || []).length;
+        const words = (selection.match(ENGLISH_WORD_REGEX) || []).length;
         const paragraphs = selection.split('\n').filter(line => line.trim().length > 0).length;
-        const lines = selection.split('\n').length;
+        const selectionLines = selection.split('\n').length;
 
         return {
             totalChars,
             chineseChars,
             words,
             paragraphs,
-            lines
+            lines: selectionLines
         };
     }
 }

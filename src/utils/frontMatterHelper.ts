@@ -43,7 +43,15 @@ export function updateFrontMatter(
 
         // 如果有变化，使用 gray-matter 重新序列化
         if (hasChanges) {
-            const updatedContent = matter.stringify(parsed.content, parsed.data);
+            // 将 Front Matter 中的空字符串转为引号包裹的空字符串
+            const cleanedData = { ...parsed.data };
+            for (const key in cleanedData) {
+                if (cleanedData[key] === "" || cleanedData[key] === null) {
+                    cleanedData[key] = "";
+                }
+            }
+
+            const updatedContent = matter.stringify(parsed.content, cleanedData);
 
             // 替换整个文档
             const fullRange = new vscode.Range(
@@ -55,7 +63,9 @@ export function updateFrontMatter(
 
         return edits;
     } catch (error) {
-        console.error('Noveler: Front Matter 更新失败', error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('Noveler: Front Matter 更新失败', errorMsg);
+        vscode.window.showWarningMessage(`Noveler: 无法更新文档元数据 - ${errorMsg}`);
         return edits;
     }
 }

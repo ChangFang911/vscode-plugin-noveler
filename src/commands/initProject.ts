@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
+import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
 
 /**
  * 初始化小说项目
@@ -28,8 +29,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
     try {
         // 创建目录结构
-        const directories = ['chapters', 'characters', 'drafts', 'references'];
-        for (const dir of directories) {
+        for (const dir of PROJECT_DIRECTORIES) {
             const dirUri = vscode.Uri.joinPath(workspaceFolder.uri, dir);
             try {
                 await vscode.workspace.fs.stat(dirUri);
@@ -39,7 +39,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
         }
 
         // 读取默认配置模板
-        const templatePath = vscode.Uri.joinPath(context.extensionUri, 'templates', 'default-config.json');
+        const templatePath = vscode.Uri.joinPath(context.extensionUri, DEFAULT_CONFIG_TEMPLATE_PATH);
         let defaultNovelerConfig;
         try {
             const templateData = await vscode.workspace.fs.readFile(templatePath);
@@ -65,7 +65,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
             noveler: defaultNovelerConfig
         };
 
-        const configUri = vscode.Uri.joinPath(workspaceFolder.uri, 'novel.json');
+        const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
         await vscode.workspace.fs.writeFile(
             configUri,
             Buffer.from(JSON.stringify(novelConfig, null, 2), 'utf8')

@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import matter = require('gray-matter');
+import {
+    CHARACTER_CACHE_DURATION,
+    DIALOGUE_REGEX,
+    THOUGHT_REGEX,
+    ELLIPSIS_REGEX,
+    CHARACTERS_FOLDER
+} from '../constants';
 
 export class NovelHighlightProvider {
     private dialogueDecorationType!: vscode.TextEditorDecorationType;
@@ -10,12 +17,16 @@ export class NovelHighlightProvider {
     private configService: ConfigService;
     private characterNamesCache: string[] = [];
     private lastCacheUpdate: number = 0;
-    private readonly CACHE_DURATION = 30000; // 30秒缓存
+    private readonly CACHE_DURATION = CHARACTER_CACHE_DURATION;
+
+    // 文件系统监视器，用于自动更新人物缓存
+    private characterFolderWatcher?: vscode.FileSystemWatcher;
 
     constructor() {
         this.configService = ConfigService.getInstance();
         this.createDecorationTypes();
         this.loadCharacterNames(); // 初始化时加载人物名称
+        this.watchCharactersFolder(); // 监视 characters/ 目录变化
     }
 
     private createDecorationTypes() {
@@ -72,7 +83,7 @@ export class NovelHighlightProvider {
             return;
         }
 
-        const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, 'characters');
+        const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
         try {
             // 检查目录是否存在
@@ -112,11 +123,26 @@ export class NovelHighlightProvider {
         }
     }
 
+    // 监视 characters/ 目录变化
+    private watchCharactersFolder() {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const pattern = new vscode.RelativePattern(workspaceFolder, `${CHARACTERS_FOLDER}/*.md`);
+        this.characterFolderWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        // 文件创建、修改、删除时重新加载人物名称
+        this.characterFolderWatcher.onDidCreate(() => this.loadCharacterNames());
+        this.characterFolderWatcher.onDidChange(() => this.loadCharacterNames());
+        this.characterFolderWatcher.onDidDelete(() => this.loadCharacterNames());
+    }
+
     // 获取人物名称列表（使用缓存）
     private async getCharacterNames(): Promise<string[]> {
-        const now = Date.now();
-        // 如果缓存过期，重新加载
-        if (now - this.lastCacheUpdate > this.CACHE_DURATION) {
+        // 如果缓存为空，加载一次
+        if (this.characterNamesCache.length === 0 && this.lastCacheUpdate === 0) {
             await this.loadCharacterNames();
         }
         return this.characterNamesCache;
@@ -148,10 +174,8 @@ export class NovelHighlightProvider {
         }
 
         // 匹配对话（所有常见引号格式）
-        // 「」直角引号  ""弯引号  ""左右引号  ''单引号  ""英文引号  \u201c\u201d英文左右双引号  \u2018\u2019英文左右单引号
-        const dialogueRegex = /「[^」]*」|"[^"]*"|"[^"]*"|'[^']*'|"[^"]*"|\u201c[^\u201d]*\u201d|\u2018[^\u2019]*\u2019/g;
         let match;
-        while ((match = dialogueRegex.exec(text)) !== null) {
+        while ((match = DIALOGUE_REGEX.exec(text)) !== null) {
             const startPos = editor.document.positionAt(match.index);
             const endPos = editor.document.positionAt(match.index + match[0].length);
             dialogueRanges.push(new vscode.Range(startPos, endPos));
@@ -163,8 +187,7 @@ export class NovelHighlightProvider {
         }
 
         // 匹配心理描写（）
-        const thoughtRegex = /（[^）]*）/g;
-        while ((match = thoughtRegex.exec(text)) !== null) {
+        while ((match = THOUGHT_REGEX.exec(text)) !== null) {
             const startPos = editor.document.positionAt(match.index);
             const endPos = editor.document.positionAt(match.index + match[0].length);
             thoughtRanges.push(new vscode.Range(startPos, endPos));
@@ -187,8 +210,7 @@ export class NovelHighlightProvider {
         }
 
         // 匹配省略号
-        const ellipsisRegex = /…+|\.{3,}/g;
-        while ((match = ellipsisRegex.exec(text)) !== null) {
+        while ((match = ELLIPSIS_REGEX.exec(text)) !== null) {
             const startPos = editor.document.positionAt(match.index);
             const endPos = editor.document.positionAt(match.index + match[0].length);
             ellipsisRanges.push(new vscode.Range(startPos, endPos));
@@ -206,5 +228,6 @@ export class NovelHighlightProvider {
         this.thoughtDecorationType.dispose();
         this.characterDecorationType.dispose();
         this.ellipsisDecorationType.dispose();
+        this.characterFolderWatcher?.dispose();
     }
 }

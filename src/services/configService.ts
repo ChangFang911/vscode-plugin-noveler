@@ -31,12 +31,13 @@ export class ConfigService {
     private config: NovelConfig = {};
     private fileWatcher?: vscode.FileSystemWatcher;
     private context?: vscode.ExtensionContext;
+    private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
 
     private constructor() {
         // 先设置默认配置，确保立即可用
         this.setDefaultConfig();
         // 然后异步加载实际配置
-        this.loadConfig();
+        this.configLoadPromise = this.loadConfig();
         this.watchConfig();
     }
 
@@ -48,8 +49,19 @@ export class ConfigService {
             ConfigService.instance.context = context;
             // 如果有 context，重新加载默认配置
             ConfigService.instance.setDefaultConfig();
+            // 重新加载配置
+            ConfigService.instance.configLoadPromise = ConfigService.instance.loadConfig();
         }
         return ConfigService.instance;
+    }
+
+    /**
+     * 等待配置加载完成
+     */
+    public async waitForConfig(): Promise<void> {
+        if (this.configLoadPromise) {
+            await this.configLoadPromise;
+        }
     }
 
     private async loadConfig() {
@@ -149,13 +161,13 @@ export class ConfigService {
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
         this.fileWatcher.onDidChange(() => {
-            this.loadConfig();
+            this.configLoadPromise = this.loadConfig();
             // 触发重新加载高亮
             vscode.commands.executeCommand('noveler.reloadHighlights');
         });
 
         this.fileWatcher.onDidCreate(() => {
-            this.loadConfig();
+            this.configLoadPromise = this.loadConfig();
         });
     }
 

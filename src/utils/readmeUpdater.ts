@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import matter = require('gray-matter');
+import { CHAPTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
 
 interface ChapterInfo {
     number: number;
@@ -29,7 +30,7 @@ export async function scanChapters(): Promise<ProjectStats> {
         throw new Error('未找到工作区');
     }
 
-    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, 'chapters');
+    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
     const chapters: ChapterInfo[] = [];
     let totalWords = 0;
     let completedChapters = 0;
@@ -108,7 +109,7 @@ export async function updateReadme(): Promise<void> {
         // 检查 README 是否存在
         await vscode.workspace.fs.stat(readmeUri);
     } catch {
-        vscode.window.showErrorMessage('Noveler: 未找到 README.md 文件');
+        vscode.window.showErrorMessage('Noveler: 未找到 README.md 文件，请先初始化项目');
         return;
     }
 
@@ -116,6 +117,12 @@ export async function updateReadme(): Promise<void> {
         // 读取 README 内容
         const readmeData = await vscode.workspace.fs.readFile(readmeUri);
         let readmeContent = Buffer.from(readmeData).toString('utf8');
+
+        // 检查是否包含必要的章节标题
+        if (!readmeContent.includes('## 目录') && !readmeContent.includes('## 写作进度')) {
+            vscode.window.showWarningMessage('Noveler: README.md 格式不正确，缺少必要的章节标题');
+            return;
+        }
 
         // 获取章节统计
         const stats = await scanChapters();
@@ -154,11 +161,12 @@ export async function updateReadme(): Promise<void> {
         );
 
         vscode.window.showInformationMessage(
-            `Noveler: README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords} 字`
+            `Noveler: README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字`
         );
 
     } catch (error) {
-        vscode.window.showErrorMessage(`Noveler: 更新 README 失败 - ${error}`);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Noveler: 更新 README 失败 - ${errorMsg}`);
         console.error('Noveler: 更新 README 错误', error);
     }
 }
@@ -198,13 +206,7 @@ function generateProgressSection(stats: ProjectStats): string {
  * 获取状态对应的 emoji
  */
 function getStatusEmoji(status: string): string {
-    const emojiMap: { [key: string]: string } = {
-        '草稿': '📝',
-        '初稿': '✏️',
-        '修改中': '🔧',
-        '已完成': '✅'
-    };
-    return emojiMap[status] || '📄';
+    return STATUS_EMOJI_MAP[status] || '📄';
 }
 
 /**

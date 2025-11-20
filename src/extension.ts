@@ -9,13 +9,18 @@ import { updateReadme } from './utils/readmeUpdater';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY } from './constants';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
 let configService: ConfigService;
 
-export function activate(context: vscode.ExtensionContext) {
+// 防抖定时器
+let wordCountDebounceTimer: NodeJS.Timeout | undefined;
+let highlightDebounceTimer: NodeJS.Timeout | undefined;
+
+export async function activate(context: vscode.ExtensionContext) {
     console.log('Noveler 中文小说写作助手已激活');
 
     // 初始化模板加载器
@@ -24,6 +29,9 @@ export function activate(context: vscode.ExtensionContext) {
     // 初始化配置服务
     configService = ConfigService.getInstance(context);
     context.subscriptions.push(configService);
+
+    // 等待配置加载完成
+    await configService.waitForConfig();
 
     // 初始化字数统计服务
     wordCountService = new WordCountService();
@@ -73,7 +81,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (editor) {
                 const stats = wordCountService.getWordCount(editor.document);
                 vscode.window.showInformationMessage(
-                    `总字数: ${stats.totalChars} | 中文字数: ${stats.chineseChars} | 段落数: ${stats.paragraphs}`
+                    `字数: ${stats.totalChars} | 中文: ${stats.chineseChars} | 段落: ${stats.paragraphs}`
                 );
             }
         })
@@ -126,16 +134,27 @@ export function activate(context: vscode.ExtensionContext) {
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor((editor) => {
-            updateWordCount(editor);
-            updateHighlights(editor);
+            // 切换文档时立即更新
+            updateWordCountImmediate(editor);
+            updateHighlightsImmediate(editor);
         })
     );
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument((e) => {
             if (e.document === vscode.window.activeTextEditor?.document) {
-                updateWordCount(vscode.window.activeTextEditor);
-                updateHighlights(vscode.window.activeTextEditor);
+                // 文档内容变化时使用防抖
+                updateWordCountDebounced(vscode.window.activeTextEditor);
+                updateHighlightsDebounced(vscode.window.activeTextEditor);
+            }
+        })
+    );
+
+    // 监听选中文本变化
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection((e) => {
+            if (e.textEditor === vscode.window.activeTextEditor) {
+                updateWordCount(e.textEditor);
             }
         })
     );
@@ -150,8 +169,58 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // 初始更新
-    updateWordCount(vscode.window.activeTextEditor);
-    updateHighlights(vscode.window.activeTextEditor);
+    updateWordCountImmediate(vscode.window.activeTextEditor);
+    updateHighlightsImmediate(vscode.window.activeTextEditor);
+}
+
+/**
+ * 立即更新字数统计（用于切换编辑器）
+ */
+function updateWordCountImmediate(editor: vscode.TextEditor | undefined) {
+    // 清除防抖定时器
+    if (wordCountDebounceTimer) {
+        clearTimeout(wordCountDebounceTimer);
+        wordCountDebounceTimer = undefined;
+    }
+    updateWordCount(editor);
+}
+
+/**
+ * 防抖更新字数统计（用于文档内容变化）
+ */
+function updateWordCountDebounced(editor: vscode.TextEditor | undefined) {
+    if (wordCountDebounceTimer) {
+        clearTimeout(wordCountDebounceTimer);
+    }
+    wordCountDebounceTimer = setTimeout(() => {
+        updateWordCount(editor);
+        wordCountDebounceTimer = undefined;
+    }, WORD_COUNT_DEBOUNCE_DELAY);
+}
+
+/**
+ * 立即更新高亮（用于切换编辑器）
+ */
+function updateHighlightsImmediate(editor: vscode.TextEditor | undefined) {
+    // 清除防抖定时器
+    if (highlightDebounceTimer) {
+        clearTimeout(highlightDebounceTimer);
+        highlightDebounceTimer = undefined;
+    }
+    updateHighlights(editor);
+}
+
+/**
+ * 防抖更新高亮（用于文档内容变化）
+ */
+function updateHighlightsDebounced(editor: vscode.TextEditor | undefined) {
+    if (highlightDebounceTimer) {
+        clearTimeout(highlightDebounceTimer);
+    }
+    highlightDebounceTimer = setTimeout(() => {
+        updateHighlights(editor);
+        highlightDebounceTimer = undefined;
+    }, HIGHLIGHT_DEBOUNCE_DELAY);
 }
 
 function updateWordCount(editor: vscode.TextEditor | undefined) {
@@ -169,9 +238,21 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
         }
     }
 
-    const stats = wordCountService.getWordCount(editor.document);
-    wordCountStatusBarItem.text = `$(pencil) ${stats.chineseChars} 字`;
-    wordCountStatusBarItem.tooltip = `总字数: ${stats.totalChars}\n中文字数: ${stats.chineseChars}\n段落数: ${stats.paragraphs}`;
+    // 检查是否有选中文本
+    const selection = editor.selection;
+    if (!selection.isEmpty) {
+        // 显示选中文本的字数（网文标准：总字符数）
+        const selectedText = editor.document.getText(selection);
+        const selectionStats = wordCountService.getSelectionWordCount(selectedText);
+        wordCountStatusBarItem.text = `$(selection) ${selectionStats.totalChars} 字 (已选)`;
+        wordCountStatusBarItem.tooltip = `选中文本统计:\n字数: ${selectionStats.totalChars} 字\n中文: ${selectionStats.chineseChars} 字\n段落: ${selectionStats.paragraphs}`;
+    } else {
+        // 显示整个文档的字数（网文标准：总字符数）
+        const stats = wordCountService.getWordCount(editor.document);
+        wordCountStatusBarItem.text = `$(pencil) ${stats.totalChars} 字`;
+        wordCountStatusBarItem.tooltip = `文档统计:\n字数: ${stats.totalChars} 字\n中文: ${stats.chineseChars} 字\n段落: ${stats.paragraphs}`;
+    }
+
     wordCountStatusBarItem.show();
 }
 
@@ -190,16 +271,18 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
         // 获取正文内容（不含 Front Matter）
         const content = getContentWithoutFrontMatter(document);
 
-        // 计算字数
+        // 计算字数（网文标准：总字符数）
         const stats = wordCountService.getWordCount({
             getText: () => content,
             languageId: 'markdown'
         } as vscode.TextDocument);
 
-        // 更新 Front Matter
-        return updateFrontMatter(document, stats.chineseChars);
+        // 更新 Front Matter（使用总字符数，符合网文计数标准）
+        return updateFrontMatter(document, stats.totalChars);
     } catch (error) {
-        console.error('Noveler: 保存时更新 Front Matter 失败', error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('Noveler: 保存时更新 Front Matter 失败', errorMsg);
+        // 不显示错误提示，因为 updateFrontMatter 内部已经处理了
         return [];
     }
 }

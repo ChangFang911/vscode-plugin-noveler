@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { convertToChineseNumber } from '../utils/chineseNumber';
+import { CHAPTERS_FOLDER } from '../constants';
 
 /**
  * 创建新章节
@@ -17,7 +18,7 @@ export async function createChapter(chapterName: string): Promise<void> {
         return;
     }
 
-    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, 'chapters');
+    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
 
     // 确保 chapters 目录存在
     try {
