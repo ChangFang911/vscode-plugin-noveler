@@ -74,16 +74,16 @@ export async function createChapter(chapterName: string): Promise<void> {
     const content = chapterTemplate?.content || "\n";
 
     const template = `---
-title: "${chapterTitle}"
+title: ${chapterTitle}
 chapter: ${nextChapterNumber}
 wordCount: ${frontMatter.wordCount}
 targetWords: ${frontMatter.targetWords}
 characters: ${JSON.stringify(frontMatter.characters)}
 locations: ${JSON.stringify(frontMatter.locations)}
 tags: ${JSON.stringify(frontMatter.tags)}
-created: "${now}"
-modified: "${now}"
-status: "${frontMatter.status}"
+created: '${now}'
+modified: '${now}'
+status: ${frontMatter.status}
 ---
 
 # ${chapterTitle}

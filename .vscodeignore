@@ -2,9 +2,14 @@
 .vscode/**
 .vscode-test/**
 src/**
-node_modules/**
 .git/**
 .github/**
+
+# 排除开发依赖，但保留生产依赖
+node_modules/@types/**
+node_modules/@typescript-eslint/**
+node_modules/eslint/**
+node_modules/typescript/**
 
 # 配置文件
 .gitignore

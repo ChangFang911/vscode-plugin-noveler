@@ -41,7 +41,7 @@ export function updateFrontMatter(
             hasChanges = true;
         }
 
-        // 如果有变化，重新序列化
+        // 如果有变化，使用 gray-matter 重新序列化
         if (hasChanges) {
             const updatedContent = matter.stringify(parsed.content, parsed.data);
 

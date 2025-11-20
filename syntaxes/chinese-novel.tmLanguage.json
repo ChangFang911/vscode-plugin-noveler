@@ -40,7 +40,7 @@
     },
     "dialogue-chinese-double": {
       "name": "string.quoted.double.dialogue.chinese.noveler",
-      "match": ""([^""]*)"|"([^""].*?)"",
+      "match": "\u201c([^\u201d]*)\u201d|\u201d([^\u201c].*?)\u201c",
       "captures": {
         "0": {
           "name": "string.quoted.double.dialogue.chinese.noveler"

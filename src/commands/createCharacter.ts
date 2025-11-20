@@ -54,19 +54,19 @@ export async function createCharacter(characterName: string): Promise<void> {
     const content = characterTemplate?.content || "\n## 基本信息\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n";
 
     const template = `---
-name: "${characterName}"
-gender: "${frontMatter.gender}"
-age: "${frontMatter.age}"
-appearance: "${frontMatter.appearance}"
-personality: "${frontMatter.personality}"
-background: "${frontMatter.background}"
+name: ${characterName}
+gender: ${frontMatter.gender}
+age: ${frontMatter.age}
+appearance: ${frontMatter.appearance}
+personality: ${frontMatter.personality}
+background: ${frontMatter.background}
 relationships: ${JSON.stringify(frontMatter.relationships)}
 abilities: ${JSON.stringify(frontMatter.abilities)}
-importance: "${frontMatter.importance}" # ${importanceOptions.join('/')}
-firstAppearance: "${frontMatter.firstAppearance}"
+importance: ${frontMatter.importance} # ${importanceOptions.join('/')}
+firstAppearance: ${frontMatter.firstAppearance}
 tags: ${JSON.stringify(frontMatter.tags)}
-created: "${now}"
-modified: "${now}"
+created: '${now}'
+modified: '${now}'
 ---
 
 # ${characterName}

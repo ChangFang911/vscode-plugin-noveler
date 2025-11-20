@@ -38,7 +38,7 @@
     "theme": "dark"
   },
   "activationEvents": [
-    "onLanguage:markdown"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
