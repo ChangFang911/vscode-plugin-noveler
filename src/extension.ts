@@ -3,6 +3,7 @@ import { ChineseNovelFormatProvider } from './providers/formatProvider';
 import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
 import { ConfigService } from './services/configService';
+import { FocusModeService } from './services/focusModeService';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
@@ -16,6 +17,7 @@ let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
 let configService: ConfigService;
+let focusModeService: FocusModeService;
 
 // 防抖器
 let wordCountDebouncer: Debouncer;
@@ -135,6 +137,20 @@ export async function activate(context: vscode.ExtensionContext) {
             await updateReadme();
         })
     );
+
+    // 初始化专注模式服务
+    focusModeService = new FocusModeService();
+    context.subscriptions.push(focusModeService);
+
+    // 注册命令：切换专注模式
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.toggleFocusMode', async () => {
+            await focusModeService.toggle();
+        })
+    );
+
+    // 配置自动保存
+    configureAutoSave();
 
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
@@ -330,6 +346,26 @@ function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
     const filePath = document.uri.fsPath;
     const normalizedPath = filePath.replace(/\\/g, '/');
     return normalizedPath.includes(`/${CHAPTERS_FOLDER}/`);
+}
+
+/**
+ * 配置自动保存
+ */
+function configureAutoSave() {
+    const novelerConfig = vscode.workspace.getConfiguration('noveler');
+    const enableAutoSave = novelerConfig.get('autoSave', true);
+
+    if (enableAutoSave) {
+        const config = vscode.workspace.getConfiguration('files');
+        const currentAutoSave = config.get('autoSave');
+
+        // 如果当前没有开启自动保存，则开启
+        if (currentAutoSave === 'off') {
+            config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Global);
+            config.update('autoSaveDelay', 1000, vscode.ConfigurationTarget.Global);
+            console.log('Noveler: 已启用自动保存（1秒延迟）');
+        }
+    }
 }
 
 export function deactivate() {
