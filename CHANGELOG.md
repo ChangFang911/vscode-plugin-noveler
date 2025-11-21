@@ -12,26 +12,29 @@
 #### 写作辅助
 - **专注模式**：一键切换 VSCode Zen Mode，隐藏所有干扰元素，进入纯粹的写作环境
 - **自动保存**：插件启动时自动检测并启用 VSCode 自动保存功能（1秒延迟），防止意外丢失内容
-- **字号设置**：为 Markdown 文件单独配置舒适的阅读字号，切换到其他文件时自动恢复
+
+#### 侧边栏视图
+- **项目概览**：实时显示总字数、章节数、人物数、完成进度等统计信息
+- **快捷操作**：集中管理所有常用命令，无需通过命令面板调用
+- **章节大纲**：以树状结构展示所有章节，显示状态图标和字数
+- **人物管理**：集中查看和管理小说人物档案
 
 #### 配置增强
-- **novel.json 集中配置**：所有插件配置现在都优先从 `novel.json` 读取，包括字号、自动空行等
+- **novel.json 集中配置**：所有插件配置现在都优先从 `novel.json` 读取
 - **配置优先级**：novel.json（项目级） > VSCode Settings（全局） > 默认值
-- **默认模板更新**：`default-config.json` 新增字号配置
 
 ### 技术改进
-- 新增 `FontSizeService` 服务，管理 Markdown 文件字号切换
-- `ConfigService` 新增 `getMarkdownFontSize()` 方法
+- 新增 `ProjectStatsService` 服务，统计项目信息
+- 新增 `NovelerViewProvider`，提供完整的侧边栏视图体验
 - 优化配置读取逻辑，支持更灵活的配置层级
 
 ### 文档更新
-- 更新 README.md 配置说明，新增字号设置示例
-- 更新 `docs/novel-json配置说明.md`，新增 `editor` 和 `autoEmptyLine` 配置说明
-- 完善配置优先级和使用建议
+- 更新 README.md 功能说明
+- 更新 `docs/novel-json配置说明.md`
 
 ### 命令新增
 - `Noveler: 切换专注模式` - 进入/退出 Zen Mode
-- `Noveler: 重置字号` - 重置字号为默认值
+- `Noveler: 刷新视图` - 刷新侧边栏视图
 
 ## [0.1.0] - 2025-11-19
 

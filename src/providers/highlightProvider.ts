@@ -163,73 +163,82 @@ export class NovelHighlightProvider {
 
         try {
             const text = editor.document.getText();
-        const dialogueRanges: vscode.Range[] = [];
-        const characterRanges: vscode.Range[] = [];
-        const htmlCommentRanges: vscode.Range[] = [];
+            const dialogueRanges: vscode.Range[] = [];
+            const characterRanges: vscode.Range[] = [];
 
-        // 从 characters/ 目录获取人物名称
-        const characterNamesFromFiles = await this.getCharacterNames();
+            // 从 characters/ 目录获取人物名称
+            const characterNamesFromFiles = await this.getCharacterNames();
 
-        // 从配置文件获取人物名称
-        const characterNamesFromConfig = this.configService.getCharacters();
+            // 从配置文件获取人物名称
+            const characterNamesFromConfig = this.configService.getCharacters();
 
-        // 合并两个来源的人物名称，去重
-        const allCharacterNames = [...new Set([...characterNamesFromFiles, ...characterNamesFromConfig])];
-        const characterNames = allCharacterNames;
+            // 合并两个来源的人物名称，去重
+            const allCharacterNames = [...new Set([...characterNamesFromFiles, ...characterNamesFromConfig])];
+            const characterNames = allCharacterNames;
 
-        if (characterNames.length > 0) {
-            console.log(`Noveler: 合并后的人物名称 (${characterNames.length}个):`, characterNames);
-        }
-
-        // 匹配对话（所有常见引号格式）
-        let match;
-        while ((match = DIALOGUE_REGEX.exec(text)) !== null) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-            dialogueRanges.push(new vscode.Range(startPos, endPos));
-        }
-
-        // 调试：输出匹配数量
-        if (dialogueRanges.length > 0) {
-            console.log(`Noveler: 找到 ${dialogueRanges.length} 个对话`);
-        }
-
-        // 匹配 HTML 注释
-        while ((match = HTML_COMMENT_REGEX.exec(text)) !== null) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-            htmlCommentRanges.push(new vscode.Range(startPos, endPos));
-        }
-
-        // 从 characters/ 目录加载的人物名高亮（排除对话和注释范围）
-        const characterNameRegex = this.getCharacterRegex(characterNames);
-        if (characterNameRegex) {
-            while ((match = characterNameRegex.exec(text)) !== null) {
+            // 匹配对话（所有常见引号格式）
+            let match;
+            const dialogueRegex = new RegExp(DIALOGUE_REGEX.source, 'g');
+            while ((match = dialogueRegex.exec(text)) !== null) {
                 const startPos = editor.document.positionAt(match.index);
                 const endPos = editor.document.positionAt(match.index + match[0].length);
-                const range = new vscode.Range(startPos, endPos);
+                dialogueRanges.push(new vscode.Range(startPos, endPos));
+            }
 
-                // 检查是否在对话或注释范围内
-                const inDialogue = dialogueRanges.some(dialogueRange =>
-                    dialogueRange.contains(range)
-                );
-                const inComment = htmlCommentRanges.some(commentRange =>
-                    commentRange.contains(range)
-                );
+            // 匹配 HTML 注释（用于排除范围）
+            const htmlCommentRanges: vscode.Range[] = [];
+            const commentRegex = new RegExp(HTML_COMMENT_REGEX.source, 'g');
+            while ((match = commentRegex.exec(text)) !== null) {
+                const startPos = editor.document.positionAt(match.index);
+                const endPos = editor.document.positionAt(match.index + match[0].length);
+                htmlCommentRanges.push(new vscode.Range(startPos, endPos));
+            }
 
-                // 只添加不在对话和注释中的人名
-                if (!inDialogue && !inComment) {
-                    characterRanges.push(range);
+            // 从 characters/ 目录加载的人物名高亮（排除对话和注释范围）
+            const characterNameRegex = this.getCharacterRegex(characterNames);
+            if (characterNameRegex) {
+                while ((match = characterNameRegex.exec(text)) !== null) {
+                    const startPos = editor.document.positionAt(match.index);
+                    const endPos = editor.document.positionAt(match.index + match[0].length);
+                    const range = new vscode.Range(startPos, endPos);
+
+                    // 优化：使用独立方法检查范围
+                    if (!this.isRangeInExcludedAreas(range, dialogueRanges, htmlCommentRanges)) {
+                        characterRanges.push(range);
+                    }
                 }
             }
-        }
 
-        // 应用装饰
-        editor.setDecorations(this.dialogueDecorationType, dialogueRanges);
-        editor.setDecorations(this.characterDecorationType, characterRanges);
+            // 应用装饰
+            editor.setDecorations(this.dialogueDecorationType, dialogueRanges);
+            editor.setDecorations(this.characterDecorationType, characterRanges);
         } catch (error) {
             console.error('Noveler: 更新高亮时发生错误', error);
         }
+    }
+
+    /**
+     * 检查范围是否在排除区域内（对话或注释）
+     * 优化版本：使用独立方法提高代码可读性和性能
+     */
+    private isRangeInExcludedAreas(
+        range: vscode.Range,
+        dialogueRanges: vscode.Range[],
+        commentRanges: vscode.Range[]
+    ): boolean {
+        // 检查是否在对话范围内
+        for (const excludedRange of dialogueRanges) {
+            if (excludedRange.contains(range)) {
+                return true;
+            }
+        }
+        // 检查是否在注释范围内
+        for (const excludedRange of commentRanges) {
+            if (excludedRange.contains(range)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public dispose() {

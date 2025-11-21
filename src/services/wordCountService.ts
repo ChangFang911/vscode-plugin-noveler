@@ -15,6 +15,27 @@ export interface WordCountStats {
 }
 
 export class WordCountService {
+    /**
+     * 静态方法：简单字数统计（仅计算中文字符 + 英文单词）
+     * 用于 ProjectStatsService 和 NovelerViewProvider
+     * @param text 要统计的文本（应该已经移除 Front Matter 和 HTML 注释）
+     * @returns 字数
+     */
+    public static getSimpleWordCount(text: string): number {
+        // 移除 HTML 注释
+        text = text.replace(HTML_COMMENT_REGEX, '');
+
+        // 统计中文字符
+        const chineseChars = text.match(CHINESE_CHARS_REGEX);
+        const chineseCount = chineseChars ? chineseChars.length : 0;
+
+        // 统计英文单词
+        const englishWords = text.match(ENGLISH_WORD_REGEX);
+        const englishCount = englishWords ? englishWords.length : 0;
+
+        return chineseCount + englishCount;
+    }
+
     getWordCount(document: vscode.TextDocument): WordCountStats {
         // 使用统一的 Front Matter 处理函数
         const text = getContentWithoutFrontMatter(document);

@@ -4,7 +4,7 @@ import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
 import { ConfigService } from './services/configService';
 import { FocusModeService } from './services/focusModeService';
-import { FontSizeService } from './services/fontSizeService';
+import { NovelerViewProvider } from './views/novelerViewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
@@ -19,7 +19,6 @@ let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
 let configService: ConfigService;
 let focusModeService: FocusModeService;
-let fontSizeService: FontSizeService;
 
 // 防抖器
 let wordCountDebouncer: Debouncer;
@@ -48,6 +47,19 @@ export async function activate(context: vscode.ExtensionContext) {
     // 初始化高亮提供者
     highlightProvider = new NovelHighlightProvider();
     context.subscriptions.push(highlightProvider);
+
+    // 注册 Noveler 侧边栏视图
+    const novelerViewProvider = new NovelerViewProvider();
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
+    );
+
+    // 注册刷新视图命令
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.refreshView', () => {
+            novelerViewProvider.refresh();
+        })
+    );
 
     // 创建状态栏项
     wordCountStatusBarItem = vscode.window.createStatusBarItem(
@@ -148,17 +160,6 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.toggleFocusMode', async () => {
             await focusModeService.toggle();
-        })
-    );
-
-    // 初始化字号服务
-    fontSizeService = new FontSizeService(configService);
-    context.subscriptions.push(fontSizeService);
-
-    // 注册命令：重置字号
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.resetFontSize', () => {
-            fontSizeService.resetFontSize();
         })
     );
 

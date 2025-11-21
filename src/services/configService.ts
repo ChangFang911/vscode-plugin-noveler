@@ -23,9 +23,6 @@ export interface NovelConfig {
         showInStatusBar?: boolean;
         includePunctuation?: boolean;
     };
-    editor?: {
-        markdownFontSize?: number; // Markdown 文件字号
-    };
     autoEmptyLine?: boolean; // 自动空行功能
     characters?: string[]; // 全局人物名称列表
 }
@@ -185,16 +182,6 @@ export class ConfigService {
         // 回退到 VSCode 设置
         const vscodeConfig = vscode.workspace.getConfiguration('noveler');
         return vscodeConfig.get('autoEmptyLine', true);
-    }
-
-    public getMarkdownFontSize(): number | undefined {
-        // 优先使用 novel.json 配置
-        if (this.config.editor?.markdownFontSize !== undefined) {
-            return this.config.editor.markdownFontSize;
-        }
-        // 回退到 VSCode 设置
-        const vscodeConfig = vscode.workspace.getConfiguration('noveler');
-        return vscodeConfig.get('markdownFontSize');
     }
 
     public dispose() {
