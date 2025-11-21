@@ -33,27 +33,19 @@ export class ConfigService {
     private static instance: ConfigService;
     private config: NovelConfig = {};
     private fileWatcher?: vscode.FileSystemWatcher;
-    private context?: vscode.ExtensionContext;
     private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
 
     private constructor() {
-        // 先设置默认配置，确保立即可用
-        this.setDefaultConfig();
+        // 先设置硬编码默认配置，确保立即可用
+        this.setHardcodedDefaultConfig();
         // 然后异步加载实际配置
         this.configLoadPromise = this.loadConfig();
         this.watchConfig();
     }
 
-    public static getInstance(context?: vscode.ExtensionContext): ConfigService {
+    public static getInstance(_context?: vscode.ExtensionContext): ConfigService {
         if (!ConfigService.instance) {
             ConfigService.instance = new ConfigService();
-        }
-        if (context) {
-            ConfigService.instance.context = context;
-            // 如果有 context，重新加载默认配置
-            ConfigService.instance.setDefaultConfig();
-            // 重新加载配置
-            ConfigService.instance.configLoadPromise = ConfigService.instance.loadConfig();
         }
         return ConfigService.instance;
     }
@@ -78,7 +70,14 @@ export class ConfigService {
         try {
             const fileData = await vscode.workspace.fs.readFile(configUri);
             const configText = Buffer.from(fileData).toString('utf8');
-            const fullConfig = JSON.parse(configText);
+
+            let fullConfig;
+            try {
+                fullConfig = JSON.parse(configText);
+            } catch (parseError) {
+                console.error('Noveler: novel.json 解析失败，请检查 JSON 格式');
+                return;
+            }
 
             // 提取 noveler 配置部分
             if (fullConfig.noveler) {
@@ -87,33 +86,8 @@ export class ConfigService {
                 vscode.commands.executeCommand('noveler.reloadHighlights');
             }
         } catch (error) {
-            // 配置文件不存在或解析失败，已有默认配置
-            console.log('Noveler: 使用默认配置');
-        }
-    }
-
-    private setDefaultConfig() {
-        // 如果有 context，尝试从模板文件读取默认配置
-        if (this.context) {
-            const templatePath = vscode.Uri.joinPath(this.context.extensionUri, 'templates', 'default-config.json');
-            vscode.workspace.fs.readFile(templatePath).then(
-                templateData => {
-                    const templateText = Buffer.from(templateData).toString('utf8');
-                    const templateConfig = JSON.parse(templateText);
-                    if (templateConfig.noveler) {
-                        this.config = templateConfig.noveler;
-                        // 触发重新加载高亮
-                        vscode.commands.executeCommand('noveler.reloadHighlights');
-                    }
-                },
-                () => {
-                    // 如果读取失败，使用硬编码的默认配置
-                    this.setHardcodedDefaultConfig();
-                }
-            );
-        } else {
-            // 没有 context，使用硬编码的默认配置
-            this.setHardcodedDefaultConfig();
+            // 配置文件不存在，使用默认配置（不是错误）
+            console.log('Noveler: novel.json 不存在，使用默认配置');
         }
     }
 

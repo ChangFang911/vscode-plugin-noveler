@@ -9,6 +9,7 @@ import { updateReadme } from './utils/readmeUpdater';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
+import { Debouncer } from './utils/debouncer';
 import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER } from './constants';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
@@ -16,12 +17,16 @@ let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
 let configService: ConfigService;
 
-// 防抖定时器
-let wordCountDebounceTimer: NodeJS.Timeout | undefined;
-let highlightDebounceTimer: NodeJS.Timeout | undefined;
+// 防抖器
+let wordCountDebouncer: Debouncer;
+let highlightDebouncer: Debouncer;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Noveler 中文小说写作助手已激活');
+
+    // 初始化防抖器
+    wordCountDebouncer = new Debouncer(WORD_COUNT_DEBOUNCE_DELAY);
+    highlightDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
 
     // 初始化模板加载器
     initTemplateLoader(context);
@@ -147,6 +152,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 updateWordCountDebounced(vscode.window.activeTextEditor);
                 updateHighlightsDebounced(vscode.window.activeTextEditor);
             }
+            // 自动空行功能
+            handleAutoEmptyLine(e);
         })
     );
 
@@ -168,13 +175,6 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // 监听文本变化，实现自动空行功能
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument((event) => {
-            handleAutoEmptyLine(event);
-        })
-    );
-
     // 初始更新
     updateWordCountImmediate(vscode.window.activeTextEditor);
     updateHighlightsImmediate(vscode.window.activeTextEditor);
@@ -184,50 +184,28 @@ export async function activate(context: vscode.ExtensionContext) {
  * 立即更新字数统计（用于切换编辑器）
  */
 function updateWordCountImmediate(editor: vscode.TextEditor | undefined) {
-    // 清除防抖定时器
-    if (wordCountDebounceTimer) {
-        clearTimeout(wordCountDebounceTimer);
-        wordCountDebounceTimer = undefined;
-    }
-    updateWordCount(editor);
+    wordCountDebouncer.immediate(() => updateWordCount(editor));
 }
 
 /**
  * 防抖更新字数统计（用于文档内容变化）
  */
 function updateWordCountDebounced(editor: vscode.TextEditor | undefined) {
-    if (wordCountDebounceTimer) {
-        clearTimeout(wordCountDebounceTimer);
-    }
-    wordCountDebounceTimer = setTimeout(() => {
-        updateWordCount(editor);
-        wordCountDebounceTimer = undefined;
-    }, WORD_COUNT_DEBOUNCE_DELAY);
+    wordCountDebouncer.debounce(() => updateWordCount(editor));
 }
 
 /**
  * 立即更新高亮（用于切换编辑器）
  */
 function updateHighlightsImmediate(editor: vscode.TextEditor | undefined) {
-    // 清除防抖定时器
-    if (highlightDebounceTimer) {
-        clearTimeout(highlightDebounceTimer);
-        highlightDebounceTimer = undefined;
-    }
-    updateHighlights(editor);
+    highlightDebouncer.immediate(() => updateHighlights(editor));
 }
 
 /**
  * 防抖更新高亮（用于文档内容变化）
  */
 function updateHighlightsDebounced(editor: vscode.TextEditor | undefined) {
-    if (highlightDebounceTimer) {
-        clearTimeout(highlightDebounceTimer);
-    }
-    highlightDebounceTimer = setTimeout(() => {
-        updateHighlights(editor);
-        highlightDebounceTimer = undefined;
-    }, HIGHLIGHT_DEBOUNCE_DELAY);
+    highlightDebouncer.debounce(() => updateHighlights(editor));
 }
 
 function updateWordCount(editor: vscode.TextEditor | undefined) {
@@ -356,4 +334,8 @@ function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
 
 export function deactivate() {
     console.log('Noveler 已停用');
+
+    // 清理防抖器，防止内存泄漏
+    wordCountDebouncer?.dispose();
+    highlightDebouncer?.dispose();
 }

@@ -14,6 +14,10 @@ export class NovelHighlightProvider {
     private characterNamesCache: string[] = [];
     private lastCacheUpdate: number = 0;
 
+    // 正则缓存
+    private cachedCharacterRegex: RegExp | null = null;
+    private cachedCharacterNamesCacheKey: string = '';
+
     // 文件系统监视器，用于自动更新人物缓存
     private characterFolderWatcher?: vscode.FileSystemWatcher;
 
@@ -125,12 +129,40 @@ export class NovelHighlightProvider {
         return this.characterNamesCache;
     }
 
+    // 获取或创建人物名称正则（带缓存）
+    private getCharacterRegex(characterNames: string[]): RegExp | null {
+        if (characterNames.length === 0) {
+            return null;
+        }
+
+        // 生成缓存键（排序后的名称列表）
+        const cacheKey = [...characterNames].sort().join('|');
+
+        // 如果缓存命中，直接返回
+        if (this.cachedCharacterRegex && this.cachedCharacterNamesCacheKey === cacheKey) {
+            // 重置 lastIndex 以确保从头开始匹配
+            this.cachedCharacterRegex.lastIndex = 0;
+            return this.cachedCharacterRegex;
+        }
+
+        // 构建新的正则并缓存
+        const escapedNames = characterNames.map(name =>
+            name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        );
+        const namesPattern = escapedNames.join('|');
+        this.cachedCharacterRegex = new RegExp(namesPattern, 'g');
+        this.cachedCharacterNamesCacheKey = cacheKey;
+
+        return this.cachedCharacterRegex;
+    }
+
     public async updateHighlights(editor: vscode.TextEditor) {
         if (!editor || editor.document.languageId !== 'markdown') {
             return;
         }
 
-        const text = editor.document.getText();
+        try {
+            const text = editor.document.getText();
         const dialogueRanges: vscode.Range[] = [];
         const characterRanges: vscode.Range[] = [];
         const htmlCommentRanges: vscode.Range[] = [];
@@ -170,14 +202,8 @@ export class NovelHighlightProvider {
         }
 
         // 从 characters/ 目录加载的人物名高亮（排除对话和注释范围）
-        if (characterNames.length > 0) {
-            // 转义特殊字符并构建正则
-            const escapedNames = characterNames.map(name =>
-                name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            );
-            const namesPattern = escapedNames.join('|');
-            const characterNameRegex = new RegExp(namesPattern, 'g');
-
+        const characterNameRegex = this.getCharacterRegex(characterNames);
+        if (characterNameRegex) {
             while ((match = characterNameRegex.exec(text)) !== null) {
                 const startPos = editor.document.positionAt(match.index);
                 const endPos = editor.document.positionAt(match.index + match[0].length);
@@ -201,6 +227,9 @@ export class NovelHighlightProvider {
         // 应用装饰
         editor.setDecorations(this.dialogueDecorationType, dialogueRanges);
         editor.setDecorations(this.characterDecorationType, characterRanges);
+        } catch (error) {
+            console.error('Noveler: 更新高亮时发生错误', error);
+        }
     }
 
     public dispose() {
