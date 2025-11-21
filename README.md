@@ -35,6 +35,7 @@
 - **输入验证**：创建章节和人物时自动过滤非法字符，确保文件名安全
 - **专注模式**：一键进入全屏 Zen Mode，隐藏所有干扰元素，专心写作
 - **自动保存**：插件自动启用 VSCode 自动保存功能（1秒延迟），防止意外丢失内容
+- **字号设置**：为 Markdown 文件单独配置舒适的阅读字号，不影响其他文件类型
 
 ### 📂 项目管理
 
@@ -199,26 +200,40 @@ modified: "2025-11-19 10:00:00"
     "wordCount": {
       "showInStatusBar": true
     },
+    "editor": {
+      "markdownFontSize": 16
+    },
     "autoEmptyLine": true,
     "characters": ["张无忌", "周芷若", "赵敏"]
   }
 }
 ```
 
+**配置说明**：
+- `editor.markdownFontSize`：Markdown 文件的字号（推荐 16-18）
+- `autoEmptyLine`：是否自动插入空行
+- `characters`：全局人物名称列表，用于高亮
+
 详细配置说明请查看 [novel.json 配置文档](docs/novel-json配置说明.md)
 
-### 全局配置
+### 全局配置（可选）
 
-在 VS Code 设置中搜索 "Noveler"：
+如果没有 `novel.json` 文件，插件会回退到 VS Code 全局设置。在 VS Code 设置中搜索 "Noveler"：
 
 ```json
 {
   "noveler.autoFormat": true,
   "noveler.showWordCountInStatusBar": true,
   "noveler.chineseQuoteStyle": "「」",
-  "noveler.autoEmptyLine": true
+  "noveler.autoEmptyLine": true,
+  "noveler.markdownFontSize": 18
 }
 ```
+
+**推荐使用项目级配置（`novel.json`）**，因为：
+- ✅ 配置跟随项目，方便版本管理
+- ✅ 不同项目可以有不同的配置
+- ✅ 团队协作时配置统一
 
 ## 🎯 常用命令
 
@@ -231,6 +246,7 @@ modified: "2025-11-19 10:00:00"
 | `Noveler: 格式化文档` | 格式化当前文档 |
 | `Noveler: 显示字数统计` | 显示详细字数统计 |
 | `Noveler: 切换专注模式` | 进入/退出专注写作模式 |
+| `Noveler: 重置字号` | 重置字号为默认值 |
 
 ## 📋 Front Matter 字段说明
 
@@ -280,6 +296,7 @@ modified: "2025-11-19 10:00:00"
 ### v0.2.0 (当前版本)
 - ✅ 专注模式（一键进入 Zen Mode）
 - ✅ 自动保存（自动启用 VSCode 自动保存）
+- ✅ 字号设置（Markdown 文件独立字号配置）
 
 ### v0.3.0 (计划中)
 - ⏳ 智能提示（人物、场景、对话）

@@ -70,6 +70,10 @@
       {
         "command": "noveler.toggleFocusMode",
         "title": "Noveler: 切换专注模式"
+      },
+      {
+        "command": "noveler.resetFontSize",
+        "title": "Noveler: 重置字号"
       }
     ],
     "configuration": {
@@ -103,6 +107,13 @@
           "type": "boolean",
           "default": true,
           "description": "启用自动保存（推荐开启，避免意外丢失内容）"
+        },
+        "noveler.markdownFontSize": {
+          "type": "number",
+          "default": null,
+          "description": "Markdown 文件的字号大小（留空则使用编辑器默认字号，推荐：16-18）",
+          "minimum": 8,
+          "maximum": 72
         }
       }
     }

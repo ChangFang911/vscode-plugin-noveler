@@ -4,6 +4,7 @@ import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
 import { ConfigService } from './services/configService';
 import { FocusModeService } from './services/focusModeService';
+import { FontSizeService } from './services/fontSizeService';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
@@ -18,6 +19,7 @@ let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
 let configService: ConfigService;
 let focusModeService: FocusModeService;
+let fontSizeService: FontSizeService;
 
 // 防抖器
 let wordCountDebouncer: Debouncer;
@@ -146,6 +148,17 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.toggleFocusMode', async () => {
             await focusModeService.toggle();
+        })
+    );
+
+    // 初始化字号服务
+    fontSizeService = new FontSizeService(configService);
+    context.subscriptions.push(fontSizeService);
+
+    // 注册命令：重置字号
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.resetFontSize', () => {
+            fontSizeService.resetFontSize();
         })
     );
 

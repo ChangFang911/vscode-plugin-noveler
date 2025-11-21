@@ -46,6 +46,10 @@
       "showInStatusBar": true,
       "includePunctuation": true
     },
+    "editor": {
+      "markdownFontSize": 16
+    },
+    "autoEmptyLine": true,
     "characters": ["张无忌", "周芷若", "赵敏"]
   }
 }
@@ -113,6 +117,29 @@
 |------|------|------|--------|
 | showInStatusBar | boolean | 在状态栏显示字数 | true |
 | includePunctuation | boolean | 字数包含标点符号 | true |
+
+#### editor - 编辑器配置
+
+| 字段 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| markdownFontSize | number | Markdown 文件字号 | 无（使用编辑器默认） |
+
+**说明：**
+- 设置后，打开 Markdown 文件时会自动应用该字号
+- 切换到其他类型文件时自动恢复原始字号
+- 推荐值：16-18，适合长时间阅读和写作
+- 留空则使用 VSCode 编辑器的默认字号
+
+#### autoEmptyLine - 自动空行配置
+
+| 字段 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| autoEmptyLine | boolean | 在 chapters 目录下按回车时自动插入空行 | true |
+
+**说明：**
+- 仅在 `chapters/` 目录下的 Markdown 文件中生效
+- 帮助保持段落间距，提升阅读体验
+- 避免手动添加空行的繁琐操作
 
 #### characters - 全局人物名称配置
 

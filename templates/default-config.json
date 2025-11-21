@@ -31,6 +31,9 @@
       "showInStatusBar": true,
       "includePunctuation": true
     },
+    "editor": {
+      "markdownFontSize": 16
+    },
     "autoEmptyLine": true,
     "characters": []
   }
