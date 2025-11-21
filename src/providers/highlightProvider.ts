@@ -3,16 +3,13 @@ import { ConfigService } from '../services/configService';
 import matter = require('gray-matter');
 import {
     DIALOGUE_REGEX,
-    THOUGHT_REGEX,
-    ELLIPSIS_REGEX,
+    HTML_COMMENT_REGEX,
     CHARACTERS_FOLDER
 } from '../constants';
 
 export class NovelHighlightProvider {
     private dialogueDecorationType!: vscode.TextEditorDecorationType;
-    private thoughtDecorationType!: vscode.TextEditorDecorationType;
     private characterDecorationType!: vscode.TextEditorDecorationType;
-    private ellipsisDecorationType!: vscode.TextEditorDecorationType;
     private configService: ConfigService;
     private characterNamesCache: string[] = [];
     private lastCacheUpdate: number = 0;
@@ -30,9 +27,7 @@ export class NovelHighlightProvider {
     private createDecorationTypes() {
         // 从配置读取样式
         const dialogueStyle = this.configService.getHighlightStyle('dialogue');
-        const thoughtStyle = this.configService.getHighlightStyle('thought');
         const characterStyle = this.configService.getHighlightStyle('character');
-        const ellipsisStyle = this.configService.getHighlightStyle('ellipsis');
 
         // 对话高亮
         this.dialogueDecorationType = vscode.window.createTextEditorDecorationType({
@@ -41,34 +36,18 @@ export class NovelHighlightProvider {
             fontStyle: dialogueStyle.fontStyle as any
         });
 
-        // 心理描写高亮
-        this.thoughtDecorationType = vscode.window.createTextEditorDecorationType({
-            color: thoughtStyle.color,
-            backgroundColor: thoughtStyle.backgroundColor,
-            fontStyle: thoughtStyle.fontStyle as any
-        });
-
         // 人物名称高亮
         this.characterDecorationType = vscode.window.createTextEditorDecorationType({
             color: characterStyle.color,
             backgroundColor: characterStyle.backgroundColor,
             fontWeight: characterStyle.fontWeight as any
         });
-
-        // 省略号高亮
-        this.ellipsisDecorationType = vscode.window.createTextEditorDecorationType({
-            color: ellipsisStyle.color,
-            backgroundColor: ellipsisStyle.backgroundColor,
-            fontWeight: ellipsisStyle.fontWeight as any
-        });
     }
 
     public reloadDecorations() {
         // 释放旧的装饰类型
         this.dialogueDecorationType.dispose();
-        this.thoughtDecorationType.dispose();
         this.characterDecorationType.dispose();
-        this.ellipsisDecorationType.dispose();
 
         // 重新创建装饰类型
         this.createDecorationTypes();
@@ -153,9 +132,8 @@ export class NovelHighlightProvider {
 
         const text = editor.document.getText();
         const dialogueRanges: vscode.Range[] = [];
-        const thoughtRanges: vscode.Range[] = [];
         const characterRanges: vscode.Range[] = [];
-        const ellipsisRanges: vscode.Range[] = [];
+        const htmlCommentRanges: vscode.Range[] = [];
 
         // 从 characters/ 目录获取人物名称
         const characterNamesFromFiles = await this.getCharacterNames();
@@ -184,14 +162,14 @@ export class NovelHighlightProvider {
             console.log(`Noveler: 找到 ${dialogueRanges.length} 个对话`);
         }
 
-        // 匹配心理描写（）
-        while ((match = THOUGHT_REGEX.exec(text)) !== null) {
+        // 匹配 HTML 注释
+        while ((match = HTML_COMMENT_REGEX.exec(text)) !== null) {
             const startPos = editor.document.positionAt(match.index);
             const endPos = editor.document.positionAt(match.index + match[0].length);
-            thoughtRanges.push(new vscode.Range(startPos, endPos));
+            htmlCommentRanges.push(new vscode.Range(startPos, endPos));
         }
 
-        // 从 characters/ 目录加载的人物名高亮
+        // 从 characters/ 目录加载的人物名高亮（排除对话和注释范围）
         if (characterNames.length > 0) {
             // 转义特殊字符并构建正则
             const escapedNames = characterNames.map(name =>
@@ -203,29 +181,31 @@ export class NovelHighlightProvider {
             while ((match = characterNameRegex.exec(text)) !== null) {
                 const startPos = editor.document.positionAt(match.index);
                 const endPos = editor.document.positionAt(match.index + match[0].length);
-                characterRanges.push(new vscode.Range(startPos, endPos));
-            }
-        }
+                const range = new vscode.Range(startPos, endPos);
 
-        // 匹配省略号
-        while ((match = ELLIPSIS_REGEX.exec(text)) !== null) {
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-            ellipsisRanges.push(new vscode.Range(startPos, endPos));
+                // 检查是否在对话或注释范围内
+                const inDialogue = dialogueRanges.some(dialogueRange =>
+                    dialogueRange.contains(range)
+                );
+                const inComment = htmlCommentRanges.some(commentRange =>
+                    commentRange.contains(range)
+                );
+
+                // 只添加不在对话和注释中的人名
+                if (!inDialogue && !inComment) {
+                    characterRanges.push(range);
+                }
+            }
         }
 
         // 应用装饰
         editor.setDecorations(this.dialogueDecorationType, dialogueRanges);
-        editor.setDecorations(this.thoughtDecorationType, thoughtRanges);
         editor.setDecorations(this.characterDecorationType, characterRanges);
-        editor.setDecorations(this.ellipsisDecorationType, ellipsisRanges);
     }
 
     public dispose() {
         this.dialogueDecorationType.dispose();
-        this.thoughtDecorationType.dispose();
         this.characterDecorationType.dispose();
-        this.ellipsisDecorationType.dispose();
         this.characterFolderWatcher?.dispose();
     }
 }

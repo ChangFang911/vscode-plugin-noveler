@@ -42,15 +42,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "grammars": [
-      {
-        "scopeName": "text.html.markdown.noveler",
-        "path": "./syntaxes/chinese-novel.tmLanguage.json",
-        "injectTo": [
-          "text.html.markdown"
-        ]
-      }
-    ],
     "commands": [
       {
         "command": "noveler.initProject",
