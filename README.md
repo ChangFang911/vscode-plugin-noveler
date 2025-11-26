@@ -59,6 +59,8 @@
 #### README 自动更新
 - 扫描章节目录，统计总字数和完成章节数
 - 自动生成章节列表（带状态图标：📝✏️🔧✅）
+- 自动扫描并分类展示人物（主角、重要配角、次要配角、路人）
+- 创建章节/人物后可选择是否自动更新（可配置：always/ask/never）
 - 一键更新项目 README
 
 ![README 更新](images/screenshot-readme-update.png)
@@ -226,7 +228,8 @@ modified: "2025-11-19 10:00:00"
   "noveler.showWordCountInStatusBar": true,
   "noveler.chineseQuoteStyle": "「」",
   "noveler.autoEmptyLine": true,
-  "noveler.markdownFontSize": 18
+  "noveler.autoSave": true,
+  "noveler.autoUpdateReadmeOnCreate": "ask"
 }
 ```
 
@@ -296,7 +299,9 @@ modified: "2025-11-19 10:00:00"
 ### v0.2.0 (当前版本)
 - ✅ 专注模式（一键进入 Zen Mode）
 - ✅ 自动保存（自动启用 VSCode 自动保存）
-- ✅ 字号设置（Markdown 文件独立字号配置）
+- ✅ 侧边栏智能刷新（创建/保存/修改文件时自动更新）
+- ✅ README 人物汇总（自动扫描并分类展示人物）
+- ✅ 灵活的 README 更新配置（always/ask/never）
 
 ### v0.3.0 (计划中)
 - ⏳ 智能提示（人物、场景、对话）

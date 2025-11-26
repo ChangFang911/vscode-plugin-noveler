@@ -4,7 +4,8 @@
 
 import * as vscode from 'vscode';
 import matter = require('gray-matter');
-import { CHAPTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
+import { handleError, handleSuccess, ErrorSeverity } from './errorHandler';
+import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
 
 interface ChapterInfo {
     number: number;
@@ -14,11 +15,20 @@ interface ChapterInfo {
     status: string;
 }
 
+interface CharacterInfo {
+    name: string;
+    fileName: string;
+    importance: string;
+    gender: string;
+    firstAppearance: string;
+}
+
 interface ProjectStats {
     totalWords: number;
     completedChapters: number;
     totalChapters: number;
     chapters: ChapterInfo[];
+    characters: CharacterInfo[];
 }
 
 /**
@@ -89,8 +99,79 @@ export async function scanChapters(): Promise<ProjectStats> {
         totalWords,
         completedChapters,
         totalChapters: chapters.length,
-        chapters
+        chapters,
+        characters: []
     };
+}
+
+/**
+ * 扫描人物目录，获取人物信息
+ */
+export async function scanCharacters(): Promise<CharacterInfo[]> {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return [];
+    }
+
+    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+    const characters: CharacterInfo[] = [];
+
+    try {
+        await vscode.workspace.fs.stat(charactersFolderUri);
+
+        const files = await vscode.workspace.fs.readDirectory(charactersFolderUri);
+        const mdFiles = files
+            .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
+            .map(([name]) => name)
+            .sort(); // 按文件名排序
+
+        for (const fileName of mdFiles) {
+            try {
+                const fileUri = vscode.Uri.joinPath(charactersFolderUri, fileName);
+                const fileData = await vscode.workspace.fs.readFile(fileUri);
+                const fileContent = Buffer.from(fileData).toString('utf8');
+
+                // 解析 Front Matter
+                const parsed = matter(fileContent);
+                const frontMatter = parsed.data;
+
+                if (frontMatter && frontMatter.name) {
+                    characters.push({
+                        name: frontMatter.name || fileName.replace('.md', ''),
+                        fileName: fileName,
+                        importance: frontMatter.importance || '次要配角',
+                        gender: frontMatter.gender || '',
+                        firstAppearance: frontMatter.firstAppearance || ''
+                    });
+                }
+            } catch (error) {
+                console.error(`Noveler: 读取人物文件失败 ${fileName}`, error);
+            }
+        }
+
+        // 按重要性排序（主角 > 重要配角 > 次要配角 > 路人）
+        const importanceOrder: { [key: string]: number } = {
+            '主角': 1,
+            '重要配角': 2,
+            '次要配角': 3,
+            '路人': 4
+        };
+
+        characters.sort((a, b) => {
+            const orderA = importanceOrder[a.importance] || 999;
+            const orderB = importanceOrder[b.importance] || 999;
+            if (orderA !== orderB) {
+                return orderA - orderB;
+            }
+            // 同等重要性按名称排序
+            return a.name.localeCompare(b.name, 'zh-CN');
+        });
+
+    } catch (error) {
+        console.log('Noveler: characters 目录不存在或为空');
+    }
+
+    return characters;
 }
 
 /**
@@ -118,14 +199,34 @@ export async function updateReadme(): Promise<void> {
         const readmeData = await vscode.workspace.fs.readFile(readmeUri);
         let readmeContent = Buffer.from(readmeData).toString('utf8');
 
-        // 检查是否包含必要的章节标题
-        if (!readmeContent.includes('## 目录') && !readmeContent.includes('## 写作进度')) {
-            vscode.window.showWarningMessage('Noveler: README.md 格式不正确，缺少必要的章节标题');
-            return;
+        // 使用正则表达式检查必要的章节标题（更宽松的匹配）
+        const hasCatalog = /^##\s*目录/m.test(readmeContent);
+        const hasProgress = /^##\s*写作进度/m.test(readmeContent);
+        const hasCharacters = /^##\s*人物设定/m.test(readmeContent);
+
+        // 如果缺少必要的标题，提示用户是否自动添加
+        if (!hasCatalog || !hasProgress || !hasCharacters) {
+            const missingSections = [];
+            if (!hasCatalog) { missingSections.push('目录'); }
+            if (!hasProgress) { missingSections.push('写作进度'); }
+            if (!hasCharacters) { missingSections.push('人物设定'); }
+
+            const result = await vscode.window.showWarningMessage(
+                `README.md 缺少必要的章节标题（"## ${missingSections.join('"、"## ')}"），是否自动添加？`,
+                '自动添加', '取消'
+            );
+
+            if (result === '自动添加') {
+                readmeContent = appendMissingSections(readmeContent, hasCatalog, hasProgress, hasCharacters);
+            } else {
+                return;
+            }
         }
 
-        // 获取章节统计
+        // 获取章节统计和人物信息
         const stats = await scanChapters();
+        const characters = await scanCharacters();
+        stats.characters = characters;
 
         // 更新目录部分
         const chapterListContent = generateChapterList(stats.chapters);
@@ -141,16 +242,28 @@ export async function updateReadme(): Promise<void> {
         readmeContent = updateSection(
             readmeContent,
             '## 写作进度',
-            '## 备注',
+            '## 人物设定',
             progressContent
         );
 
-        // 如果没有"备注"部分，就添加到末尾
-        if (!readmeContent.includes('## 备注')) {
+        // 更新人物设定部分
+        const characterContent = generateCharacterSection(stats.characters);
+        const hasRemarks = /^##\s*备注/m.test(readmeContent);
+
+        if (hasRemarks) {
+            // 如果有"备注"部分，更新到备注之前
+            readmeContent = updateSection(
+                readmeContent,
+                '## 人物设定',
+                '## 备注',
+                characterContent
+            );
+        } else {
+            // 如果没有"备注"部分，更新到末尾
             readmeContent = updateSectionToEnd(
                 readmeContent,
-                '## 写作进度',
-                progressContent
+                '## 人物设定',
+                characterContent
             );
         }
 
@@ -160,15 +273,33 @@ export async function updateReadme(): Promise<void> {
             Buffer.from(readmeContent, 'utf8')
         );
 
-        vscode.window.showInformationMessage(
-            `Noveler: README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字`
-        );
+        handleSuccess(`README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字，${stats.characters.length} 个人物`);
 
     } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Noveler: 更新 README 失败 - ${errorMsg}`);
-        console.error('Noveler: 更新 README 错误', error);
+        handleError('更新 README 失败', error);
     }
+}
+
+/**
+ * 自动添加缺失的章节标题
+ */
+function appendMissingSections(content: string, hasCatalog: boolean, hasProgress: boolean, hasCharacters: boolean): string {
+    let result = content;
+
+    // 在文件末尾添加缺失的章节
+    if (!hasCatalog) {
+        result += '\n\n## 目录\n\n暂无章节\n';
+    }
+
+    if (!hasProgress) {
+        result += '\n\n## 写作进度\n\n- **总字数**：0 字\n- **完成章节**：0 / 0 章 (0%)\n- **章节列表**：见上方目录\n';
+    }
+
+    if (!hasCharacters) {
+        result += '\n\n## 人物设定\n\n暂无人物\n';
+    }
+
+    return result;
 }
 
 /**
@@ -203,6 +334,50 @@ function generateProgressSection(stats: ProjectStats): string {
 }
 
 /**
+ * 生成人物设定内容
+ */
+function generateCharacterSection(characters: CharacterInfo[]): string {
+    if (characters.length === 0) {
+        return '\n暂无人物\n';
+    }
+
+    let content = '\n';
+
+    // 按重要性分组
+    const groups: { [key: string]: CharacterInfo[] } = {
+        '主角': [],
+        '重要配角': [],
+        '次要配角': [],
+        '路人': []
+    };
+
+    characters.forEach(char => {
+        const importance = char.importance || '次要配角';
+        if (!groups[importance]) {
+            groups[importance] = [];
+        }
+        groups[importance].push(char);
+    });
+
+    // 生成每个分组的内容（按指定顺序）
+    const importanceOrder = ['主角', '重要配角', '次要配角', '路人'];
+
+    for (const importance of importanceOrder) {
+        const chars = groups[importance];
+        if (chars && chars.length > 0) {
+            content += `\n### ${importance}\n\n`;
+            for (const char of chars) {
+                const genderEmoji = char.gender === '男' ? '👨' : char.gender === '女' ? '👩' : '👤';
+                const firstAppearance = char.firstAppearance ? ` | 首次登场：${char.firstAppearance}` : '';
+                content += `- [${char.name}](characters/${char.fileName}) ${genderEmoji}${firstAppearance}\n`;
+            }
+        }
+    }
+
+    return content;
+}
+
+/**
  * 获取状态对应的 emoji
  */
 function getStatusEmoji(status: string): string {
@@ -223,7 +398,7 @@ function updateSection(
         return content;
     }
 
-    const endIndex = content.indexOf(endMarker, startIndex);
+    const endIndex = content.indexOf(endMarker, startIndex + startMarker.length);
     if (endIndex === -1) {
         return content;
     }
@@ -247,17 +422,22 @@ function updateSectionToEnd(
         return content;
     }
 
-    // 找到下一个 ## 标题或文件末尾
-    const nextHeaderIndex = content.indexOf('\n##', startIndex + startMarker.length);
+    // 找到标题结束位置（标题行之后）
+    const afterStartMarker = startIndex + startMarker.length;
 
-    if (nextHeaderIndex === -1) {
+    // 使用正则表达式查找下一个二级标题（更健壮）
+    const restContent = content.substring(afterStartMarker);
+    const nextHeaderMatch = restContent.match(/\n##\s/);
+
+    const before = content.substring(0, afterStartMarker);
+
+    if (!nextHeaderMatch || nextHeaderMatch.index === undefined) {
         // 没有下一个标题，更新到末尾
-        const before = content.substring(0, startIndex + startMarker.length);
         return before + newContent + '\n';
     } else {
-        // 有下一个标题
-        const before = content.substring(0, startIndex + startMarker.length);
-        const after = content.substring(nextHeaderIndex);
+        // 有下一个标题，保留该标题及之后的内容
+        const nextHeaderPosition = afterStartMarker + nextHeaderMatch.index;
+        const after = content.substring(nextHeaderPosition);
         return before + newContent + '\n' + after;
     }
 }

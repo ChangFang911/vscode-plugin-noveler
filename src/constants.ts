@@ -59,7 +59,7 @@ export const REFERENCES_FOLDER = 'references';
 export const CHAPTER_STATUS_OPTIONS = ['草稿', '初稿', '修改中', '已完成'] as const;
 
 /** 人物重要性选项 */
-export const CHARACTER_IMPORTANCE_OPTIONS = ['主角', '重要配角', '次要角色', '路人'] as const;
+export const CHARACTER_IMPORTANCE_OPTIONS = ['主角', '重要配角', '次要配角', '路人'] as const;
 
 // ==================== 状态对应的 Emoji ====================
 

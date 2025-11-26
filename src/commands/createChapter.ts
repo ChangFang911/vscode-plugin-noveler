@@ -7,6 +7,8 @@ import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { convertToChineseNumber } from '../utils/chineseNumber';
 import { validateChapterName } from '../utils/inputValidator';
+import { handleError, handleSuccess } from '../utils/errorHandler';
+import { updateReadme } from '../utils/readmeUpdater';
 import { CHAPTERS_FOLDER } from '../constants';
 
 /**
@@ -46,7 +48,7 @@ export async function createChapter(chapterName: string): Promise<void> {
         try {
             await vscode.workspace.fs.createDirectory(chaptersFolderUri);
         } catch (error) {
-            vscode.window.showErrorMessage(`Noveler: 无法创建 chapters 目录 - ${error}`);
+            handleError('无法创建 chapters 目录', error);
             return;
         }
     }
@@ -124,8 +126,37 @@ ${content}`;
         await vscode.workspace.fs.writeFile(fileUri, Buffer.from(template, 'utf8'));
         const doc = await vscode.workspace.openTextDocument(fileUri);
         await vscode.window.showTextDocument(doc);
-        vscode.window.showInformationMessage(`Noveler: 新章节已创建: ${chapterTitle}`);
+        handleSuccess(`新章节已创建: ${chapterTitle}`);
+
+        // 自动刷新侧边栏视图
+        vscode.commands.executeCommand('noveler.refreshView');
+
+        // 根据配置自动更新 README
+        await handleReadmeAutoUpdate();
     } catch (error) {
-        vscode.window.showErrorMessage(`Noveler: 创建章节失败 - ${error}`);
+        handleError('创建章节失败', error);
     }
+}
+
+/**
+ * 根据配置处理 README 自动更新
+ */
+async function handleReadmeAutoUpdate(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('noveler');
+    const autoUpdate = config.get<string>('autoUpdateReadmeOnCreate', 'ask');
+
+    if (autoUpdate === 'always') {
+        // 总是自动更新
+        await updateReadme();
+    } else if (autoUpdate === 'ask') {
+        // 询问用户
+        const result = await vscode.window.showInformationMessage(
+            '是否更新 README 统计信息？',
+            '更新', '跳过'
+        );
+        if (result === '更新') {
+            await updateReadme();
+        }
+    }
+    // autoUpdate === 'never' 时什么都不做
 }

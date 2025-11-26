@@ -120,6 +120,21 @@
           "type": "boolean",
           "default": true,
           "description": "启用自动保存（推荐开启，避免意外丢失内容）"
+        },
+        "noveler.autoUpdateReadmeOnCreate": {
+          "type": "string",
+          "enum": [
+            "always",
+            "ask",
+            "never"
+          ],
+          "default": "ask",
+          "description": "创建章节或人物后自动更新 README：always（总是自动更新）、ask（询问是否更新）、never（从不自动更新）",
+          "enumDescriptions": [
+            "总是自动更新 README",
+            "每次询问是否更新 README",
+            "从不自动更新 README"
+          ]
         }
       }
     }

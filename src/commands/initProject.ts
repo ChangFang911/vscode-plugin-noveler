@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
+import { handleError, handleSuccess } from '../utils/errorHandler';
 import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
 
 /**
@@ -124,16 +125,13 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
             Buffer.from(outlineContent, 'utf8')
         );
 
-        vscode.window.showInformationMessage(
-            `Noveler: 小说项目"${novelName}"初始化完成！已创建目录结构和配置文件。`
-        );
+        handleSuccess(`小说项目"${novelName}"初始化完成！已创建目录结构和配置文件`);
 
         // 打开 README.md
         const readmeDoc = await vscode.workspace.openTextDocument(readmeUri);
         await vscode.window.showTextDocument(readmeDoc);
 
     } catch (error) {
-        vscode.window.showErrorMessage(`Noveler: 初始化项目失败 - ${error}`);
-        console.error('Noveler: 初始化项目错误', error);
+        handleError('初始化项目失败', error);
     }
 }

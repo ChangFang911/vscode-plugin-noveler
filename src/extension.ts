@@ -12,6 +12,7 @@ import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
 import { Debouncer } from './utils/debouncer';
+import { handleError, ErrorSeverity } from './utils/errorHandler';
 import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER } from './constants';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
@@ -205,6 +206,46 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // 监听文档保存完成事件，刷新侧边栏视图
+    context.subscriptions.push(
+        vscode.workspace.onDidSaveTextDocument((document) => {
+            if (document.languageId === 'markdown') {
+                // 刷新侧边栏视图，显示最新的字数统计
+                novelerViewProvider.refresh();
+            }
+        })
+    );
+
+    // 监听 chapters 和 characters 目录的文件变化
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+        // 监听章节文件变化
+        const chaptersPattern = new vscode.RelativePattern(
+            workspaceFolder,
+            `${CHAPTERS_FOLDER}/*.md`
+        );
+        const chaptersWatcher = vscode.workspace.createFileSystemWatcher(chaptersPattern);
+
+        chaptersWatcher.onDidCreate(() => novelerViewProvider.refresh());
+        chaptersWatcher.onDidDelete(() => novelerViewProvider.refresh());
+        chaptersWatcher.onDidChange(() => novelerViewProvider.refresh());
+
+        context.subscriptions.push(chaptersWatcher);
+
+        // 监听人物文件变化
+        const charactersPattern = new vscode.RelativePattern(
+            workspaceFolder,
+            'characters/*.md'
+        );
+        const charactersWatcher = vscode.workspace.createFileSystemWatcher(charactersPattern);
+
+        charactersWatcher.onDidCreate(() => novelerViewProvider.refresh());
+        charactersWatcher.onDidDelete(() => novelerViewProvider.refresh());
+        charactersWatcher.onDidChange(() => novelerViewProvider.refresh());
+
+        context.subscriptions.push(charactersWatcher);
+    }
+
     // 初始更新
     updateWordCountImmediate(vscode.window.activeTextEditor);
     updateHighlightsImmediate(vscode.window.activeTextEditor);
@@ -244,13 +285,10 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
         return;
     }
 
-    // 使用 novel.json 配置，如果不存在则回退到 VSCode 设置
+    // 使用配置服务检��是否显示字数统计（内部已处理配置回退）
     if (!configService.shouldShowWordCountInStatusBar()) {
-        const config = vscode.workspace.getConfiguration('noveler');
-        if (!config.get('showWordCountInStatusBar', true)) {
-            wordCountStatusBarItem.hide();
-            return;
-        }
+        wordCountStatusBarItem.hide();
+        return;
     }
 
     // 检查是否有选中文本
@@ -290,9 +328,8 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
         // 更新 Front Matter（使用总字符数，符合网文计数标准）
         return updateFrontMatter(document, stats.totalChars);
     } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error('Noveler: 保存时更新 Front Matter 失败', errorMsg);
-        // 不显示错误提示，因为 updateFrontMatter 内部已经处理了
+        // 静默失败 - Front Matter 更新失败不应中断保存流程
+        handleError('保存时更新 Front Matter 失败', error, ErrorSeverity.Silent);
         return [];
     }
 }
@@ -364,6 +401,7 @@ function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
 
 /**
  * 配置自动保存
+ * 仅在工作区级别启用，不影响全局设置
  */
 function configureAutoSave() {
     const novelerConfig = vscode.workspace.getConfiguration('noveler');
@@ -373,11 +411,11 @@ function configureAutoSave() {
         const config = vscode.workspace.getConfiguration('files');
         const currentAutoSave = config.get('autoSave');
 
-        // 如果当前没有开启自动保存，则开启
+        // 如果当前没有开启自动保存，则在工作区级别开启
         if (currentAutoSave === 'off') {
-            config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Global);
-            config.update('autoSaveDelay', 1000, vscode.ConfigurationTarget.Global);
-            console.log('Noveler: 已启用自动保存（1秒延迟）');
+            config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
+            config.update('autoSaveDelay', 1000, vscode.ConfigurationTarget.Workspace);
+            console.log('Noveler: 已在工作区级别启用自动保存（1秒延迟）');
         }
     }
 }
