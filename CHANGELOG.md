@@ -5,6 +5,44 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 2025-11-26
+
+### 新增功能
+
+#### 侧边栏智能刷新
+- **创建文件自动刷新**：创建章节或人物后自动刷新侧边栏，立即显示新内容
+- **保存文件实时更新**：保存 Markdown 文件时自动更新字数统计和状态
+- **文件监控**：通过 FileSystemWatcher 监控 chapters/ 和 characters/ 目录，外部修改也能及时刷新
+
+#### README 人物汇总
+- **自动扫描人物**：扫描 characters/ 目录，解析人物 Front Matter 信息
+- **分类展示**：按重要性分组展示（主角 > 重要配角 > 次要配角 > 路人）
+- **详细信息**：显示人物性别图标（👨👩👤）和首次登场信息
+- **智能更新**：创建章节/人物后可选择是否自动更新 README
+
+#### 灵活配置
+- **README 更新配置**：新增 `autoUpdateReadmeOnCreate` 配置项
+  - `always` - 总是自动更新
+  - `ask` - 每次询问（默认）
+  - `never` - 从不自动更新
+
+### 技术改进
+- 新增 `ErrorHandler` 统一错误处理模块，支持不同严重级别（Error/Warning/Silent）
+- 新增 `scanCharacters()` 函数，扫描并解析人物文件 Front Matter
+- 优化 README 更新逻辑，使用正则表达式进行更健壮的标题匹配
+- 优化人物排序算法，使用显式排序数组确保顺序正确
+- 改进 `updateSection()` 和 `updateSectionToEnd()` 函数，修复内容重复问题
+
+### Bug 修复
+- 修复 README 更新时重复添加内容的问题（`updateSection` 搜索位置错误）
+- 修复人物重要性排序不正确的问题（使用显式排序数组代替 `Object.entries`）
+- 统一术语：将"次要角色"改为"次要配角"，保持一致性
+
+### 文档更新
+- 更新 CHANGELOG.md 记录 v0.3.0 所有新功能
+- 更新 README.md 补充侧边栏刷新和人物汇总说明
+- 更新路线图，将已完成功能标记为 ✅
+
 ## [0.2.0] - 2025-11-21
 
 ### 新增功能
