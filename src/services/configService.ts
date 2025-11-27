@@ -35,8 +35,8 @@ export class ConfigService {
     private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
 
     private constructor() {
-        // 先设置硬编码默认配置，确保立即可用
-        this.setHardcodedDefaultConfig();
+        // 先设置默认配置，确保立即可用
+        this.setDefaultConfig();
         // 然后异步加载实际配置
         this.configLoadPromise = this.loadConfig();
         this.watchConfig();
@@ -90,7 +90,11 @@ export class ConfigService {
         }
     }
 
-    private setHardcodedDefaultConfig() {
+    /**
+     * 设置默认配置
+     * 注意：这些值应与 templates/default-config.json 保持一致
+     */
+    private setDefaultConfig() {
         this.config = {
             highlight: {
                 dialogue: {

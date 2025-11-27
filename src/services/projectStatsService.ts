@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CHAPTERS_FOLDER } from '../constants';
+import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, COMPLETED_STATUS } from '../constants';
 import { WordCountService } from './wordCountService';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import matter = require('gray-matter');
@@ -105,7 +105,7 @@ export class ProjectStatsService {
         workspaceFolder: vscode.WorkspaceFolder,
         stats: ProjectStats
     ): Promise<void> {
-        const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, 'characters');
+        const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
         try {
             const files = await vscode.workspace.fs.readDirectory(charactersPath);
@@ -151,14 +151,14 @@ export class ProjectStatsService {
             const parsed = matter(text);
             if (parsed.data && parsed.data.status) {
                 const status = String(parsed.data.status).trim();
-                return status === '已完成' || status === 'completed';
+                return status === COMPLETED_STATUS || status === 'completed';
             }
         } catch (error) {
             // 解析失败，降级到正则匹配
             const statusMatch = text.match(/^status:\s*["']?(.+?)["']?$/m);
             if (statusMatch) {
                 const status = statusMatch[1].trim();
-                return status === '已完成' || status === 'completed';
+                return status === COMPLETED_STATUS || status === 'completed';
             }
         }
         return false;

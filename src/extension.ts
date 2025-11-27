@@ -11,6 +11,15 @@ import { updateReadme } from './utils/readmeUpdater';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
+import {
+    renameChapter,
+    markChapterCompleted,
+    markChapterInProgress,
+    deleteChapter,
+    renameCharacter,
+    deleteCharacter
+} from './commands/contextMenuCommands';
+import { jumpToReadmeSection } from './commands/jumpToReadme';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
 import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS } from './constants';
@@ -164,6 +173,78 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // 注册命令：打开配置文件
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.openConfig', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showWarningMessage('未找到工作区文件夹');
+                return;
+            }
+
+            const configUri = vscode.Uri.joinPath(workspaceFolder.uri, 'novel.json');
+
+            try {
+                // 尝试打开配置文件
+                const document = await vscode.workspace.openTextDocument(configUri);
+                await vscode.window.showTextDocument(document);
+            } catch (error) {
+                // 配置文件不存在，询问是否创建
+                const result = await vscode.window.showInformationMessage(
+                    'novel.json 配置文件不存在，是否创建？',
+                    '创建', '取消'
+                );
+
+                if (result === '创建') {
+                    try {
+                        // 从模板读取默认配置
+                        const templatePath = vscode.Uri.joinPath(
+                            context.extensionUri,
+                            'templates',
+                            'default-config.json'
+                        );
+                        const templateData = await vscode.workspace.fs.readFile(templatePath);
+
+                        // 写入配置文件
+                        await vscode.workspace.fs.writeFile(configUri, templateData);
+                        const document = await vscode.workspace.openTextDocument(configUri);
+                        await vscode.window.showTextDocument(document);
+                        vscode.window.showInformationMessage('已创建 novel.json 配置文件');
+                    } catch (templateError) {
+                        handleError('创建配置文件失败', templateError, ErrorSeverity.Error);
+                    }
+                }
+            }
+        })
+    );
+
+    // 注册右键菜单命令：章节操作
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.renameChapter', renameChapter)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.markChapterCompleted', markChapterCompleted)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.markChapterInProgress', markChapterInProgress)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.deleteChapter', deleteChapter)
+    );
+
+    // 注册右键菜单命令：人物操作
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.renameCharacter', renameCharacter)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.deleteCharacter', deleteCharacter)
+    );
+
+    // 注册命令：跳转到 README 指定位置
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.jumpToReadmeSection', jumpToReadmeSection)
+    );
+
     // 配置自动保存
     configureAutoSave();
 
@@ -294,16 +375,16 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
     // 检查是否有选中文本
     const selection = editor.selection;
     if (!selection.isEmpty) {
-        // 显示选中文本的字数（网文标准：总字符数）
+        // 显示选中文本的字数统计
         const selectedText = editor.document.getText(selection);
         const selectionStats = wordCountService.getSelectionWordCount(selectedText);
-        wordCountStatusBarItem.text = `$(selection) ${selectionStats.totalChars} 字 (已选)`;
-        wordCountStatusBarItem.tooltip = `选中文本统计:\n字数: ${selectionStats.totalChars} 字\n中文: ${selectionStats.chineseChars} 字\n段落: ${selectionStats.paragraphs}`;
+        wordCountStatusBarItem.text = `$(selection) 总计 ${selectionStats.totalChars.toLocaleString()} | 正文 ${selectionStats.contentChars.toLocaleString()} | 标点 ${selectionStats.punctuation.toLocaleString()}`;
+        wordCountStatusBarItem.tooltip = `选中文本统计\n━━━━━━━━━━━━━━\n总计: ${selectionStats.totalChars.toLocaleString()} 字\n正文: ${selectionStats.contentChars.toLocaleString()} 字\n标点: ${selectionStats.punctuation.toLocaleString()} 个`;
     } else {
-        // 显示整个文档的字数（网文标准：总字符数）
+        // 显示整个文档的字数统计
         const stats = wordCountService.getWordCount(editor.document);
-        wordCountStatusBarItem.text = `$(pencil) ${stats.totalChars} 字`;
-        wordCountStatusBarItem.tooltip = `文档统计:\n字数: ${stats.totalChars} 字\n中文: ${stats.chineseChars} 字\n段落: ${stats.paragraphs}`;
+        wordCountStatusBarItem.text = `$(pencil) 总计 ${stats.totalChars.toLocaleString()} | 正文 ${stats.contentChars.toLocaleString()} | 标点 ${stats.punctuation.toLocaleString()}`;
+        wordCountStatusBarItem.tooltip = `当前文档统计\n━━━━━━━━━━━━━━\n总计: ${stats.totalChars.toLocaleString()} 字\n正文: ${stats.contentChars.toLocaleString()} 字\n标点: ${stats.punctuation.toLocaleString()} 个`;
     }
 
     wordCountStatusBarItem.show();

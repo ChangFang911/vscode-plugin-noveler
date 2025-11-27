@@ -67,8 +67,25 @@ export const STATUS_EMOJI_MAP: Record<string, string> = {
     '草稿': '📝',
     '初稿': '✏️',
     '修改中': '🔧',
-    '已完成': '✅'
+    '已完成': '✅',
+    // 英文别名（兼容）
+    'draft': '📝',
+    'completed': '✅'
 };
+
+/** 重要性排序权重 */
+export const IMPORTANCE_ORDER: Record<string, number> = {
+    '主角': 1,
+    '重要配角': 2,
+    '次要配角': 3,
+    '路人': 4
+};
+
+/** 完成状态的值（用于判断） */
+export const COMPLETED_STATUS = '已完成';
+
+/** 进行中状态的值 */
+export const IN_PROGRESS_STATUS = '修改中';
 
 // ==================== 项目目录结构 ====================
 

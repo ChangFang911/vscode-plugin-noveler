@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -70,8 +70,74 @@
       {
         "command": "noveler.toggleFocusMode",
         "title": "Noveler: 切换专注模式"
+      },
+      {
+        "command": "noveler.openConfig",
+        "title": "Noveler: 打开配置文件"
+      },
+      {
+        "command": "noveler.renameChapter",
+        "title": "重命名章节"
+      },
+      {
+        "command": "noveler.markChapterCompleted",
+        "title": "标记为完成"
+      },
+      {
+        "command": "noveler.markChapterInProgress",
+        "title": "标记为进行中"
+      },
+      {
+        "command": "noveler.deleteChapter",
+        "title": "删除章节"
+      },
+      {
+        "command": "noveler.renameCharacter",
+        "title": "重命名人物"
+      },
+      {
+        "command": "noveler.deleteCharacter",
+        "title": "删除人物"
+      },
+      {
+        "command": "noveler.jumpToReadmeSection",
+        "title": "Noveler: 跳转到 README 指定位置"
       }
     ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "noveler.renameChapter",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "noveler.markChapterCompleted",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "2_status@1"
+        },
+        {
+          "command": "noveler.markChapterInProgress",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "2_status@2"
+        },
+        {
+          "command": "noveler.deleteChapter",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "3_delete@1"
+        },
+        {
+          "command": "noveler.renameCharacter",
+          "when": "view == novelerView && viewItem == character",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "noveler.deleteCharacter",
+          "when": "view == novelerView && viewItem == character",
+          "group": "3_delete@1"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
