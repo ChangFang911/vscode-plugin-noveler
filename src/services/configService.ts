@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { handleError, ErrorSeverity } from '../utils/errorHandler';
 
 export interface HighlightStyle {
     color?: string;
@@ -73,7 +74,7 @@ export class ConfigService {
             try {
                 fullConfig = JSON.parse(configText);
             } catch (parseError) {
-                console.error('Noveler: novel.json 解析失败，请检查 JSON 格式');
+                handleError('novel.json 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
                 return;
             }
 
@@ -182,6 +183,23 @@ export class ConfigService {
         // 回退到 VSCode 设置
         const vscodeConfig = vscode.workspace.getConfiguration('noveler');
         return vscodeConfig.get('autoEmptyLine', true);
+    }
+
+    /**
+     * 获取自动保存配置
+     */
+    public shouldAutoSave(): boolean {
+        const vscodeConfig = vscode.workspace.getConfiguration('noveler');
+        return vscodeConfig.get('autoSave', true);
+    }
+
+    /**
+     * 获取 README 自动更新配置
+     * @returns 'always' | 'ask' | 'never'
+     */
+    public getReadmeAutoUpdateMode(): string {
+        const vscodeConfig = vscode.workspace.getConfiguration('noveler');
+        return vscodeConfig.get('autoUpdateReadmeOnCreate', 'ask');
     }
 
     public dispose() {

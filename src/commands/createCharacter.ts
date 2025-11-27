@@ -7,7 +7,7 @@ import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { validateCharacterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
-import { updateReadme } from '../utils/readmeUpdater';
+import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { CHARACTERS_FOLDER } from '../constants';
 
 /**
@@ -122,27 +122,4 @@ ${content}`;
     } catch (error) {
         handleError('创建人物失败', error);
     }
-}
-
-/**
- * 根据配置处理 README 自动更新
- */
-async function handleReadmeAutoUpdate(): Promise<void> {
-    const config = vscode.workspace.getConfiguration('noveler');
-    const autoUpdate = config.get<string>('autoUpdateReadmeOnCreate', 'ask');
-
-    if (autoUpdate === 'always') {
-        // 总是自动更新
-        await updateReadme();
-    } else if (autoUpdate === 'ask') {
-        // 询问用户
-        const result = await vscode.window.showInformationMessage(
-            '是否更新 README 统计信息？',
-            '更新', '跳过'
-        );
-        if (result === '更新') {
-            await updateReadme();
-        }
-    }
-    // autoUpdate === 'never' 时什么都不做
 }

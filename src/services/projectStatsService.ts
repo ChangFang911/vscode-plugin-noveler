@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CHAPTERS_FOLDER } from '../constants';
 import { WordCountService } from './wordCountService';
+import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import matter = require('gray-matter');
 
 /**
@@ -50,7 +51,7 @@ export class ProjectStatsService {
 
             return stats;
         } catch (error) {
-            console.error('Noveler: 统计项目信息失败', error);
+            handleError('统计项目信息失败', error, ErrorSeverity.Silent);
             return null;
         }
     }
@@ -89,7 +90,7 @@ export class ProjectStatsService {
                         stats.completedChapters++;
                     }
                 } catch (error) {
-                    console.error(`Noveler: 读取章节文件失败 ${filename}`, error);
+                    handleError(`读取章节文件失败 ${filename}`, error, ErrorSeverity.Silent);
                 }
             }
         } catch (error) {

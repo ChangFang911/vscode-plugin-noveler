@@ -84,7 +84,7 @@ export async function scanChapters(): Promise<ProjectStats> {
                     }
                 }
             } catch (error) {
-                console.error(`Noveler: 读取章节文件失败 ${fileName}`, error);
+                handleError(`读取章节文件失败 ${fileName}`, error, ErrorSeverity.Silent);
             }
         }
 
@@ -145,7 +145,7 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
                     });
                 }
             } catch (error) {
-                console.error(`Noveler: 读取人物文件失败 ${fileName}`, error);
+                handleError(`读取人物文件失败 ${fileName}`, error, ErrorSeverity.Silent);
             }
         }
 
@@ -223,9 +223,11 @@ export async function updateReadme(): Promise<void> {
             }
         }
 
-        // 获取章节统计和人物信息
-        const stats = await scanChapters();
-        const characters = await scanCharacters();
+        // 并行获取章节统计和人物信息,减少 I/O 时间
+        const [stats, characters] = await Promise.all([
+            scanChapters(),
+            scanCharacters()
+        ]);
         stats.characters = characters;
 
         // 更新目录部分

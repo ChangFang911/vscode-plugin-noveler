@@ -13,7 +13,7 @@ import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS } from './constants';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
@@ -404,8 +404,7 @@ function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
  * 仅在工作区级别启用，不影响全局设置
  */
 function configureAutoSave() {
-    const novelerConfig = vscode.workspace.getConfiguration('noveler');
-    const enableAutoSave = novelerConfig.get('autoSave', true);
+    const enableAutoSave = configService.shouldAutoSave();
 
     if (enableAutoSave) {
         const config = vscode.workspace.getConfiguration('files');
@@ -414,8 +413,8 @@ function configureAutoSave() {
         // 如果当前没有开启自动保存，则在工作区级别开启
         if (currentAutoSave === 'off') {
             config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
-            config.update('autoSaveDelay', 1000, vscode.ConfigurationTarget.Workspace);
-            console.log('Noveler: 已在工作区级别启用自动保存（1秒延迟）');
+            config.update('autoSaveDelay', AUTO_SAVE_DELAY_MS, vscode.ConfigurationTarget.Workspace);
+            console.log(`Noveler: 已在工作区级别启用自动保存（${AUTO_SAVE_DELAY_MS}ms 延迟）`);
         }
     }
 }

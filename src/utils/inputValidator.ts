@@ -2,6 +2,8 @@
  * 输入验证和清理工具
  */
 
+import { MAX_CHARACTER_NAME_LENGTH, MAX_CHAPTER_NAME_LENGTH } from '../constants';
+
 /**
  * 清理文件名中的非法字符
  * @param name 原始文件名
@@ -20,9 +22,8 @@ export function sanitizeFileName(name: string): string {
     }
 
     // 限制文件名长度（大多数文件系统限制为 255 字符，减去扩展名和编号前缀）
-    const maxLength = 200;
-    if (sanitized.length > maxLength) {
-        sanitized = sanitized.substring(0, maxLength);
+    if (sanitized.length > MAX_CHAPTER_NAME_LENGTH) {
+        sanitized = sanitized.substring(0, MAX_CHAPTER_NAME_LENGTH);
     }
 
     return sanitized;
@@ -61,8 +62,7 @@ export function validateCharacterName(characterName: string | undefined): string
     const sanitized = sanitizeFileName(characterName);
 
     // 人物名称不应该太长
-    const maxLength = 50;
-    if (sanitized.length > maxLength) {
+    if (sanitized.length > MAX_CHARACTER_NAME_LENGTH) {
         return null;
     }
 

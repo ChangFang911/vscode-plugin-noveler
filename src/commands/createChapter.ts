@@ -8,8 +8,8 @@ import { formatDateTime } from '../utils/dateFormatter';
 import { convertToChineseNumber } from '../utils/chineseNumber';
 import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
-import { updateReadme } from '../utils/readmeUpdater';
-import { CHAPTERS_FOLDER } from '../constants';
+import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
+import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING } from '../constants';
 
 /**
  * 创建新章节
@@ -78,7 +78,7 @@ export async function createChapter(chapterName: string): Promise<void> {
 
     const now = formatDateTime(new Date());
     const chapterTitle = `第${convertToChineseNumber(nextChapterNumber)}章 ${sanitizedName}`;
-    const fileName = `${String(nextChapterNumber).padStart(2, '0')}-${sanitizedName}.md`;
+    const fileName = `${String(nextChapterNumber).padStart(CHAPTER_NUMBER_PADDING, '0')}-${sanitizedName}.md`;
 
     // 从模板配置读取章节模板
     const templates = await loadTemplates();
@@ -136,27 +136,4 @@ ${content}`;
     } catch (error) {
         handleError('创建章节失败', error);
     }
-}
-
-/**
- * 根据配置处理 README 自动更新
- */
-async function handleReadmeAutoUpdate(): Promise<void> {
-    const config = vscode.workspace.getConfiguration('noveler');
-    const autoUpdate = config.get<string>('autoUpdateReadmeOnCreate', 'ask');
-
-    if (autoUpdate === 'always') {
-        // 总是自动更新
-        await updateReadme();
-    } else if (autoUpdate === 'ask') {
-        // 询问用户
-        const result = await vscode.window.showInformationMessage(
-            '是否更新 README 统计信息？',
-            '更新', '跳过'
-        );
-        if (result === '更新') {
-            await updateReadme();
-        }
-    }
-    // autoUpdate === 'never' 时什么都不做
 }

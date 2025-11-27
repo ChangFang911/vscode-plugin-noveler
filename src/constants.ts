@@ -78,3 +78,19 @@ export const PROJECT_DIRECTORIES = [
     DRAFTS_FOLDER,
     REFERENCES_FOLDER
 ] as const;
+
+// ==================== 文件命名和验证 ====================
+
+/** 章节号填充位数（例如 01, 02, ...） */
+export const CHAPTER_NUMBER_PADDING = 2;
+
+/** 人物名称最大长度 */
+export const MAX_CHARACTER_NAME_LENGTH = 50;
+
+/** 章节名称最大长度 */
+export const MAX_CHAPTER_NAME_LENGTH = 100;
+
+// ==================== 自动保存配置 ====================
+
+/** 自动保存延迟时间（毫秒） */
+export const AUTO_SAVE_DELAY_MS = 1000;

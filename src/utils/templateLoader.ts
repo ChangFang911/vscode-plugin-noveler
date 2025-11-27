@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import { Templates } from '../types/templates';
+import { handleError, ErrorSeverity } from './errorHandler';
 
 let cachedTemplates: Templates | null = null;
 let extensionContext: vscode.ExtensionContext | null = null;
@@ -26,7 +27,7 @@ export async function loadTemplates(): Promise<Templates | null> {
     }
 
     if (!extensionContext) {
-        console.error('Noveler: TemplateLoader 未初始化');
+        handleError('TemplateLoader 未初始化', new Error('Extension context not set'), ErrorSeverity.Error);
         return null;
     }
 
@@ -48,8 +49,7 @@ export async function loadTemplates(): Promise<Templates | null> {
         cachedTemplates = templates;
         return templates;
     } catch (error) {
-        console.error('Noveler: 无法读取模板配置文件', error);
-        vscode.window.showErrorMessage(`Noveler: 无法加载模板配置 - ${error}`);
+        handleError('无法读取模板配置文件', error);
         return null;
     }
 }
