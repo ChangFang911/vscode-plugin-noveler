@@ -1,4 +1,7 @@
 {
+  "_comment": "模板配置文件 - 仅用于定义模板的元数据和选项",
+  "_description": "注意：targetWords 值会被 novel.jsonc 中的配置覆盖",
+
   "chapter": {
     "frontMatter": {
       "wordCount": 0,
@@ -8,8 +11,7 @@
       "tags": [],
       "status": "草稿"
     },
-    "statusOptions": ["草稿", "初稿", "修改中", "已完成"],
-    "content": "\n"
+    "statusOptions": ["草稿", "初稿", "修改中", "已完成"]
   },
   "character": {
     "frontMatter": {
@@ -24,13 +26,6 @@
       "firstAppearance": "",
       "tags": []
     },
-    "importanceOptions": ["主角", "重要配角", "次要配角", "路人"],
-    "content": "\n## 基本信息\n\n- **性别**：\n- **年龄**：\n- **身份**：\n- **出场**：\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n"
-  },
-  "outline": {
-    "content": "# {novelName} - 大纲\n\n## 主要角色\n\n-\n\n## 主线剧情\n\n1.\n\n## 世界观设定\n\n-\n"
-  },
-  "readme": {
-    "content": "# {novelName}\n\n## 项目说明\n\n这是使用 Noveler 插件创建的中文小说写作项目。\n\n## 目录\n\n暂无章节\n\n## 写作进度\n\n- **总字数**：0 字\n- **完成章节**：0 / 0 章 (0%)\n- **章节列表**：见上方目录\n\n## 使用说明\n\n- 使用命令 `Noveler: 创建新章节` 来创建新的章节\n- 使用命令 `Noveler: 更新 README 统计` 来刷新章节目录和统计信息\n- 每次保存章节时，字数会自动更新到章节的 Front Matter 中\n\n## 备注\n\n"
+    "importanceOptions": ["主角", "重要配角", "次要配角", "路人"]
   }
 }

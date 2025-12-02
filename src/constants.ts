@@ -10,6 +10,9 @@ export const WORD_COUNT_DEBOUNCE_DELAY = 300;
 /** 高亮更新防抖延迟（毫秒） */
 export const HIGHLIGHT_DEBOUNCE_DELAY = 500;
 
+/** README 更新防抖延迟（毫秒） */
+export const README_UPDATE_DEBOUNCE_DELAY = 5000;
+
 // ==================== 正则表达式 ====================
 
 /** 对话引号匹配正则 */
@@ -36,10 +39,10 @@ export const ENGLISH_WORD_REGEX = /\b[a-zA-Z]+\b/g;
 // ==================== 文件路径 ====================
 
 /** 配置文件名 */
-export const CONFIG_FILE_NAME = 'novel.json';
+export const CONFIG_FILE_NAME = 'novel.jsonc';
 
 /** 默认配置模板路径 */
-export const DEFAULT_CONFIG_TEMPLATE_PATH = 'templates/default-config.json';
+export const DEFAULT_CONFIG_TEMPLATE_PATH = 'templates/default-config.jsonc';
 
 /** 章节目录名 */
 export const CHAPTERS_FOLDER = 'chapters';

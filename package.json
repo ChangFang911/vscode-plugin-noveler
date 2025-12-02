@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -56,12 +56,18 @@
         "title": "Noveler: 显示字数统计"
       },
       {
+        "command": "noveler.showStats",
+        "title": "Noveler: 显示统计仪表板"
+      },
+      {
         "command": "noveler.createChapter",
-        "title": "Noveler: 创建新章节"
+        "title": "创建章节",
+        "icon": "$(add)"
       },
       {
         "command": "noveler.createCharacter",
-        "title": "Noveler: 创建人物"
+        "title": "创建人物",
+        "icon": "$(add)"
       },
       {
         "command": "noveler.updateReadme",
@@ -105,7 +111,29 @@
       }
     ],
     "menus": {
+      "editor/context": [
+        {
+          "command": "noveler.formatDocument",
+          "when": "editorLangId == markdown",
+          "group": "noveler@1"
+        },
+        {
+          "command": "noveler.toggleFocusMode",
+          "when": "editorLangId == markdown",
+          "group": "noveler@2"
+        }
+      ],
       "view/item/context": [
+        {
+          "command": "noveler.createChapter",
+          "when": "view == novelerView && viewItem == chapterGroup",
+          "group": "inline"
+        },
+        {
+          "command": "noveler.createCharacter",
+          "when": "view == novelerView && viewItem == characterGroup",
+          "group": "inline"
+        },
         {
           "command": "noveler.renameChapter",
           "when": "view == novelerView && viewItem == chapter",
@@ -194,8 +222,8 @@
             "ask",
             "never"
           ],
-          "default": "ask",
-          "description": "创建章节或人物后自动更新 README：always（总是自动更新）、ask（询问是否更新）、never（从不自动更新）",
+          "default": "always",
+          "description": "章节或人物变化后自动更新 README：always（总是自动更新）、ask（询问是否更新）、never（从不自动更新）",
           "enumDescriptions": [
             "总是自动更新 README",
             "每次询问是否更新 README",
@@ -221,6 +249,7 @@
     "typescript": "^4.9.0"
   },
   "dependencies": {
-    "gray-matter": "^4.0.3"
+    "gray-matter": "^4.0.3",
+    "jsonc-parser": "^3.3.1"
   }
 }

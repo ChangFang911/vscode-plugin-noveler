@@ -4,14 +4,14 @@ import { ConfigService } from '../services/configService';
 export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(
         document: vscode.TextDocument,
-        options: vscode.FormattingOptions,
-        token: vscode.CancellationToken
+        _options: vscode.FormattingOptions,
+        _token: vscode.CancellationToken
     ): vscode.TextEdit[] {
         const edits: vscode.TextEdit[] = [];
         const text = document.getText();
         const lines = text.split('\n');
 
-        // 优先使用 novel.json 配置，回退到 VSCode 设置
+        // 优先使用 novel.jsonc 配置，回退到 VSCode 设置
         const configService = ConfigService.getInstance();
         let quoteStyle = configService.getChineseQuoteStyle();
 
@@ -20,7 +20,7 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
             quoteStyle = config.get('chineseQuoteStyle', '「」');
         }
 
-        let formattedLines: string[] = [];
+        const formattedLines: string[] = [];
         let inFrontMatter = false;
         let frontMatterCount = 0;
 

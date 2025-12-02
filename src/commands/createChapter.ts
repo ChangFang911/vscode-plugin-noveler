@@ -9,7 +9,9 @@ import { convertToChineseNumber } from '../utils/chineseNumber';
 import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
+import { ConfigService } from '../services/configService';
 import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING } from '../constants';
+import { Logger } from '../utils/logger';
 
 /**
  * 创建新章节
@@ -73,7 +75,7 @@ export async function createChapter(chapterName: string): Promise<void> {
             nextChapterNumber = Math.max(...chapterNumbers) + 1;
         }
     } catch (error) {
-        console.log('Noveler: 扫描章节目录失败，使用默认章节号 1', error);
+        Logger.warn('扫描章节目录失败，使用默认章节号 1', error);
     }
 
     const now = formatDateTime(new Date());
@@ -84,14 +86,22 @@ export async function createChapter(chapterName: string): Promise<void> {
     const templates = await loadTemplates();
     const chapterTemplate = templates?.chapter;
 
+    // 从配置文件读取目标字数
+    const configService = ConfigService.getInstance();
+    await configService.waitForConfig(); // 等待配置加载完成
+    const targetWords = configService.getTargetWords();
+
     const frontMatter = chapterTemplate?.frontMatter || {
         wordCount: 0,
-        targetWords: 5000,
+        targetWords: targetWords,
         characters: [],
         locations: [],
         tags: [],
         status: "草稿"
     };
+
+    // 确保使用配置中的 targetWords（即使模板中有值也覆盖）
+    frontMatter.targetWords = targetWords;
 
     const content = chapterTemplate?.content || "\n";
 

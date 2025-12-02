@@ -59,6 +59,22 @@ export async function createCharacter(characterName: string): Promise<void> {
     const templates = await loadTemplates();
     const characterTemplate = templates?.character;
 
+    // 询问用户选择角色定位
+    const importanceOptions = [
+        { label: '⭐ 主角', value: '主角' },
+        { label: '🌟 重要配角', value: '重要配角' },
+        { label: '✨ 次要配角', value: '次要配角' },
+        { label: '👤 路人', value: '路人' },
+    ];
+
+    const selectedImportance = await vscode.window.showQuickPick(importanceOptions, {
+        placeHolder: '选择角色定位',
+        title: `设置人物「${sanitizedName}」的角色定位`
+    });
+
+    // 如果用户取消选择,使用默认值"重要配角"
+    const importance = selectedImportance?.value || '重要配角';
+
     const frontMatter = characterTemplate?.frontMatter || {
         gender: "",
         age: "",
@@ -67,12 +83,14 @@ export async function createCharacter(characterName: string): Promise<void> {
         background: "",
         relationships: [],
         abilities: [],
-        importance: "主角",
+        importance: importance,
         firstAppearance: "",
         tags: []
     };
 
-    const importanceOptions = characterTemplate?.importanceOptions || ["主角", "重要配角", "次要配角", "路人"];
+    // 使用用户选择的 importance
+    frontMatter.importance = importance;
+
     const content = characterTemplate?.content || "\n## 基本信息\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n";
 
     // 辅助函数：将空字符串转为引号包裹的空字符串，避免 YAML 解析为 null
@@ -87,7 +105,7 @@ personality: ${toYamlString(frontMatter.personality)}
 background: ${toYamlString(frontMatter.background)}
 relationships: ${JSON.stringify(frontMatter.relationships)}
 abilities: ${JSON.stringify(frontMatter.abilities)}
-importance: ${frontMatter.importance} # ${importanceOptions.join('/')}
+importance: ${frontMatter.importance} # 主角/重要配角/次要配角/路人
 firstAppearance: ${toYamlString(frontMatter.firstAppearance)}
 tags: ${JSON.stringify(frontMatter.tags)}
 created: '${now}'

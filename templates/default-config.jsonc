@@ -1,0 +1,78 @@
+{
+  "noveler": {
+    // ==================== 章节目标字数 ====================
+    // 创建新章节时的默认目标字数
+    "targetWords": {
+      "default": 2500
+    },
+
+    // ==================== 语法高亮配置 ====================
+    // 设置对话、人物名称等元素的高亮样式
+    "highlight": {
+      // 对话高亮样式（引号内的文字）
+      "dialogue": {
+        "color": "#ce9178",
+        "backgroundColor": "rgba(206, 145, 120, 0.15)",
+        "fontStyle": "normal"
+      },
+      // 内心独白高亮样式（暂未启用）
+      "thought": {
+        "color": "#608b4e",
+        "backgroundColor": "rgba(96, 139, 78, 0.15)",
+        "fontStyle": "italic"
+      },
+      // 人物名称高亮样式（自动识别 characters/ 目录中的人物）
+      "character": {
+        "color": "#4ec9b0",
+        "backgroundColor": "rgba(78, 201, 176, 0.15)",
+        "fontWeight": "bold"
+      },
+      // 省略号高亮样式（暂未启用）
+      "ellipsis": {
+        "color": "#569cd6",
+        "backgroundColor": "rgba(86, 156, 214, 0.15)",
+        "fontWeight": "bold"
+      }
+    },
+
+    // ==================== 格式化配置 ====================
+    // 控制标点符号和格式化行为
+    "format": {
+      // 是否自动转换引号为中文引号
+      "convertQuotes": true,
+      // 保存时是否自动格式化
+      "autoFormat": true,
+      // 中文引号样式：""（直角引号）或 ""（弯引号）
+      "chineseQuoteStyle": "\"\""
+    },
+
+    // ==================== 字数统计配置 ====================
+    // 控制字数统计的显示和计算方式
+    "wordCount": {
+      // 是否在状态栏显示字数
+      "showInStatusBar": true,
+      // 字数统计是否包含标点符号
+      "includePunctuation": true
+    },
+
+    // ==================== README 自动更新 ====================
+    // 创建章节/人物时自动更新 README 的行为
+    // 可选值：'always'（总是自动添加）、'ask'（询问用户）、'never'（从不添加）
+    "autoUpdateReadmeOnCreate": {
+      "value": "always"
+    },
+
+    // ==================== 自动空行 ====================
+    // 是否在段落之间自动添加空行
+    "autoEmptyLine": {
+      "value": true
+    },
+
+    // ==================== 全局人物列表 ====================
+    // 已弃用：推荐使用 characters/ 目录管理人物
+    // 此配置项将在未来版本移除
+    "characters": {
+      "list": []
+    }
+  }
+}

@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import matter = require('gray-matter');
+import matter from 'gray-matter';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { sanitizeFileName } from '../utils/inputValidator';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
@@ -122,6 +122,50 @@ export async function markChapterCompleted(item: NovelerTreeItem): Promise<void>
  */
 export async function markChapterInProgress(item: NovelerTreeItem): Promise<void> {
     await updateChapterStatus(item, IN_PROGRESS_STATUS);
+}
+
+/**
+ * 更新章节状态（通过对话框选择）
+ * 用于 CodeLens 点击状态时调用
+ */
+export async function updateChapterStatusWithDialog(fileUri: vscode.Uri): Promise<void> {
+    const statusOptions = [
+        { label: '📝 草稿', value: '草稿' },
+        { label: '✏️ 初稿', value: '初稿' },
+        { label: '🔧 修改中', value: '修改中' },
+        { label: '✅ 已完成', value: '已完成' },
+    ];
+
+    const selected = await vscode.window.showQuickPick(statusOptions, {
+        placeHolder: '选择章节状态',
+        title: '更新章节状态'
+    });
+
+    if (!selected) {
+        return;
+    }
+
+    try {
+        // 读取当前文件内容
+        const content = await vscode.workspace.fs.readFile(fileUri);
+        const text = Buffer.from(content).toString('utf8');
+
+        // 解析并更新 Front Matter
+        const parsed = matter(text);
+        parsed.data.status = selected.value;
+        const newContent = matter.stringify(parsed.content, parsed.data);
+
+        // 写回文件
+        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(newContent, 'utf8'));
+
+        vscode.window.showInformationMessage(`章节状态已更新为：${selected.value}`);
+        vscode.commands.executeCommand('noveler.refreshView');
+
+        // 根据配置自动更新 README
+        await handleReadmeAutoUpdate();
+    } catch (error) {
+        handleError('更新章节状态失败', error, ErrorSeverity.Error);
+    }
 }
 
 /**

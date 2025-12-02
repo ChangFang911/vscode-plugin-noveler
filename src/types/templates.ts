@@ -42,9 +42,14 @@ export interface ReadmeTemplate {
     content: string;
 }
 
+export interface ReferenceTemplate {
+    content: string;
+}
+
 export interface Templates {
     chapter: ChapterTemplate;
     character: CharacterTemplate;
     outline: OutlineTemplate;
     readme: ReadmeTemplate;
+    reference: ReferenceTemplate;
 }

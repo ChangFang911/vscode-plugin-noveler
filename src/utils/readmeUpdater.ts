@@ -3,9 +3,11 @@
  */
 
 import * as vscode from 'vscode';
-import matter = require('gray-matter');
+import matter from 'gray-matter';
 import { handleError, handleSuccess, ErrorSeverity } from './errorHandler';
+import { ConfigService } from '../services/configService';
 import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
+import { Logger } from './logger';
 
 interface ChapterInfo {
     number: number;
@@ -92,7 +94,7 @@ export async function scanChapters(): Promise<ProjectStats> {
         chapters.sort((a, b) => a.number - b.number);
 
     } catch (error) {
-        console.log('Noveler: chapters 目录不存在或为空');
+        Logger.debug('chapters 目录不存在或为空');
     }
 
     return {
@@ -168,7 +170,7 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
         });
 
     } catch (error) {
-        console.log('Noveler: characters 目录不存在或为空');
+        Logger.debug('characters 目录不存在或为空');
     }
 
     return characters;
@@ -204,21 +206,35 @@ export async function updateReadme(): Promise<void> {
         const hasProgress = /^##\s*写作进度/m.test(readmeContent);
         const hasCharacters = /^##\s*人物设定/m.test(readmeContent);
 
-        // 如果缺少必要的标题，提示用户是否自动添加
+        // 如果缺少必要的标题，根据配置处理
         if (!hasCatalog || !hasProgress || !hasCharacters) {
-            const missingSections = [];
-            if (!hasCatalog) { missingSections.push('目录'); }
-            if (!hasProgress) { missingSections.push('写作进度'); }
-            if (!hasCharacters) { missingSections.push('人物设定'); }
+            const configService = ConfigService.getInstance();
+            const autoUpdateMode = configService.getReadmeAutoUpdateMode();
 
-            const result = await vscode.window.showWarningMessage(
-                `README.md 缺少必要的章节标题（"## ${missingSections.join('"、"## ')}"），是否自动添加？`,
-                '自动添加', '取消'
-            );
-
-            if (result === '自动添加') {
+            if (autoUpdateMode === 'always') {
+                // 总是自动添加
                 readmeContent = appendMissingSections(readmeContent, hasCatalog, hasProgress, hasCharacters);
+            } else if (autoUpdateMode === 'ask') {
+                // 询问用户
+                const missingSections = [];
+                if (!hasCatalog) { missingSections.push('目录'); }
+                if (!hasProgress) { missingSections.push('写作进度'); }
+                if (!hasCharacters) { missingSections.push('人物设定'); }
+
+                const result = await vscode.window.showWarningMessage(
+                    `README.md 缺少必要的章节标题（"## ${missingSections.join('"、"## ')}"），是否自动添加？`,
+                    '自动添加', '取消'
+                );
+
+                if (result === '自动添加') {
+                    readmeContent = appendMissingSections(readmeContent, hasCatalog, hasProgress, hasCharacters);
+                } else {
+                    return;
+                }
             } else {
+                // never - 不做任何处理，但继续更新已有的章节
+                // 如果缺少必要标题但配置为never，则跳过更新
+                vscode.window.showWarningMessage('README.md 缺少必要的章节标题，请手动添加或修改配置');
                 return;
             }
         }

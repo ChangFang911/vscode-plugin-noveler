@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { Logger } from './logger';
 
 /**
  * 错误严重程度
@@ -30,19 +31,18 @@ export function handleError(
     const errorMsg = error instanceof Error ? error.message : String(error);
     const fullMessage = `Noveler: ${operation}`;
 
-    // 始终记录到控制台
-    console.error(fullMessage, error);
-
-    // 根据严重程度显示不同类型的消息
+    // 根据严重程度记录和显示
     switch (severity) {
         case ErrorSeverity.Error:
+            Logger.error(fullMessage, error);
             vscode.window.showErrorMessage(`${fullMessage} - ${errorMsg}`);
             break;
         case ErrorSeverity.Warning:
+            Logger.warn(fullMessage, error);
             vscode.window.showWarningMessage(`${fullMessage} - ${errorMsg}`);
             break;
         case ErrorSeverity.Silent:
-            // 仅记录日志，不显示消息
+            Logger.debug(fullMessage, error);
             break;
     }
 }
@@ -52,8 +52,8 @@ export function handleError(
  * @param message 成功消息
  * @param silent 是否静默（不显示提示），默认为 false
  */
-export function handleSuccess(message: string, silent: boolean = false): void {
-    console.log(`Noveler: ${message}`);
+export function handleSuccess(message: string, silent = false): void {
+    Logger.info(message);
     if (!silent) {
         vscode.window.showInformationMessage(`Noveler: ${message}`);
     }

@@ -12,6 +12,7 @@ import { ConfigService } from '../services/configService';
  */
 export async function handleReadmeAutoUpdate(): Promise<void> {
     const configService = ConfigService.getInstance();
+    await configService.waitForConfig(); // 等待配置加载完成
     const autoUpdate = configService.getReadmeAutoUpdateMode();
 
     if (autoUpdate === 'always') {

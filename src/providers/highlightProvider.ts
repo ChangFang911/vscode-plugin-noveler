@@ -1,22 +1,39 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import matter = require('gray-matter');
+import matter from 'gray-matter';
 import {
     DIALOGUE_REGEX,
     HTML_COMMENT_REGEX,
     CHARACTERS_FOLDER
 } from '../constants';
+import { Logger } from '../utils/logger';
 
+/**
+ * 小说高亮提供器
+ * 为 Markdown 文档中的对话和人物名称提供语法高亮
+ *
+ * 功能：
+ * - 高亮显示对话（引号内的文字）
+ * - 高亮显示人物名称（从 characters/ 目录读取）
+ * - 自动监听 characters/ 目录变化，更新人物名称缓存
+ * - 支持自定义高亮样式（通过 novel.jsonc 配置）
+ *
+ * @example
+ * ```typescript
+ * const provider = new NovelHighlightProvider();
+ * provider.updateHighlights(editor);
+ * ```
+ */
 export class NovelHighlightProvider {
     private dialogueDecorationType!: vscode.TextEditorDecorationType;
     private characterDecorationType!: vscode.TextEditorDecorationType;
     private configService: ConfigService;
     private characterNamesCache: string[] = [];
-    private lastCacheUpdate: number = 0;
+    private lastCacheUpdate = 0;
 
     // 正则缓存
     private cachedCharacterRegex: RegExp | null = null;
-    private cachedCharacterNamesCacheKey: string = '';
+    private cachedCharacterNamesCacheKey = '';
 
     // 文件系统监视器，用于自动更新人物缓存
     private characterFolderWatcher?: vscode.FileSystemWatcher;
@@ -37,17 +54,26 @@ export class NovelHighlightProvider {
         this.dialogueDecorationType = vscode.window.createTextEditorDecorationType({
             color: dialogueStyle.color,
             backgroundColor: dialogueStyle.backgroundColor,
-            fontStyle: dialogueStyle.fontStyle as any
+            fontStyle: dialogueStyle.fontStyle as 'normal' | 'italic' | 'oblique' | undefined
         });
 
         // 人物名称高亮
         this.characterDecorationType = vscode.window.createTextEditorDecorationType({
             color: characterStyle.color,
             backgroundColor: characterStyle.backgroundColor,
-            fontWeight: characterStyle.fontWeight as any
+            fontWeight: characterStyle.fontWeight as 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900' | undefined
         });
     }
 
+    /**
+     * 重新加载装饰类型
+     * 当配置文件更改时调用，更新高亮样式
+     *
+     * @example
+     * ```typescript
+     * provider.reloadDecorations();
+     * ```
+     */
     public reloadDecorations() {
         // 释放旧的装饰类型
         this.dialogueDecorationType.dispose();
@@ -88,19 +114,23 @@ export class NovelHighlightProvider {
                     // 使用 gray-matter 解��� Front Matter
                     const parsed = matter(fileContent);
                     if (parsed.data && parsed.data.name) {
-                        names.push(parsed.data.name);
+                        // 确保 name 是字符串类型
+                        const nameStr = typeof parsed.data.name === 'string'
+                            ? parsed.data.name
+                            : String(parsed.data.name);
+                        names.push(nameStr);
                     }
                 } catch (error) {
-                    console.log(`Noveler: 无法读取人物文件 ${fileName}`);
+                    Logger.warn(`无法读取人物文件 ${fileName}`, error);
                 }
             }
 
             this.characterNamesCache = names;
             this.lastCacheUpdate = Date.now();
-            console.log(`Noveler: 从 characters/ 目录加载了 ${names.length} 个人物名称:`, names);
+            Logger.debug(`从 characters/ 目录加载了 ${names.length} 个人物名称`, names);
         } catch (error) {
             // characters 目录不存在或为空
-            console.log('Noveler: characters 目录不存在');
+            Logger.debug('characters 目录不存在');
         }
     }
 
@@ -135,8 +165,14 @@ export class NovelHighlightProvider {
             return null;
         }
 
+        // 过滤并确保所有名称都是字符串
+        const validNames = characterNames.filter(name => typeof name === 'string' && name.length > 0);
+        if (validNames.length === 0) {
+            return null;
+        }
+
         // 生成缓存键（排序后的名称列表）
-        const cacheKey = [...characterNames].sort().join('|');
+        const cacheKey = [...validNames].sort().join('|');
 
         // 如果缓存命中，直接返回
         if (this.cachedCharacterRegex && this.cachedCharacterNamesCacheKey === cacheKey) {
@@ -145,8 +181,12 @@ export class NovelHighlightProvider {
             return this.cachedCharacterRegex;
         }
 
+        // 按名称长度从长到短排序，避免短名称匹配到长名称的一部分
+        // 例如：先匹配"豆豆王子"，再匹配"豆豆"
+        const sortedNames = [...validNames].sort((a, b) => b.length - a.length);
+
         // 构建新的正则并缓存
-        const escapedNames = characterNames.map(name =>
+        const escapedNames = sortedNames.map(name =>
             name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         );
         const namesPattern = escapedNames.join('|');
@@ -156,6 +196,21 @@ export class NovelHighlightProvider {
         return this.cachedCharacterRegex;
     }
 
+    /**
+     * 更新编辑器中的高亮显示
+     * 为对话和人物名称应用装饰效果
+     *
+     * @param editor VSCode 文本编辑器实例
+     *
+     * @example
+     * ```typescript
+     * vscode.window.onDidChangeActiveTextEditor(editor => {
+     *     if (editor) {
+     *         provider.updateHighlights(editor);
+     *     }
+     * });
+     * ```
+     */
     public async updateHighlights(editor: vscode.TextEditor) {
         if (!editor || editor.document.languageId !== 'markdown') {
             return;
@@ -213,7 +268,7 @@ export class NovelHighlightProvider {
             editor.setDecorations(this.dialogueDecorationType, dialogueRanges);
             editor.setDecorations(this.characterDecorationType, characterRanges);
         } catch (error) {
-            console.error('Noveler: 更新高亮时发生错误', error);
+            Logger.error('更新高亮时发生错误', error);
         }
     }
 
@@ -241,6 +296,10 @@ export class NovelHighlightProvider {
         return false;
     }
 
+    /**
+     * 释放资源
+     * 清理装饰类型和文件监听器
+     */
     public dispose() {
         this.dialogueDecorationType.dispose();
         this.characterDecorationType.dispose();

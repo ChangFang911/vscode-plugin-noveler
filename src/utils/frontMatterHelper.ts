@@ -3,8 +3,10 @@
  */
 
 import * as vscode from 'vscode';
-import matter = require('gray-matter');
+import matter from 'gray-matter';
 import { formatDateTime } from './dateFormatter';
+import { ChapterFrontMatter, CharacterFrontMatter, GenericFrontMatter } from '../types/frontMatter';
+import { Logger } from './logger';
 
 /**
  * 更新文档的 Front Matter
@@ -64,7 +66,7 @@ export function updateFrontMatter(
         return edits;
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error('Noveler: Front Matter 更新失败', errorMsg);
+        Logger.error('Front Matter 更新失败', error);
         vscode.window.showWarningMessage(`Noveler: 无法更新文档元数据 - ${errorMsg}`);
         return edits;
     }
@@ -75,15 +77,33 @@ export function updateFrontMatter(
  * @param document 文档对象
  * @returns Front Matter 数据对象
  */
-export function extractFrontMatter(document: vscode.TextDocument): any {
+export function extractFrontMatter(document: vscode.TextDocument): GenericFrontMatter {
     try {
         const text = document.getText();
         const parsed = matter(text);
         return parsed.data || {};
     } catch (error) {
-        console.error('Noveler: Front Matter 解析失败', error);
+        Logger.error('Front Matter 解析失败', error);
         return {};
     }
+}
+
+/**
+ * 从文档中提取章节 Front Matter
+ * @param document 文档对象
+ * @returns 章节 Front Matter 数据对象（部分属性）
+ */
+export function extractChapterFrontMatter(document: vscode.TextDocument): Partial<ChapterFrontMatter> {
+    return extractFrontMatter(document) as Partial<ChapterFrontMatter>;
+}
+
+/**
+ * 从文档中提取人物 Front Matter
+ * @param document 文档对象
+ * @returns 人物 Front Matter 数据对象（部分属性）
+ */
+export function extractCharacterFrontMatter(document: vscode.TextDocument): Partial<CharacterFrontMatter> {
+    return extractFrontMatter(document) as Partial<CharacterFrontMatter>;
 }
 
 /**
@@ -97,7 +117,7 @@ export function getContentWithoutFrontMatter(document: vscode.TextDocument): str
         const parsed = matter(text);
         return parsed.content || text;
     } catch (error) {
-        console.error('Noveler: Front Matter 解析失败', error);
+        Logger.error('Front Matter 解析失败', error);
         return document.getText();
     }
 }

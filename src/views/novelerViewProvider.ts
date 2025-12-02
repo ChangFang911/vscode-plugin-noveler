@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { ProjectStatsService } from '../services/projectStatsService';
 import { WordCountService } from '../services/wordCountService';
 import { extractFrontMatter, getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
-import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
+import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, DRAFTS_FOLDER, REFERENCES_FOLDER, STATUS_EMOJI_MAP, CONFIG_FILE_NAME } from '../constants';
+import { Logger } from '../utils/logger';
 
 /**
  * TreeView 节点类型
@@ -10,14 +11,22 @@ import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constan
 export enum NodeType {
     Overview = 'overview',        // 项目概览
     Actions = 'actions',          // 快捷操作
-    Chapters = 'chapters',        // 章节大纲
+    Chapters = 'chapters',        // 章节列表
     Characters = 'characters',    // 人物管理
+    Outlines = 'outlines',        // 大纲列表
+    References = 'references',    // 参考资料
 
     // 子节点类型
     OverviewItem = 'overviewItem',
     ActionItem = 'actionItem',
     ChapterItem = 'chapterItem',
     CharacterItem = 'characterItem',
+    OutlineItem = 'outlineItem',
+    ReferenceItem = 'referenceItem',
+
+    // 特殊节点
+    InitProject = 'initProject',  // 初始化项目
+    EmptyHint = 'emptyHint',      // 空状态提示
 }
 
 /**
@@ -51,6 +60,9 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
 
     private statsService: ProjectStatsService;
 
+    // 预编译的正则表达式（静态成员，所有实例共享）
+    private static readonly FIRST_HEADING_REGEX = /^#\s+(.+)$/m;
+
     constructor() {
         this.statsService = new ProjectStatsService();
     }
@@ -60,6 +72,24 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
      */
     refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    /**
+     * 检查项目是否已初始化
+     */
+    private async isProjectInitialized(): Promise<boolean> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return false;
+        }
+
+        try {
+            const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
+            await vscode.workspace.fs.stat(configUri);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -74,9 +104,9 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
      */
     async getChildren(element?: NovelerTreeItem): Promise<NovelerTreeItem[]> {
         try {
-            // 根节点
+            // 根节点：检查是否已初始化
             if (!element) {
-                return this.getRootNodes();
+                return await this.getRootNodes();
             }
 
             // 子节点
@@ -89,11 +119,15 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                     return await this.getChapterItems();
                 case NodeType.Characters:
                     return await this.getCharacterItems();
+                case NodeType.Outlines:
+                    return await this.getOutlineItems();
+                case NodeType.References:
+                    return await this.getReferenceItems();
                 default:
                     return [];
             }
         } catch (error) {
-            console.error('Noveler: 获取视图子节点失败', error);
+            Logger.error('获取视图子节点失败', error);
             return [
                 new NovelerTreeItem(
                     '加载失败',
@@ -111,7 +145,29 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     /**
      * 获取根节点（四大分类）
      */
-    private getRootNodes(): NovelerTreeItem[] {
+    private async getRootNodes(): Promise<NovelerTreeItem[]> {
+        // 检查项目是否已初始化
+        const initialized = await this.isProjectInitialized();
+
+        if (!initialized) {
+            // 未初始化，显示初始化引导
+            return [
+                new NovelerTreeItem(
+                    '🚀 初始化小说项目',
+                    NodeType.InitProject,
+                    vscode.TreeItemCollapsibleState.None,
+                    {
+                        command: 'noveler.initProject',
+                        title: '初始化小说项目',
+                    },
+                    'initProject',
+                    undefined,
+                    '点击此处在当前工作区初始化小说项目结构'
+                )
+            ];
+        }
+
+        // 已初始化，显示正常结构
         return [
             new NovelerTreeItem(
                 '📊 项目概览',
@@ -132,22 +188,40 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '常用功能快捷入口'
             ),
             new NovelerTreeItem(
-                '📂 章节大纲',
+                '📂 章节列表',
                 NodeType.Chapters,
                 vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
-                'chapters',
-                undefined,
+                'chapterGroup',  // 改为 chapterGroup，用于添加内联按钮
+                '点击 ➕ 创建章节',
                 '浏览和管理章节'
             ),
             new NovelerTreeItem(
                 '👤 人物管理',
                 NodeType.Characters,
+                vscode.TreeItemCollapsibleState.Expanded,
+                undefined,
+                'characterGroup',  // 改为 characterGroup，用于添加内联按钮
+                '点击 ➕ 创建人物',
+                '管理小说人物'
+            ),
+            new NovelerTreeItem(
+                '📝 大纲草稿',
+                NodeType.Outlines,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
-                'characters',
+                'outlineGroup',
                 undefined,
-                '管理小说人物'
+                '大纲和草稿文件'
+            ),
+            new NovelerTreeItem(
+                '📚 参考资料',
+                NodeType.References,
+                vscode.TreeItemCollapsibleState.Collapsed,
+                undefined,
+                'referenceGroup',
+                undefined,
+                '灵感和参考素材'
             ),
         ];
     }
@@ -234,30 +308,6 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     private getActionItems(): NovelerTreeItem[] {
         return [
             new NovelerTreeItem(
-                '📝 创建新章节',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.createChapter',
-                    title: '创建新章节',
-                },
-                'actionItem',
-                undefined,
-                '创建新的章节文件'
-            ),
-            new NovelerTreeItem(
-                '👤 创建人物',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.createCharacter',
-                    title: '创建人物',
-                },
-                'actionItem',
-                undefined,
-                '创建新的人物档案'
-            ),
-            new NovelerTreeItem(
                 '🎨 格式化当前章节',
                 NodeType.ActionItem,
                 vscode.TreeItemCollapsibleState.None,
@@ -282,28 +332,16 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '隐藏其他面板，专心写作'
             ),
             new NovelerTreeItem(
-                '📄 更新项目文档',
+                '📊 统计仪表板',
                 NodeType.ActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
-                    command: 'noveler.updateReadme',
-                    title: '更新项目文档',
+                    command: 'noveler.showStats',
+                    title: '显示统计仪表板',
                 },
                 'actionItem',
                 undefined,
-                '扫描所有章节，更新项目文档中的统计信息'
-            ),
-            new NovelerTreeItem(
-                '🔄 刷新侧边栏',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.refreshView',
-                    title: '刷新侧边栏',
-                },
-                'actionItem',
-                undefined,
-                '重新加载章节和统计信息'
+                '查看详细的写作统计和可视化数据'
             ),
             new NovelerTreeItem(
                 '⚙️ 打开配置文件',
@@ -321,92 +359,38 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     }
 
     /**
-     * 获取章节大纲子项
+     * 获取章节列表子项
      */
     private async getChapterItems(): Promise<NovelerTreeItem[]> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            return [];
-        }
+        return this.getMarkdownItems({
+            folderName: CHAPTERS_FOLDER,
+            nodeType: NodeType.Chapters,
+            itemNodeType: NodeType.ChapterItem,
+            iconPrefix: '',  // 章节的 icon 由状态决定，在 processor 中添加
+            emptyHint: '💡 还没有章节，点击右侧 ➕ 创建',
+            emptyTooltip: '点击章节列表标题右侧的 ➕ 按钮创建你的第一个章节',
+            notFoundMessage: '未找到 chapters 目录',
+            contextValue: 'chapter',
+            commandTitle: '打开章节',
+            itemProcessor: async (text, filename) => {
+                const title = this.extractTitle(text, filename);
+                const contentWithoutFM = this.removeFrontMatter(text);
+                const wordCount = this.countWords(contentWithoutFM);
+                const status = this.extractStatus(text);
+                const statusIcon = this.getStatusIcon(status);
 
-        const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+                // 获取详细字数统计
+                const detailedStats = this.getDetailedWordCount(contentWithoutFM);
+                const totalWords = detailedStats.content + detailedStats.punctuation;
+                const tooltip = `${title}\n━━━━━━━━━━━━━━\n总计: ${totalWords.toLocaleString()} 字\n正文: ${detailedStats.content.toLocaleString()} 字\n标点: ${detailedStats.punctuation.toLocaleString()} 个\n━━━━━━━━━━━━━━\n状态: ${status}`;
 
-        try {
-            const files = await vscode.workspace.fs.readDirectory(chaptersPath);
-            const mdFiles = files
-                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
-                .sort(([a], [b]) => a.localeCompare(b));
-
-            if (mdFiles.length === 0) {
-                return [
-                    new NovelerTreeItem(
-                        '暂无章节',
-                        NodeType.ChapterItem,
-                        vscode.TreeItemCollapsibleState.None,
-                        undefined,
-                        undefined,
-                        undefined,
-                        '点击上方"创建新章节"开始创作'
-                    ),
-                ];
-            }
-
-            const items: NovelerTreeItem[] = [];
-
-            for (const [filename] of mdFiles) {
-                const filePath = vscode.Uri.joinPath(chaptersPath, filename);
-
-                try {
-                    const content = await vscode.workspace.fs.readFile(filePath);
-                    const text = Buffer.from(content).toString('utf8');
-
-                    // 提取标题和字数
-                    const title = this.extractTitle(text, filename);
-                    const contentWithoutFM = this.removeFrontMatter(text);
-                    const wordCount = this.countWords(contentWithoutFM);
-                    const status = this.extractStatus(text);
-                    const statusIcon = this.getStatusIcon(status);
-
-                    // 获取详细字数统计
-                    const detailedStats = this.getDetailedWordCount(contentWithoutFM);
-                    const totalWords = detailedStats.content + detailedStats.punctuation;
-                    const tooltip = `${title}\n━━━━━━━━━━━━━━\n总计: ${totalWords.toLocaleString()} 字\n正文: ${detailedStats.content.toLocaleString()} 字\n标点: ${detailedStats.punctuation.toLocaleString()} 个\n━━━━━━━━━━━━━━\n状态: ${status}`;
-
-                    const item = new NovelerTreeItem(
-                        `${statusIcon} ${title}`,
-                        NodeType.ChapterItem,
-                        vscode.TreeItemCollapsibleState.None,
-                        {
-                            command: 'vscode.open',
-                            title: '打开章节',
-                            arguments: [filePath],
-                        },
-                        'chapter',  // 改为 'chapter' 以匹配右键菜单配置
-                        `${wordCount.toLocaleString()} 字`,
-                        tooltip
-                    );
-                    // 存储文件路径到 resourceUri，供命令使用
-                    item.resourceUri = filePath;
-                    items.push(item);
-                } catch (error) {
-                    console.error(`读取章节失败 ${filename}:`, error);
-                }
-            }
-
-            return items;
-        } catch (error) {
-            return [
-                new NovelerTreeItem(
-                    '未找到 chapters 目录',
-                    NodeType.ChapterItem,
-                    vscode.TreeItemCollapsibleState.None,
-                    undefined,
-                    undefined,
-                    undefined,
-                    '请先运行 "Noveler: 初始化小说项目"'
-                ),
-            ];
-        }
+                return {
+                    label: `${statusIcon} ${title}`,  // 状态 icon 在这里添加
+                    description: `${wordCount.toLocaleString()} 字`,
+                    tooltip: tooltip,
+                };
+            },
+        });
     }
 
     /**
@@ -423,7 +407,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         }
 
         // 从第一个 # 标题提取
-        const headingMatch = text.match(/^#\s+(.+)$/m);
+        const headingMatch = text.match(NovelerViewProvider.FIRST_HEADING_REGEX);
         if (headingMatch) {
             return headingMatch[1].trim();
         }
@@ -479,81 +463,26 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
      * 获取人物管理子项
      */
     private async getCharacterItems(): Promise<NovelerTreeItem[]> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            return [];
-        }
-
-        const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
-
-        try {
-            const files = await vscode.workspace.fs.readDirectory(charactersPath);
-            const mdFiles = files
-                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
-                .sort(([a], [b]) => a.localeCompare(b));
-
-            if (mdFiles.length === 0) {
-                return [
-                    new NovelerTreeItem(
-                        '暂无人物',
-                        NodeType.CharacterItem,
-                        vscode.TreeItemCollapsibleState.None,
-                        undefined,
-                        undefined,
-                        undefined,
-                        '点击上方"创建人物"添加角色'
-                    ),
-                ];
-            }
-
-            const items: NovelerTreeItem[] = [];
-
-            for (const [filename] of mdFiles) {
-                const filePath = vscode.Uri.joinPath(charactersPath, filename);
-
-                try {
-                    const content = await vscode.workspace.fs.readFile(filePath);
-                    const text = Buffer.from(content).toString('utf8');
-
-                    // 提取人物名称
-                    const name = this.extractCharacterName(text, filename);
-                    const role = this.extractCharacterRole(text);
-
-                    const item = new NovelerTreeItem(
-                        `👤 ${name}`,
-                        NodeType.CharacterItem,
-                        vscode.TreeItemCollapsibleState.None,
-                        {
-                            command: 'vscode.open',
-                            title: '打开人物档案',
-                            arguments: [filePath],
-                        },
-                        'character',  // 改为 'character' 以匹配右键菜单配置
-                        role || undefined,
-                        `${name}${role ? `\n角色：${role}` : ''}`
-                    );
-                    // 存储文件路径到 resourceUri，供命令使用
-                    item.resourceUri = filePath;
-                    items.push(item);
-                } catch (error) {
-                    console.error(`读取人物文件失败 ${filename}:`, error);
-                }
-            }
-
-            return items;
-        } catch (error) {
-            return [
-                new NovelerTreeItem(
-                    '未找到 characters 目录',
-                    NodeType.CharacterItem,
-                    vscode.TreeItemCollapsibleState.None,
-                    undefined,
-                    undefined,
-                    undefined,
-                    '请先运行 "Noveler: 初始化小说项目"'
-                ),
-            ];
-        }
+        return this.getMarkdownItems({
+            folderName: CHARACTERS_FOLDER,
+            nodeType: NodeType.Characters,
+            itemNodeType: NodeType.CharacterItem,
+            iconPrefix: '👤',
+            emptyHint: '💡 还没有人物，点击右侧 ➕ 创建',
+            emptyTooltip: '点击人物管理标题右侧的 ➕ 按钮创建你的第一个人物',
+            notFoundMessage: '未找到 characters 目录',
+            contextValue: 'character',
+            commandTitle: '打开人物档案',
+            itemProcessor: async (text, filename) => {
+                const name = this.extractCharacterName(text, filename);
+                const role = this.extractCharacterRole(text);
+                return {
+                    label: name,
+                    description: role || undefined,
+                    tooltip: `${name}${role ? `\n角色：${role}` : ''}`,
+                };
+            },
+        });
     }
 
     /**
@@ -570,7 +499,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         }
 
         // 从第一个 # 标题提取
-        const headingMatch = text.match(/^#\s+(.+)$/m);
+        const headingMatch = text.match(NovelerViewProvider.FIRST_HEADING_REGEX);
         if (headingMatch) {
             return headingMatch[1].trim();
         }
@@ -589,5 +518,149 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
             return String(frontMatter.role).trim();
         }
         return '';
+    }
+
+    /**
+     * 获取大纲列表子项
+     */
+    private async getOutlineItems(): Promise<NovelerTreeItem[]> {
+        return this.getMarkdownItems({
+            folderName: DRAFTS_FOLDER,
+            nodeType: NodeType.Outlines,
+            itemNodeType: NodeType.OutlineItem,
+            iconPrefix: '📋',
+            emptyHint: '💡 还没有大纲文件',
+            emptyTooltip: '可以在 drafts/ 目录创建 Markdown 文件',
+            notFoundMessage: '未找到 drafts 目录',
+            contextValue: 'outline',
+            commandTitle: '打开大纲',
+            itemProcessor: async (text, filename) => {
+                const title = this.extractTitle(text, filename);
+                return {
+                    label: title,
+                    description: undefined,
+                    tooltip: title,
+                };
+            },
+        });
+    }
+
+    /**
+     * 获取参考资料列表子项
+     */
+    private async getReferenceItems(): Promise<NovelerTreeItem[]> {
+        return this.getMarkdownItems({
+            folderName: REFERENCES_FOLDER,
+            nodeType: NodeType.References,
+            itemNodeType: NodeType.ReferenceItem,
+            iconPrefix: '📖',
+            emptyHint: '💡 还没有参考资料',
+            emptyTooltip: '可以在 references/ 目录创建 Markdown 文件',
+            notFoundMessage: '未找到 references 目录',
+            contextValue: 'reference',
+            commandTitle: '打开参考资料',
+            itemProcessor: async (text, filename) => {
+                const title = this.extractTitle(text, filename);
+                return {
+                    label: title,
+                    description: undefined,
+                    tooltip: title,
+                };
+            },
+        });
+    }
+
+    /**
+     * 通用的 Markdown 文件列表获取方法
+     * 用于减少重复代码
+     */
+    private async getMarkdownItems(config: {
+        folderName: string;
+        nodeType: NodeType;
+        itemNodeType: NodeType;
+        iconPrefix: string;
+        emptyHint: string;
+        emptyTooltip: string;
+        notFoundMessage: string;
+        contextValue: string;
+        commandTitle: string;
+        itemProcessor: (text: string, filename: string, filePath: vscode.Uri) => Promise<{
+            label: string;
+            description?: string;
+            tooltip?: string;
+        }>;
+    }): Promise<NovelerTreeItem[]> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return [];
+        }
+
+        const folderPath = vscode.Uri.joinPath(workspaceFolder.uri, config.folderName);
+
+        try {
+            const files = await vscode.workspace.fs.readDirectory(folderPath);
+            const mdFiles = files
+                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
+                .sort(([a], [b]) => a.localeCompare(b));
+
+            if (mdFiles.length === 0) {
+                return [
+                    new NovelerTreeItem(
+                        config.emptyHint,
+                        NodeType.EmptyHint,
+                        vscode.TreeItemCollapsibleState.None,
+                        undefined,
+                        'emptyHint',
+                        undefined,
+                        config.emptyTooltip
+                    ),
+                ];
+            }
+
+            const items: NovelerTreeItem[] = [];
+
+            for (const [filename] of mdFiles) {
+                const filePath = vscode.Uri.joinPath(folderPath, filename);
+
+                try {
+                    const content = await vscode.workspace.fs.readFile(filePath);
+                    const text = Buffer.from(content).toString('utf8');
+
+                    const processed = await config.itemProcessor(text, filename, filePath);
+
+                    const item = new NovelerTreeItem(
+                        `${config.iconPrefix} ${processed.label}`,
+                        config.itemNodeType,
+                        vscode.TreeItemCollapsibleState.None,
+                        {
+                            command: 'vscode.open',
+                            title: config.commandTitle,
+                            arguments: [filePath],
+                        },
+                        config.contextValue,
+                        processed.description,
+                        processed.tooltip
+                    );
+                    item.resourceUri = filePath;
+                    items.push(item);
+                } catch (error) {
+                    Logger.error(`读取${config.folderName}文件失败 ${filename}`, error);
+                }
+            }
+
+            return items;
+        } catch (error) {
+            return [
+                new NovelerTreeItem(
+                    config.notFoundMessage,
+                    config.itemNodeType,
+                    vscode.TreeItemCollapsibleState.None,
+                    undefined,
+                    undefined,
+                    undefined,
+                    '请先运行 "Noveler: 初始化小说项目"'
+                ),
+            ];
+        }
     }
 }

@@ -2,9 +2,12 @@ import * as vscode from 'vscode';
 import { ChineseNovelFormatProvider } from './providers/formatProvider';
 import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
+import { ChapterCodeLensProvider } from './providers/codeLensProvider';
 import { ConfigService } from './services/configService';
 import { FocusModeService } from './services/focusModeService';
+import { ProjectStatsService } from './services/projectStatsService';
 import { NovelerViewProvider } from './views/novelerViewProvider';
+import { StatsWebviewProvider } from './views/statsWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
@@ -15,6 +18,7 @@ import {
     renameChapter,
     markChapterCompleted,
     markChapterInProgress,
+    updateChapterStatusWithDialog,
     deleteChapter,
     renameCharacter,
     deleteCharacter
@@ -22,34 +26,50 @@ import {
 import { jumpToReadmeSection } from './commands/jumpToReadme';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS, CONFIG_FILE_NAME } from './constants';
+import { Logger, LogLevel } from './utils/logger';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
 let highlightProvider: NovelHighlightProvider;
+let codeLensProvider: ChapterCodeLensProvider;
 let configService: ConfigService;
 let focusModeService: FocusModeService;
+let statsWebviewProvider: StatsWebviewProvider;
 
 // 防抖器
 let wordCountDebouncer: Debouncer;
 let highlightDebouncer: Debouncer;
+let readmeUpdateDebouncer: Debouncer;
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('Noveler 中文小说写作助手已激活');
+    // 初始化日志系统
+    Logger.initialize(context, LogLevel.Info);
+    Logger.info('Noveler 中文小说写作助手已激活');
 
     // 初始化防抖器
     wordCountDebouncer = new Debouncer(WORD_COUNT_DEBOUNCE_DELAY);
     highlightDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
+    readmeUpdateDebouncer = new Debouncer(README_UPDATE_DEBOUNCE_DELAY);
 
     // 初始化模板加载器
     initTemplateLoader(context);
 
     // 初始化配置服务
-    configService = ConfigService.getInstance(context);
+    configService = ConfigService.initialize();
     context.subscriptions.push(configService);
 
     // 等待配置加载完成
     await configService.waitForConfig();
+
+    // 订阅配置变更事件
+    context.subscriptions.push(
+        configService.onDidChangeConfig(() => {
+            // 配置变更时，刷新侧边栏和 CodeLens
+            vscode.commands.executeCommand('noveler.refreshView');
+            codeLensProvider?.refresh();
+        })
+    );
 
     // 初始化字数统计服务
     wordCountService = new WordCountService();
@@ -57,6 +77,15 @@ export async function activate(context: vscode.ExtensionContext) {
     // 初始化高亮提供者
     highlightProvider = new NovelHighlightProvider();
     context.subscriptions.push(highlightProvider);
+
+    // 初始化 Code Lens 提供者
+    codeLensProvider = new ChapterCodeLensProvider(wordCountService);
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(
+            { language: 'markdown', pattern: '**/chapters/**' },
+            codeLensProvider
+        )
+    );
 
     // 注册 Noveler 侧边栏视图
     const novelerViewProvider = new NovelerViewProvider();
@@ -87,6 +116,17 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
 
+    // 初始化统计服务和 Webview
+    const projectStatsService = new ProjectStatsService();
+    statsWebviewProvider = new StatsWebviewProvider(context, projectStatsService);
+
+    // 注册命令：显示统计面板
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.showStats', async () => {
+            await statsWebviewProvider.show();
+        })
+    );
+
     // 注册命令：初始化小说项目
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.initProject', async () => {
@@ -98,9 +138,35 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.formatDocument', async () => {
             const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                await vscode.commands.executeCommand('editor.action.formatDocument');
-                vscode.window.showInformationMessage('文档格式化完成');
+            if (!editor) {
+                vscode.window.showWarningMessage('没有打开的编辑器');
+                return;
+            }
+
+            if (editor.document.languageId !== 'markdown') {
+                vscode.window.showWarningMessage('只能格式化 Markdown 文档');
+                return;
+            }
+
+            try {
+                // 直接使用 Noveler 的格式化提供器
+                const formatProvider = new ChineseNovelFormatProvider();
+                const edits = formatProvider.provideDocumentFormattingEdits(
+                    editor.document,
+                    {} as vscode.FormattingOptions,
+                    {} as vscode.CancellationToken
+                );
+
+                if (edits.length > 0) {
+                    const workspaceEdit = new vscode.WorkspaceEdit();
+                    workspaceEdit.set(editor.document.uri, edits);
+                    await vscode.workspace.applyEdit(workspaceEdit);
+                    vscode.window.showInformationMessage('文档格式化完成');
+                } else {
+                    vscode.window.showInformationMessage('文档无需格式化');
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(`格式化失败: ${error}`);
             }
         })
     );
@@ -182,7 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            const configUri = vscode.Uri.joinPath(workspaceFolder.uri, 'novel.json');
+            const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
 
             try {
                 // 尝试打开配置文件
@@ -191,7 +257,7 @@ export async function activate(context: vscode.ExtensionContext) {
             } catch (error) {
                 // 配置文件不存在，询问是否创建
                 const result = await vscode.window.showInformationMessage(
-                    'novel.json 配置文件不存在，是否创建？',
+                    'novel.jsonc 配置文件不存在，是否创建？',
                     '创建', '取消'
                 );
 
@@ -201,15 +267,15 @@ export async function activate(context: vscode.ExtensionContext) {
                         const templatePath = vscode.Uri.joinPath(
                             context.extensionUri,
                             'templates',
-                            'default-config.json'
+                            'default-config.jsonc'
                         );
                         const templateData = await vscode.workspace.fs.readFile(templatePath);
 
-                        // 写入配置文件
+                        // 直接写入带注释的配置文件
                         await vscode.workspace.fs.writeFile(configUri, templateData);
                         const document = await vscode.workspace.openTextDocument(configUri);
                         await vscode.window.showTextDocument(document);
-                        vscode.window.showInformationMessage('已创建 novel.json 配置文件');
+                        vscode.window.showInformationMessage('已创建 novel.jsonc 配置文件');
                     } catch (templateError) {
                         handleError('创建配置文件失败', templateError, ErrorSeverity.Error);
                     }
@@ -227,6 +293,9 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.markChapterInProgress', markChapterInProgress)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.updateChapterStatus', updateChapterStatusWithDialog)
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.deleteChapter', deleteChapter)
@@ -293,6 +362,14 @@ export async function activate(context: vscode.ExtensionContext) {
             if (document.languageId === 'markdown') {
                 // 刷新侧边栏视图，显示最新的字数统计
                 novelerViewProvider.refresh();
+
+                // 如果是章节或人物文件,防抖更新 README
+                const filePath = document.uri.fsPath;
+                if (filePath.includes('/chapters/') || filePath.includes('/characters/')) {
+                    readmeUpdateDebouncer.debounce(async () => {
+                        await updateReadme();
+                    });
+                }
             }
         })
     );
@@ -325,6 +402,31 @@ export async function activate(context: vscode.ExtensionContext) {
         charactersWatcher.onDidChange(() => novelerViewProvider.refresh());
 
         context.subscriptions.push(charactersWatcher);
+
+        // 监听 novel.jsonc 配置文件变化 (判断项目是否初始化)
+        const configPattern = new vscode.RelativePattern(
+            workspaceFolder,
+            CONFIG_FILE_NAME
+        );
+        const configWatcher = vscode.workspace.createFileSystemWatcher(configPattern);
+
+        configWatcher.onDidCreate(() => novelerViewProvider.refresh());
+        configWatcher.onDidDelete(() => novelerViewProvider.refresh());
+        configWatcher.onDidChange(() => novelerViewProvider.refresh());
+
+        context.subscriptions.push(configWatcher);
+
+        // 监听 chapters 和 characters 目录本身的变化
+        const dirPattern = new vscode.RelativePattern(
+            workspaceFolder,
+            '{chapters,characters}'
+        );
+        const dirWatcher = vscode.workspace.createFileSystemWatcher(dirPattern);
+
+        dirWatcher.onDidCreate(() => novelerViewProvider.refresh());
+        dirWatcher.onDidDelete(() => novelerViewProvider.refresh());
+
+        context.subscriptions.push(dirWatcher);
     }
 
     // 初始更新
@@ -495,15 +597,16 @@ function configureAutoSave() {
         if (currentAutoSave === 'off') {
             config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
             config.update('autoSaveDelay', AUTO_SAVE_DELAY_MS, vscode.ConfigurationTarget.Workspace);
-            console.log(`Noveler: 已在工作区级别启用自动保存（${AUTO_SAVE_DELAY_MS}ms 延迟）`);
+            Logger.info(`已在工作区级别启用自动保存（${AUTO_SAVE_DELAY_MS}ms 延迟）`);
         }
     }
 }
 
 export function deactivate() {
-    console.log('Noveler 已停用');
+    Logger.info('Noveler 已停用');
 
     // 清理防抖器，防止内存泄漏
     wordCountDebouncer?.dispose();
     highlightDebouncer?.dispose();
+    readmeUpdateDebouncer?.dispose();
 }

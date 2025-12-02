@@ -11,7 +11,7 @@ import { MAX_CHARACTER_NAME_LENGTH, MAX_CHAPTER_NAME_LENGTH } from '../constants
  */
 export function sanitizeFileName(name: string): string {
     // 移除文件系统不允许的字符: / \ : * ? " < > |
-    let sanitized = name.replace(/[\/\\:*?"<>|]/g, '');
+    let sanitized = name.replace(/[/\\:*?"<>|]/g, '');
 
     // 移除前后空格
     sanitized = sanitized.trim();

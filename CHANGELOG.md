@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.3] - 2025-12-02
+
+### Bug 修复
+- **修复格式化命令触发 VSCode 格式化选择器的问题**：`noveler.formatDocument` 命令现在直接调用 Noveler 的格式化提供器，不再弹出格式化工具选择对话框
+- **修复高亮提供器类型错误**：修复 `highlightProvider.ts` 中的 `TypeError: name.replace is not a function` 运行时错误
+  - 在 `loadCharacterNames()` 方法中添加类型检查，确保 `parsed.data.name` 转换为字符串
+  - 在 `getCharacterRegex()` 方法中添加防御性过滤，确保所有人物名称都是有效字符串
+  - 修复位置：`src/providers/highlightProvider.ts` 第 117-121 行和第 168-172 行
+
+### 代码质量改进
+- **ESLint 代码规范修复**：修复所有 ESLint 错误（11 处），代码质量达到 0 错误标准
+  - 移除 TypeScript 可推断类型的冗余类型注解（7 处）
+  - 规范未使用参数命名（3 处，使用下划线前缀）
+  - 修复正则表达式不必要的转义字符（1 处）
+- **JSDoc 文档完善**：为 4 个核心服务类添加完整的 JSDoc 注释
+  - `ConfigService` - 配置服务类（13 个公共方法）
+  - `WordCountService` - 字数统计服务类（5 个公共方法）
+  - `ProjectStatsService` - 项目统计服务类
+  - `NovelHighlightProvider` - 高亮提供器类（3 个公共方法）
+- **正则表达式预编译**：将 7 个正则表达式提取为静态成员，减少运行时开销
+  - `WordCountService` - 6 个正则表达式
+  - `NovelerViewProvider` - 1 个正则表达式
+
 ## [0.3.2] - 2025-11-27
 
 ### 字数统计重大优化
@@ -108,7 +131,7 @@
 #### 侧边栏视图
 - **项目概览**：实时显示总字数、章节数、人物数、完成进度等统计信息
 - **快捷操作**：集中管理所有常用命令，无需通过命令面板调用
-- **章节大纲**：以树状结构展示所有章节，显示状态图标和字数
+- **章节列表**：以树状结构展示所有章节，显示状态图标和字数
 - **人物管理**：集中查看和管理小说人物档案
 - **智能刷新**：创建章节/人物时自动刷新侧边栏，保存文件时实时更新统计
 - **文件监控**：通过 FileSystemWatcher 监控 chapters/ 和 characters/ 目录，外部修改也能及时刷新
@@ -204,7 +227,7 @@
 ### v0.3.0
 - 智能提示（人物、场景、对话）
 - 人物关系图可视化
-- 章节大纲树状视图
+- 章节列表树状视图
 - 更丰富的语法高亮规则
 
 ### v0.4.0
