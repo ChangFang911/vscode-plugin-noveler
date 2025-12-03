@@ -11,14 +11,9 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
         const text = document.getText();
         const lines = text.split('\n');
 
-        // 优先使用 novel.jsonc 配置，回退到 VSCode 设置
+        // 从 novel.json 配置获取引号样式
         const configService = ConfigService.getInstance();
-        let quoteStyle = configService.getChineseQuoteStyle();
-
-        if (!quoteStyle || quoteStyle === '「」') {
-            const config = vscode.workspace.getConfiguration('noveler');
-            quoteStyle = config.get('chineseQuoteStyle', '「」');
-        }
+        const quoteStyle = configService.getChineseQuoteStyle();
 
         const formattedLines: string[] = [];
         let inFrontMatter = false;

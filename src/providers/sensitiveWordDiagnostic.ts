@@ -27,7 +27,7 @@ export class SensitiveWordDiagnosticProvider {
         const config = this.service.getConfig();
 
         // 创建状态栏项
-        if (config.display.showWordCount) {
+        if (config.display?.showWordCount) {
             this.statusBarItem = vscode.window.createStatusBarItem(
                 vscode.StatusBarAlignment.Right,
                 99 // 优先级，数字越大越靠左
@@ -145,7 +145,7 @@ export class SensitiveWordDiagnosticProvider {
         );
 
         const config = this.service.getConfig();
-        const severity = this.mapSeverity(config.display.severity);
+        const severity = this.mapSeverity(config.display?.severity || 'Warning');
         const levelText = this.getLevelText(match.level);
 
         const diagnostic = new vscode.Diagnostic(

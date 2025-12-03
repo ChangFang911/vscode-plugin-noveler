@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -82,6 +82,11 @@
         "title": "Noveler: 打开配置文件"
       },
       {
+        "command": "noveler.openSensitiveWordsConfig",
+        "title": "Noveler: 打开敏感词配置",
+        "icon": "$(warning)"
+      },
+      {
         "command": "noveler.renameChapter",
         "title": "重命名章节"
       },
@@ -112,6 +117,14 @@
       {
         "command": "noveler.reloadSensitiveWords",
         "title": "Noveler: 重新加载敏感词库"
+      },
+      {
+        "command": "noveler.addToCustomWords",
+        "title": "Noveler: 添加到自定义敏感词库"
+      },
+      {
+        "command": "noveler.addSelectedToWhitelist",
+        "title": "Noveler: 添加到白名单"
       }
     ],
     "menus": {
@@ -125,6 +138,16 @@
           "command": "noveler.toggleFocusMode",
           "when": "editorLangId == markdown",
           "group": "noveler@2"
+        },
+        {
+          "command": "noveler.addToCustomWords",
+          "when": "editorLangId == markdown && editorHasSelection",
+          "group": "noveler@3"
+        },
+        {
+          "command": "noveler.addSelectedToWhitelist",
+          "when": "editorLangId == markdown && editorHasSelection",
+          "group": "noveler@4"
         }
       ],
       "view/item/context": [
@@ -186,55 +209,6 @@
           "name": "小说项目"
         }
       ]
-    },
-    "configuration": {
-      "title": "Noveler",
-      "properties": {
-        "noveler.autoFormat": {
-          "type": "boolean",
-          "default": true,
-          "description": "保存时自动格式化文档"
-        },
-        "noveler.showWordCountInStatusBar": {
-          "type": "boolean",
-          "default": true,
-          "description": "在状态栏显示字数统计"
-        },
-        "noveler.chineseQuoteStyle": {
-          "type": "string",
-          "enum": [
-            "「」",
-            "\"\""
-          ],
-          "default": "「」",
-          "description": "中文引号样式"
-        },
-        "noveler.autoEmptyLine": {
-          "type": "boolean",
-          "default": true,
-          "description": "在 chapters 目录下的 Markdown 文件中，按回车时自动插入空行（仅在小说项目中生效）"
-        },
-        "noveler.autoSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "启用自动保存（推荐开启，避免意外丢失内容）"
-        },
-        "noveler.autoUpdateReadmeOnCreate": {
-          "type": "string",
-          "enum": [
-            "always",
-            "ask",
-            "never"
-          ],
-          "default": "always",
-          "description": "章节或人物变化后自动更新 README：always（总是自动更新）、ask（询问是否更新）、never（从不自动更新）",
-          "enumDescriptions": [
-            "总是自动更新 README",
-            "每次询问是否更新 README",
-            "从不自动更新 README"
-          ]
-        }
-      }
     }
   },
   "scripts": {

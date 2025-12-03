@@ -1,8 +1,0 @@
-{
-  "description": "用户自定义白名单模板。将此文件复制到项目根目录的 .noveler/sensitive-words/ 文件夹下，重命名为 whitelist.json，然后添加误报的词汇（如小说人名、地名）。",
-  "words": [
-    "小说主角名",
-    "架空地名",
-    "特殊术语"
-  ]
-}

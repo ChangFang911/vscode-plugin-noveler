@@ -67,6 +67,11 @@ export interface NovelConfig {
         /** 是否启用自动空行 */
         value?: boolean;
     };
+    /** 自动保存配置 */
+    autoSave?: {
+        /** 是否启用自动保存 */
+        value?: boolean;
+    };
     /** 人物配置 */
     characters?: {
         /** 人物名称列表 */
@@ -248,6 +253,9 @@ export class ConfigService {
             autoEmptyLine: {
                 value: true
             },
+            autoSave: {
+                value: true
+            },
             characters: {
                 list: []
             }
@@ -342,12 +350,11 @@ export class ConfigService {
 
     /**
      * 获取自动保存配置
-     * 从 VSCode 工作区配置中读取
+     * 优先从项目配置读取，否则使用默认值 true
      * @returns true 表示启用自动保存，false 表示禁用，默认为 true
      */
     public shouldAutoSave(): boolean {
-        const vscodeConfig = vscode.workspace.getConfiguration('noveler');
-        return vscodeConfig.get('autoSave', true);
+        return this.config.autoSave?.value !== false;
     }
 
     /**

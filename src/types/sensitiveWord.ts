@@ -56,7 +56,7 @@ export interface WordLibraryFile {
 }
 
 /**
- * 自定义词库文件格式
+ * 自定义词库文件格式（黑名单/白名单）
  */
 export interface CustomWordLibrary {
     /** 描述 */
@@ -65,28 +65,51 @@ export interface CustomWordLibrary {
     words: string[];
 }
 
+
 /**
  * 敏感词配置
  */
 export interface SensitiveWordConfig {
     /** 是否启用 */
     enabled: boolean;
-    /** 级别配置 */
-    levels: Record<SensitiveLevel, boolean>;
-    /** 输入时检测 */
-    checkOnType: boolean;
-    /** 保存时检测 */
-    checkOnSave: boolean;
-    /** 自定义词库配置 */
-    customWords: {
+    /** 内置词库配置 */
+    builtInLibrary?: {
+        /** 是否启用内置词库 */
         enabled: boolean;
-        blacklistPath: string;
-        whitelistPath: string;
+        /** 级别配置 */
+        levels: Record<SensitiveLevel, boolean>;
     };
+    /** 自定义敏感词库配置 */
+    customLibrary?: {
+        /** 是否启用 */
+        enabled: boolean;
+        /** 文件路径 */
+        path: string;
+    };
+    /** 白名单配置 */
+    whitelist?: {
+        /** 是否启用 */
+        enabled: boolean;
+        /** 文件路径 */
+        path: string;
+    };
+    /** 输入时检测 */
+    checkOnType?: boolean;
+    /** 保存时检测 */
+    checkOnSave?: boolean;
     /** 显示配置 */
-    display: {
+    display?: {
         severity: 'Error' | 'Warning' | 'Information';
         showInProblems: boolean;
         showWordCount: boolean;
+    };
+    // 兼容旧版配置
+    /** @deprecated 已废弃，使用 builtInLibrary.levels */
+    levels?: Record<SensitiveLevel, boolean>;
+    /** @deprecated 已废弃，使用 whitelist */
+    customWords?: {
+        enabled: boolean;
+        blacklistPath: string;
+        whitelistPath: string;
     };
 }

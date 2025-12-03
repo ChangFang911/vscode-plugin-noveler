@@ -60,7 +60,7 @@ export class SensitiveWordService {
     }
 
     /**
-     * 异步初始化（加载词库）
+     * 异步初始化(加载词库)
      */
     private async initializeAsync(): Promise<void> {
         if (!this.config.enabled) {
@@ -74,10 +74,22 @@ export class SensitiveWordService {
             this.whitelist.clear();
 
             // 1. 加载内置词库
-            await this.loadBuiltinLibrary();
+            if (this.config.builtInLibrary?.enabled) {
+                await this.loadBuiltinLibrary();
+            }
 
-            // 2. 加载自定义词库
-            if (this.config.customWords.enabled) {
+            // 2. 加载自定义敏感词库
+            if (this.config.customLibrary?.enabled) {
+                await this.loadCustomSensitiveLibrary();
+            }
+
+            // 3. 加载白名单
+            if (this.config.whitelist?.enabled) {
+                await this.loadWhitelist();
+            }
+
+            // 兼容旧版配置：如果使用了 customWords 配置
+            if (this.config.customWords?.enabled) {
                 await this.loadCustomLibrary();
             }
 
@@ -92,23 +104,29 @@ export class SensitiveWordService {
      */
     private loadConfig(): void {
         const configService = ConfigService.getInstance();
-        const rawConfig = configService.getConfig();
+        const projectConfig = configService.getConfig();
 
         // 默认配置
         const defaultConfig: SensitiveWordConfig = {
             enabled: true,
-            levels: {
-                high: true,
-                medium: true,
-                low: false
+            builtInLibrary: {
+                enabled: true,
+                levels: {
+                    high: true,
+                    medium: false,
+                    low: false
+                }
+            },
+            customLibrary: {
+                enabled: true,
+                path: '.noveler/sensitive-words/custom-words.jsonc'
+            },
+            whitelist: {
+                enabled: true,
+                path: '.noveler/sensitive-words/whitelist.jsonc'
             },
             checkOnType: true,
             checkOnSave: true,
-            customWords: {
-                enabled: true,
-                blacklistPath: '.noveler/sensitive-words/blacklist.json',
-                whitelistPath: '.noveler/sensitive-words/whitelist.json'
-            },
             display: {
                 severity: 'Warning',
                 showInProblems: true,
@@ -116,15 +134,61 @@ export class SensitiveWordService {
             }
         };
 
-        // 合并用户配置
+        // 合并项目配置（仅使用 novel.json 中的配置）
+        const userConfig = projectConfig.sensitiveWords;
+
+        // 处理新旧配置兼容
+        let builtInLibrary = defaultConfig.builtInLibrary;
+        if (userConfig?.builtInLibrary) {
+            builtInLibrary = {
+                ...defaultConfig.builtInLibrary,
+                ...userConfig.builtInLibrary,
+                levels: {
+                    ...defaultConfig.builtInLibrary!.levels,
+                    ...userConfig.builtInLibrary.levels
+                }
+            };
+        } else if (userConfig?.levels) {
+            // 兼容旧版配置：levels 直接配置的情况
+            builtInLibrary = {
+                enabled: true,
+                levels: {
+                    ...defaultConfig.builtInLibrary!.levels,
+                    ...userConfig.levels
+                }
+            };
+        }
+
         this.config = {
-            ...defaultConfig,
-            ...rawConfig.sensitiveWords
+            enabled: userConfig?.enabled !== undefined ? userConfig.enabled : defaultConfig.enabled,
+            builtInLibrary,
+            customLibrary: {
+                enabled: userConfig?.customLibrary?.enabled !== undefined ? userConfig.customLibrary.enabled : defaultConfig.customLibrary!.enabled,
+                path: userConfig?.customLibrary?.path || defaultConfig.customLibrary!.path
+            },
+            whitelist: {
+                enabled: userConfig?.whitelist?.enabled !== undefined ? userConfig.whitelist.enabled : defaultConfig.whitelist!.enabled,
+                path: userConfig?.whitelist?.path || defaultConfig.whitelist!.path
+            },
+            checkOnType: userConfig?.checkOnType !== undefined ? userConfig.checkOnType : defaultConfig.checkOnType,
+            checkOnSave: userConfig?.checkOnSave !== undefined ? userConfig.checkOnSave : defaultConfig.checkOnSave,
+            // 兼容旧版配置
+            customWords: userConfig?.customWords ? {
+                enabled: userConfig.customWords.enabled,
+                blacklistPath: userConfig.customWords.blacklistPath,
+                whitelistPath: userConfig.customWords.whitelistPath
+            } : undefined,
+            display: {
+                severity: userConfig?.display?.severity || defaultConfig.display!.severity,
+                showInProblems: userConfig?.display?.showInProblems !== undefined ? userConfig.display.showInProblems : defaultConfig.display!.showInProblems,
+                showWordCount: userConfig?.display?.showWordCount !== undefined ? userConfig.display.showWordCount : defaultConfig.display!.showWordCount
+            }
         };
 
-        Logger.info('[SensitiveWord] 加载配置:', {
+        Logger.info('[SensitiveWord] 加载配置完成:', {
             enabled: this.config.enabled,
-            levels: this.config.levels,
+            builtInLibrary: this.config.builtInLibrary,
+            customLibrary: this.config.customLibrary,
             checkOnType: this.config.checkOnType
         });
     }
@@ -147,7 +211,7 @@ export class SensitiveWordService {
         // 根据配置加载各级别词库
         const levels: SensitiveLevel[] = ['high', 'medium', 'low'];
         for (const level of levels) {
-            if (this.config.levels[level]) {
+            if (this.config.builtInLibrary?.levels[level]) {
                 await this.loadLevelWords(libPath, level);
             }
         }
@@ -178,7 +242,64 @@ export class SensitiveWordService {
     }
 
     /**
-     * 加载自定义词库
+     * 加载自定义敏感词库（用户完全自定义的敏感词列表）
+     */
+    private async loadCustomSensitiveLibrary(): Promise<void> {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) {
+            return;
+        }
+
+        const customPath = path.join(workspaceRoot, this.config.customLibrary!.path);
+        if (!fs.existsSync(customPath)) {
+            Logger.info(`自定义敏感词库文件不存在: ${customPath}`);
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(customPath, 'utf-8');
+            const data: CustomWordLibrary = JSON.parse(content);
+
+            if (data.words && Array.isArray(data.words)) {
+                // 简化版：所有自定义敏感词都视为 high 级别
+                this.trie.insertBatch(data.words, 'high');
+                Logger.info(`加载自定义敏感词库，共 ${data.words.length} 个词`);
+            }
+        } catch (error) {
+            Logger.error('加载自定义敏感词库失败', error);
+        }
+    }
+
+    /**
+     * 加载白名单
+     */
+    private async loadWhitelist(): Promise<void> {
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) {
+            return;
+        }
+
+        const whitelistPath = path.join(workspaceRoot, this.config.whitelist!.path);
+        if (!fs.existsSync(whitelistPath)) {
+            Logger.info(`白名单文件不存在: ${whitelistPath}`);
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(whitelistPath, 'utf-8');
+            const data: CustomWordLibrary = JSON.parse(content);
+
+            if (data.words && Array.isArray(data.words)) {
+                this.whitelist = new Set(data.words);
+                Logger.info(`加载白名单，共 ${this.whitelist.size} 个词`);
+            }
+        } catch (error) {
+            Logger.error('加载白名单失败', error);
+        }
+    }
+
+    /**
+     * 加载黑名单/白名单（用于微调内置词库）
      */
     private async loadCustomLibrary(): Promise<void> {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -187,7 +308,7 @@ export class SensitiveWordService {
         }
 
         // 加载黑名单
-        const blacklistPath = path.join(workspaceRoot, this.config.customWords.blacklistPath);
+        const blacklistPath = path.join(workspaceRoot, this.config.customWords!.blacklistPath);
         if (fs.existsSync(blacklistPath)) {
             try {
                 const content = fs.readFileSync(blacklistPath, 'utf-8');
@@ -200,7 +321,7 @@ export class SensitiveWordService {
         }
 
         // 加载白名单
-        const whitelistPath = path.join(workspaceRoot, this.config.customWords.whitelistPath);
+        const whitelistPath = path.join(workspaceRoot, this.config.customWords!.whitelistPath);
         if (fs.existsSync(whitelistPath)) {
             try {
                 const content = fs.readFileSync(whitelistPath, 'utf-8');

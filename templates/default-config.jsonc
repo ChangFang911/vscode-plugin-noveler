@@ -68,35 +68,49 @@
       "value": true
     },
 
+    // ==================== 自动保存 ====================
+    // 是否启用 VSCode 自动保存功能（推荐开启，避免意外丢失内容）
+    "autoSave": {
+      "value": true
+    },
+
     // ==================== 敏感词检测 ====================
     // 自动检测小说中的敏感词汇，帮助规避审核风险
     "sensitiveWords": {
       // 总开关
       "enabled": true,
 
-      // 检测级别（选择启用哪些级别）
-      "levels": {
-        "high": true,       // 高危：政治、严重暴力、严重违法（推荐启用）
-        "medium": true,     // 中危：色情、一般违法、宗教敏感（推荐启用）
-        "low": false        // 低危：广告、争议词汇、不文明用语（可选启用）
+      // 内置词库配置（插件自带的 900 词敏感词库）
+      "builtInLibrary": {
+        "enabled": true,  // 是否使用内置词库
+        "levels": {
+          "high": true,    // ✅ 高危级别（默认开启）：政治、严重暴力、严重违法等红线词汇，强烈建议启用
+          "medium": false, // ❌ 中危级别（默认关闭）：色情、毒品、赌博、宗教敏感等风险词汇，根据题材选择
+          "low": false     // ❌ 低危级别（默认关闭）：脏话、广告、歧视性语言等质量词汇，可选启用
+        }
+      },
+
+      // 自定义敏感词库配置（完全由您自己维护的敏感词列表）
+      "customLibrary": {
+        "enabled": true,  // ��� 默认开启
+        "path": ".noveler/sensitive-words/custom-words.jsonc"
+      },
+
+      // 白名单配置（排除误报的词汇）
+      "whitelist": {
+        "enabled": true,  // ✅ 默认开启
+        "path": ".noveler/sensitive-words/whitelist.jsonc"  // 排除误报的词汇（如人物名、地名）
       },
 
       // 检测时机
-      "checkOnType": true,        // 输入时检测（防抖 500ms）
-      "checkOnSave": true,        // 保存时检测
-
-      // 自定义词库
-      "customWords": {
-        "enabled": true,
-        "blacklistPath": ".noveler/sensitive-words/blacklist.json",  // 自定义黑名单
-        "whitelistPath": ".noveler/sensitive-words/whitelist.json"   // 自定义白名单
-      },
+      "checkOnType": true,   // 输入时实时检测（防抖 500ms，不影响性能）
+      "checkOnSave": true,   // 保存文件时检测
 
       // 显示设置
       "display": {
-        "severity": "Warning",              // "Error" | "Warning" | "Information"
-        "showInProblems": true,             // 在问题面板显示
-        "showWordCount": true               // 状态栏显示敏感词数量
+        "severity": "Warning",       // 问题严重度："Error"（错误）| "Warning"（警告）| "Information"（提示）
+        "showInProblems": true,      // 是否在问题面板（Problems）中显示
+        "showWordCount": true        // 是否在状态栏显示敏感词数量
       }
     },
 

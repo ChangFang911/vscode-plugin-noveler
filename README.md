@@ -260,6 +260,7 @@ modified: "2025-11-19 10:00:00"
 **配置说明**：
 - `editor.markdownFontSize`：Markdown 文件的字号（推荐 16-18）
 - `autoEmptyLine`：是否自动插入空行
+- `autoSave`：是否启用自动保存（推荐开启）
 - `characters`：全局人物名称列表，用于高亮
 - `sensitiveWords.enabled`：是否启用敏感词检测
 - `sensitiveWords.levels`：启用的检测级别（high/medium/low）
@@ -270,22 +271,7 @@ modified: "2025-11-19 10:00:00"
 
 详细配置说明请查看 [novel.json 配置文档](docs/novel-json配置说明.md)
 
-### 全局配置（可选）
-
-如果没有 `novel.json` 文件，插件会回退到 VS Code 全局设置。在 VS Code 设置中搜索 "Noveler"：
-
-```json
-{
-  "noveler.autoFormat": true,
-  "noveler.showWordCountInStatusBar": true,
-  "noveler.chineseQuoteStyle": "「」",
-  "noveler.autoEmptyLine": true,
-  "noveler.autoSave": true,
-  "noveler.autoUpdateReadmeOnCreate": "ask"
-}
-```
-
-**推荐使用项目级配置（`novel.json`）**，因为：
+**为什么使用项目级配置？**
 - ✅ 配置跟随项目，方便版本管理
 - ✅ 不同项目可以有不同的配置
 - ✅ 团队协作时配置统一

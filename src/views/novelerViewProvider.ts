@@ -344,6 +344,18 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '查看详细的写作统计和可视化数据'
             ),
             new NovelerTreeItem(
+                '⚠️ 敏感词配置',
+                NodeType.ActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.openSensitiveWordsConfig',
+                    title: '打开敏感词配置',
+                },
+                'actionItem',
+                undefined,
+                '配置敏感词检测级别和自定义词库'
+            ),
+            new NovelerTreeItem(
                 '⚙️ 打开配置文件',
                 NodeType.ActionItem,
                 vscode.TreeItemCollapsibleState.None,

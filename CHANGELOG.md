@@ -5,6 +5,55 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2025-12-03
+
+### 重大改进 - 敏感词配置体验优化
+
+#### 🎯 用户体验全面升级
+- **自动创建配置文件**：初始化项目时自动创建带完整注释的配置文件，无需手动复制重命名
+- **简化配置结构**：配置文件采用简单的字符串数组格式，无需复杂的 level/reason 字段
+- **统一使用 JSONC 格式**：所有配置文件（novel.jsonc, custom-words.jsonc, whitelist.jsonc）统一使用 JSONC 格式，支持注释
+- **保留注释功能**：使用 jsonc-parser 库，右键添加词汇时自动保留文件中的注释
+
+#### 📝 配置文件优化
+- **custom-words.jsonc**：自定义敏感词库，带详细使用说明
+  - 📖 3 步使用指南
+  - 💡 4 个实际应用场景
+  - ⚠️ 重要注意事项
+- **whitelist.jsonc**：白名单配置，排除误报词汇
+  - 人物名、地名、技能名等特殊术语
+  - 架空世界词汇支持
+
+#### 🚀 交互方式改进
+- **选项菜单**：点击侧边栏"敏感词配置"显示选项菜单，引导用户选择要编辑的文件
+  - ⚙️ 配置检测级别（调整内置词库）
+  - ➕ 管理自定义敏感词
+  - ➖ 管理白名单
+- **右键快捷操作**：选中文字后右键菜单新增
+  - "Noveler: 添加到自定义敏感词库"
+  - "Noveler: 添加到白名单"
+
+#### 🗑️ 简化设计
+- **移除冗余文件**：删除 blacklist（黑名单）配置，与 custom-words 合并
+- **减少文件数量**：从 3 个配置文件（blacklist, custom-words, whitelist）简化为 2 个（custom-words, whitelist）
+- **默认启用**：自定义词库和白名单默认开启，无需手动配置
+
+#### 🔧 技术改进
+- 使用 `jsonc-parser` 库实现注释保留
+- 配置文件路径统一更新为 `.jsonc` 扩展名
+- 服务层完全兼容 JSONC 格式
+
+### 配置变更
+- **新文件**：
+  - `.noveler/sensitive-words/custom-words.jsonc`（自动创建）
+  - `.noveler/sensitive-words/whitelist.jsonc`（自动创建）
+- **移除文件**：
+  - `blacklist-template.jsonc`（已删除）
+  - `blacklist.json`（不再使用）
+- **配置路径更新**：
+  - `customLibrary.path`: `.noveler/sensitive-words/custom-words.jsonc`
+  - `whitelist.path`: `.noveler/sensitive-words/whitelist.jsonc`
+
 ## [0.3.4] - 2025-12-03
 
 ### 新功能

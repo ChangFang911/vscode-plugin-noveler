@@ -16,9 +16,12 @@ import { StatsWebviewProvider } from './views/statsWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { updateReadme } from './utils/readmeUpdater';
+import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
+import { openSensitiveWordsConfig } from './commands/openSensitiveWordsConfigCommand';
+import { addToCustomWords, addToWhitelist } from './commands/addToSensitiveWordsCommand';
 import {
     renameChapter,
     markChapterCompleted,
@@ -155,6 +158,13 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.initProject', async () => {
             await initProject(context);
+        })
+    );
+
+    // 注册命令：打开敏感词配置
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.openSensitiveWordsConfig', async () => {
+            await openSensitiveWordsConfig();
         })
     );
 
@@ -334,6 +344,16 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('noveler.deleteCharacter', deleteCharacter)
     );
 
+    // 注册命令：添加选中文本到自定义敏感词库
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.addToCustomWords', addToCustomWords)
+    );
+
+    // 注册命令：添加选中文本到白名单
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.addSelectedToWhitelist', addToWhitelist)
+    );
+
     // 注册命令：重新加载敏感词库
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.reloadSensitiveWords', async () => {
@@ -486,7 +506,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 const filePath = document.uri.fsPath;
                 if (filePath.includes('/chapters/') || filePath.includes('/characters/')) {
                     readmeUpdateDebouncer.debounce(async () => {
-                        await updateReadme();
+                        await handleReadmeAutoUpdate();
                     });
                 }
             }
