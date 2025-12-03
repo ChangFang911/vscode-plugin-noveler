@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { ChineseNovelFormatProvider } from './providers/formatProvider';
 import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
@@ -6,6 +8,9 @@ import { ChapterCodeLensProvider } from './providers/codeLensProvider';
 import { ConfigService } from './services/configService';
 import { FocusModeService } from './services/focusModeService';
 import { ProjectStatsService } from './services/projectStatsService';
+import { SensitiveWordService } from './services/sensitiveWordService';
+import { SensitiveWordDiagnosticProvider } from './providers/sensitiveWordDiagnostic';
+import { SensitiveWordCodeActionProvider } from './providers/sensitiveWordCodeAction';
 import { NovelerViewProvider } from './views/novelerViewProvider';
 import { StatsWebviewProvider } from './views/statsWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
@@ -36,6 +41,8 @@ let codeLensProvider: ChapterCodeLensProvider;
 let configService: ConfigService;
 let focusModeService: FocusModeService;
 let statsWebviewProvider: StatsWebviewProvider;
+let sensitiveWordService: SensitiveWordService;
+let sensitiveWordDiagnostic: SensitiveWordDiagnosticProvider;
 
 // 防抖器
 let wordCountDebouncer: Debouncer;
@@ -77,6 +84,23 @@ export async function activate(context: vscode.ExtensionContext) {
     // 初始化高亮提供者
     highlightProvider = new NovelHighlightProvider();
     context.subscriptions.push(highlightProvider);
+
+    // 初始化敏感词检测服务（等待异步加载完成）
+    sensitiveWordService = await SensitiveWordService.initialize(context);
+    sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
+    sensitiveWordDiagnostic.register(context);
+
+    // 注册敏感词快速修复提供器
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            'markdown',
+            new SensitiveWordCodeActionProvider(),
+            {
+                providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
+            }
+        )
+    );
+    Logger.info('敏感词检测功能已启用');
 
     // 初始化 Code Lens 提供者
     codeLensProvider = new ChapterCodeLensProvider(wordCountService);
@@ -217,7 +241,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('noveler.reloadHighlights', () => {
             highlightProvider.reloadDecorations();
             updateHighlights(vscode.window.activeTextEditor);
-            vscode.window.showInformationMessage('Noveler: 高亮配置已重新加载');
+            Logger.info('高亮配置已重新加载');
+            // 不再显示通知，只记录日志
         })
     );
 
@@ -307,6 +332,100 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.deleteCharacter', deleteCharacter)
+    );
+
+    // 注册命令：重新加载敏感词库
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.reloadSensitiveWords', async () => {
+            try {
+                await sensitiveWordService.reload();
+                vscode.window.showInformationMessage('敏感词库已重新加载');
+
+                // 重新检测当前文档
+                if (vscode.window.activeTextEditor) {
+                    sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
+                }
+            } catch (error) {
+                handleError('重新加载敏感词库失败', error, ErrorSeverity.Error);
+            }
+        })
+    );
+
+    // 注册命令：添加到白名单
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.addToWhitelist', async (word: string) => {
+            try {
+                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                if (!workspaceRoot) {
+                    vscode.window.showErrorMessage('请先打开一个工作区');
+                    return;
+                }
+
+                const whitelistDir = path.join(workspaceRoot, '.noveler', 'sensitive-words');
+                const whitelistPath = path.join(whitelistDir, 'whitelist.json');
+
+                // 确保目录存在
+                if (!fs.existsSync(whitelistDir)) {
+                    fs.mkdirSync(whitelistDir, { recursive: true });
+                }
+
+                // 读取或创建白名单文件
+                interface WhitelistFile {
+                    description: string;
+                    words: string[];
+                }
+
+                let whitelist: WhitelistFile;
+                if (fs.existsSync(whitelistPath)) {
+                    const content = fs.readFileSync(whitelistPath, 'utf-8');
+                    whitelist = JSON.parse(content);
+                } else {
+                    whitelist = {
+                        description: '用户自定义白名单',
+                        words: []
+                    };
+                }
+
+                // 检查是否已存在
+                if (whitelist.words.includes(word)) {
+                    vscode.window.showInformationMessage(`"${word}" 已在白名单中`);
+                    return;
+                }
+
+                // 添加词汇
+                whitelist.words.push(word);
+
+                // 保存文件
+                fs.writeFileSync(whitelistPath, JSON.stringify(whitelist, null, 2), 'utf-8');
+
+                // 重新加载词库
+                await sensitiveWordService.reload();
+
+                // 重新检测当前文档
+                if (vscode.window.activeTextEditor) {
+                    sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
+                }
+
+                vscode.window.showInformationMessage(`已将 "${word}" 添加到白名单`);
+            } catch (error) {
+                handleError('添加到白名单失败', error, ErrorSeverity.Error);
+            }
+        })
+    );
+
+    // 注册命令：忽略敏感词（实际不做任何事）
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.ignoreSensitiveWord', () => {
+            // 这个命令不做任何事，只是提供一个选项让用户关闭提示
+        })
+    );
+
+    // 注册命令：显示敏感词详情
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.showSensitiveWordDetails', () => {
+            // 打开问题面板
+            vscode.commands.executeCommand('workbench.actions.view.problems');
+        })
     );
 
     // 注册命令：跳转到 README 指定位置

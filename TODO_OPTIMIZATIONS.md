@@ -6,9 +6,9 @@
 
 ## 📊 总体进度
 
-- ✅ **已完成**: 15 项 (高优 7 + 中优 7 + 低优 1)
-- 🚧 **待完成**: 6 项
-- 📈 **完成率**: 71% (15/21)
+- ✅ **已完成**: 16 项 (高优 7 + 中优 7 + 低优 2)
+- 🚧 **待完成**: 10 项 (低优 10)
+- 📈 **完成率**: 62% (16/26)
 
 ---
 
@@ -265,25 +265,138 @@ export class NovelerViewProvider {
 
 ---
 
-### 8. 大纲分类功能
+## 💡 低优先级 (长期功能)
+
+### 8. 大纲分类功能 ⭐⭐
 **工作量**: 4-6 小时
+**性价比**: 中
 **功能**: 支持 drafts/ 和 references/ 子目录
 
-### 9. 导出功能
+### 9. 导出功能 ⭐⭐
 **工作量**: 12-20 小时
+**性价比**: 中
 **功能**: 导出为 MD / PDF / EPUB
 
-### 10. 人物关系图
+### 10. 人物关系图 ⭐⭐
 **工作量**: 16-24 小时
+**性价比**: 低
 **功能**: 可视化人物关系
 
-### 11. 写作进度追踪
+### 11. 写作进度追踪 ⭐⭐⭐
 **工作量**: 8-12 小时
+**性价比**: 中
 **功能**: 每日字数统计、写作曲线
 
-### 12. 智能提示补全
+### 12. 智能提示补全 ⭐⭐⭐
 **工作量**: 12-16 小时
+**性价比**: 中
 **功能**: 人物名、地点名自动补全
+
+### 13. 随机起名功能 ⭐⭐⭐⭐
+**工作量**: 6-10 小时
+**性价比**: 高
+**功能**: 多风格姓名生成工具
+
+**实现方案**:
+- **中文姓名**: 支持现代、经典、奇幻、历史等多种风格的中文姓名生成
+- **英文名字**: 基于 `@faker-js/faker` 库，提供真实的英文姓名组合
+- **日语名字**: 包含常见日本姓氏和名字的组合生成
+- **奇幻风格**: 专为奇幻小说设计的音节组合名字生成器
+
+**技术栈**:
+```typescript
+// 依赖安装
+npm install @faker-js/faker
+
+// 姓名生成服务
+class NameGeneratorService {
+    generateChineseName(style: 'modern' | 'classic' | 'fantasy' | 'historical'): string
+    generateEnglishName(gender?: 'male' | 'female'): string
+    generateJapaneseName(gender?: 'male' | 'female'): string
+    generateFantasyName(length?: number): string
+}
+```
+
+### 14. 手机视图预览 ⭐⭐⭐
+**工作量**: 8-12 小时
+**性价比**: 中
+**功能**: 移动端阅读体验预览
+
+**实现方案**:
+- Webview 面板，模拟手机屏幕尺寸
+- 实时预览当前章节
+- 支持多种屏幕尺寸切换（iPhone、Android）
+- 支持深色/浅色主题预览
+
+### 15. 分卷功能 ⭐⭐⭐⭐
+**工作量**: 6-8 小时
+**性价比**: 高
+**功能**: 支持多卷本小说管理
+
+**实现方案**:
+```
+novel-project/
+├── volumes/
+│   ├── volume-01/
+│   │   ├── chapters/
+│   │   └── volume.json
+│   ├── volume-02/
+│   │   ├── chapters/
+│   │   └── volume.json
+├── characters/
+└── novel.jsonc
+```
+
+- 侧边栏树形显示分卷结构
+- README 自动生成分卷目录
+- 跨卷字数统计
+
+### ✅ 16. 敏感词检测提示 ⭐⭐⭐⭐⭐ (已完成)
+**工作量**: 4-6 小时
+**性价比**: 极高
+**功能**: 实时检测文本中的敏感词汇
+
+**完成情况**:
+- ✅ 实现 Trie 树算法进行 O(n) 高效检测
+- ✅ 三级词库系统（high/medium/low）
+- ✅ 实时下划线标记（防抖 500ms）
+- ✅ VSCode Diagnostics API 集成
+- ✅ Quick Fix 快速修复菜单（添加白名单、删除、替换、忽略）
+- ✅ 自定义黑名单/白名单支持
+- ✅ 状态栏显示敏感词数量
+- ✅ 可配置检测级别、检测时机、显示方式
+- ✅ README 文档完善
+
+**已实现文件**:
+1. src/utils/trieTree.ts - Trie 树核心算法
+2. src/services/sensitiveWordService.ts - 敏感词检测服务
+3. src/providers/sensitiveWordDiagnostic.ts - 诊断提供器
+4. src/providers/sensitiveWordCodeAction.ts - Quick Fix 提供器
+5. templates/sensitive-words/ - 内置词库（high/medium/low）
+6. templates/default-config.jsonc - 配置模板
+
+**完成时间**: 2025-12-03
+
+### 17. 打包优化 ⭐⭐⭐⭐
+**工作量**: 4-6 小时
+**性价比**: 高
+**功能**: 减小扩展包体积，提升加载速度
+
+**实现方案**:
+- 使用 webpack/esbuild 打包，减少文件数量
+- 配置 `.vscodeignore` 排除不必要文件
+- 压缩和混淆代码
+- 目标：从 1.2MB 减少到 500KB 以内
+
+**技术步骤**:
+```bash
+# 1. 安装打包工具
+npm install --save-dev webpack webpack-cli ts-loader
+
+# 2. 配置 webpack.config.js
+# 3. 更新 package.json scripts
+# 4. 测试打包后的扩展
+```
 
 ---
 
@@ -315,7 +428,7 @@ export class NovelerViewProvider {
 ---
 
 ### 长期 (根据需求)
-8-12. 功能增强项目
+8-17. 功能增强项目（包括随机起名、手机预览、分卷、敏感词检测、打包优化等）
 
 ---
 

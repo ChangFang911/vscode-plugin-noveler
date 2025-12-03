@@ -144,10 +144,31 @@ export class NovelHighlightProvider {
         const pattern = new vscode.RelativePattern(workspaceFolder, `${CHARACTERS_FOLDER}/*.md`);
         this.characterFolderWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-        // 文件创建、修改、删除时重新加载人物名称
-        this.characterFolderWatcher.onDidCreate(() => this.loadCharacterNames());
-        this.characterFolderWatcher.onDidChange(() => this.loadCharacterNames());
-        this.characterFolderWatcher.onDidDelete(() => this.loadCharacterNames());
+        // 文件创建、修改、删除时重新加载人物名称并刷新高亮
+        this.characterFolderWatcher.onDidCreate(async () => {
+            await this.loadCharacterNames();
+            this.refreshCurrentEditorHighlights();
+        });
+        this.characterFolderWatcher.onDidChange(async () => {
+            await this.loadCharacterNames();
+            this.refreshCurrentEditorHighlights();
+        });
+        this.characterFolderWatcher.onDidDelete(async () => {
+            await this.loadCharacterNames();
+            this.refreshCurrentEditorHighlights();
+        });
+    }
+
+    /**
+     * 刷新当前活动编辑器的高亮
+     * 在人物列表变化时调用
+     */
+    private refreshCurrentEditorHighlights() {
+        const editor = vscode.window.activeTextEditor;
+        if (editor && editor.document.languageId === 'markdown') {
+            Logger.debug('人物列表已更新，刷新编辑器高亮');
+            this.updateHighlights(editor);
+        }
     }
 
     // 获取人物名称列表（使用缓存）

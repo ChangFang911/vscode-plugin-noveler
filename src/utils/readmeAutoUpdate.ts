@@ -16,8 +16,8 @@ export async function handleReadmeAutoUpdate(): Promise<void> {
     const autoUpdate = configService.getReadmeAutoUpdateMode();
 
     if (autoUpdate === 'always') {
-        // 总是自动更新
-        await updateReadme();
+        // 总是自动更新（静默模式，不显示通知）
+        await updateReadme(true);
     } else if (autoUpdate === 'ask') {
         // 询问用户
         const result = await vscode.window.showInformationMessage(
@@ -25,7 +25,7 @@ export async function handleReadmeAutoUpdate(): Promise<void> {
             '更新', '跳过'
         );
         if (result === '更新') {
-            await updateReadme();
+            await updateReadme(false); // 用户主动选择，显示通知
         }
     }
     // autoUpdate === 'never' 时什么都不做

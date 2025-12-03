@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -108,6 +108,10 @@
       {
         "command": "noveler.jumpToReadmeSection",
         "title": "Noveler: 跳转到 README 指定位置"
+      },
+      {
+        "command": "noveler.reloadSensitiveWords",
+        "title": "Noveler: 重新加载敏感词库"
       }
     ],
     "menus": {

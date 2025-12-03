@@ -600,8 +600,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         try {
             const files = await vscode.workspace.fs.readDirectory(folderPath);
             const mdFiles = files
-                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
-                .sort(([a], [b]) => a.localeCompare(b));
+                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'));
 
             if (mdFiles.length === 0) {
                 return [
@@ -617,9 +616,41 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 ];
             }
 
+            // 对于章节，提取 chapter 字段进行数字排序
+            const filesWithMeta: Array<[string, number | null]> = [];
+            for (const [filename] of mdFiles) {
+                if (config.folderName === 'chapters') {
+                    try {
+                        const filePath = vscode.Uri.joinPath(folderPath, filename);
+                        const content = await vscode.workspace.fs.readFile(filePath);
+                        const text = Buffer.from(content).toString('utf8');
+                        const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+                        const chapterNum = frontMatter.chapter ? Number(frontMatter.chapter) : null;
+                        filesWithMeta.push([filename, chapterNum]);
+                    } catch {
+                        filesWithMeta.push([filename, null]);
+                    }
+                } else {
+                    filesWithMeta.push([filename, null]);
+                }
+            }
+
+            // 排序：有 chapter 字段的按数字排序，无 chapter 字段的按文件名排序
+            filesWithMeta.sort(([aName, aChapter], [bName, bChapter]) => {
+                if (aChapter !== null && bChapter !== null) {
+                    return aChapter - bChapter; // 数字排序
+                } else if (aChapter !== null) {
+                    return -1; // 有 chapter 的排前面
+                } else if (bChapter !== null) {
+                    return 1;
+                } else {
+                    return aName.localeCompare(bName); // 文件名排序
+                }
+            });
+
             const items: NovelerTreeItem[] = [];
 
-            for (const [filename] of mdFiles) {
+            for (const [filename] of filesWithMeta) {
                 const filePath = vscode.Uri.joinPath(folderPath, filename);
 
                 try {

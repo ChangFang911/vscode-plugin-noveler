@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "totalWords": 30,
+  "lastUpdate": "2025-12-02",
+  "levels": {
+    "high": 10,
+    "medium": 10,
+    "low": 10
+  },
+  "description": "Noveler 内置敏感词库（测试版）",
+  "license": "Community Curated"
+}

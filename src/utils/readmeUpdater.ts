@@ -178,8 +178,9 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
 
 /**
  * 更新 README.md 文件
+ * @param silent 是否静默更新（不显示通知）
  */
-export async function updateReadme(): Promise<void> {
+export async function updateReadme(silent = false): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
@@ -291,7 +292,12 @@ export async function updateReadme(): Promise<void> {
             Buffer.from(readmeContent, 'utf8')
         );
 
-        handleSuccess(`README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字，${stats.characters.length} 个人物`);
+        // 只在非静默模式下显示通知
+        if (!silent) {
+            handleSuccess(`README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字，${stats.characters.length} 个人物`);
+        } else {
+            Logger.info(`README 已更新 - 共 ${stats.totalChapters} 章，${stats.totalWords.toLocaleString()} 字，${stats.characters.length} 个人物`);
+        }
 
     } catch (error) {
         handleError('更新 README 失败', error);

@@ -4,6 +4,7 @@ import { CONFIG_FILE_NAME } from '../constants';
 import * as jsoncParser from 'jsonc-parser';
 import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
+import { SensitiveWordConfig } from '../types/sensitiveWord';
 
 /**
  * 高亮样式配置接口
@@ -71,6 +72,8 @@ export interface NovelConfig {
         /** 人物名称列表 */
         list?: string[];
     };
+    /** 敏感词检测配置 */
+    sensitiveWords?: SensitiveWordConfig;
 }
 
 /**

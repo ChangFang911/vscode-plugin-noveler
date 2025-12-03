@@ -36,6 +36,25 @@
 - **空格处理**：删除中文之间多余的空格
 - **特殊符号**：统一省略号（…）和破折号（——）
 
+### 🛡️ 敏感词检测
+
+自动检测小说中的敏感词汇，帮助规避审核风险：
+
+- **三级词库系统**：
+  - **高危**：政治、严重暴力、严重违法（推荐启用）
+  - **中危**：色情、一般违法、宗教敏感（推荐启用）
+  - **低危**：广告、争议词汇、不文明用语（可选启用）
+- **实时检测**：输入时自动检测（防抖 500ms），保存时再次检查
+- **可视化标注**：黄色波浪线标记敏感词，问题面板显示详细信息
+- **快速修复**：
+  - 添加到白名单（如人物名、专有名词）
+  - 删除敏感词
+  - 替换为星号（***）
+  - 忽略此处
+- **自定义词库**：支持项目级黑名单和白名单配置
+- **状态栏显示**：实时显示当前文档中的敏感词数量
+- **灵活配置**：可选择启用的检测级别、检测时机、显示方式等
+
 ### ✍️ 写作辅助
 
 - **自动空行**：在 chapters 目录下按回车时自动插入空行，保持段落间距（可在 novel.json 中配置开关）
@@ -213,7 +232,27 @@ modified: "2025-11-19 10:00:00"
       "markdownFontSize": 16
     },
     "autoEmptyLine": true,
-    "characters": ["张无忌", "周芷若", "赵敏"]
+    "characters": ["张无忌", "周芷若", "赵敏"],
+    "sensitiveWords": {
+      "enabled": true,
+      "levels": {
+        "high": true,
+        "medium": true,
+        "low": false
+      },
+      "checkOnType": true,
+      "checkOnSave": true,
+      "customWords": {
+        "enabled": true,
+        "blacklistPath": ".noveler/sensitive-words/blacklist.json",
+        "whitelistPath": ".noveler/sensitive-words/whitelist.json"
+      },
+      "display": {
+        "severity": "Warning",
+        "showInProblems": true,
+        "showWordCount": true
+      }
+    }
   }
 }
 ```
@@ -222,6 +261,12 @@ modified: "2025-11-19 10:00:00"
 - `editor.markdownFontSize`：Markdown 文件的字号（推荐 16-18）
 - `autoEmptyLine`：是否自动插入空行
 - `characters`：全局人物名称列表，用于高亮
+- `sensitiveWords.enabled`：是否启用敏感词检测
+- `sensitiveWords.levels`：启用的检测级别（high/medium/low）
+- `sensitiveWords.checkOnType`：是否在输入时检测（防抖 500ms）
+- `sensitiveWords.checkOnSave`：是否在保存时检测
+- `sensitiveWords.customWords`：自定义词库配置（黑名单/白名单路径）
+- `sensitiveWords.display`：显示设置（严重性、是否显示数量等）
 
 详细配置说明请查看 [novel.json 配置文档](docs/novel-json配置说明.md)
 

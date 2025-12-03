@@ -1,0 +1,8 @@
+{
+  "description": "用户自定义黑名单模板。将此文件复制到项目根目录的 .noveler/sensitive-words/ 文件夹下，重命名为 blacklist.json，然后添加您认为敏感的词汇。",
+  "words": [
+    "示例敏感词1",
+    "示例敏感词2",
+    "您的自定义词汇"
+  ]
+}

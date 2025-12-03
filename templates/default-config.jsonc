@@ -68,6 +68,38 @@
       "value": true
     },
 
+    // ==================== 敏感词检测 ====================
+    // 自动检测小说中的敏感词汇，帮助规避审核风险
+    "sensitiveWords": {
+      // 总开关
+      "enabled": true,
+
+      // 检测级别（选择启用哪些级别）
+      "levels": {
+        "high": true,       // 高危：政治、严重暴力、严重违法（推荐启用）
+        "medium": true,     // 中危：色情、一般违法、宗教敏感（推荐启用）
+        "low": false        // 低危：广告、争议词汇、不文明用语（可选启用）
+      },
+
+      // 检测时机
+      "checkOnType": true,        // 输入时检测（防抖 500ms）
+      "checkOnSave": true,        // 保存时检测
+
+      // 自定义词库
+      "customWords": {
+        "enabled": true,
+        "blacklistPath": ".noveler/sensitive-words/blacklist.json",  // 自定义黑名单
+        "whitelistPath": ".noveler/sensitive-words/whitelist.json"   // 自定义白名单
+      },
+
+      // 显示设置
+      "display": {
+        "severity": "Warning",              // "Error" | "Warning" | "Information"
+        "showInProblems": true,             // 在问题面板显示
+        "showWordCount": true               // 状态栏显示敏感词数量
+      }
+    },
+
     // ==================== 全局人物列表 ====================
     // 已弃用：推荐使用 characters/ 目录管理人物
     // 此配置项将在未来版本移除
