@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { getContentWithoutFrontMatter, extractFrontMatter } from '../utils/frontMatterHelper';
 import { WordCountService } from '../services/wordCountService';
+import { getStatusDisplayName } from '../utils/statusHelper';
 
 export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
     private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
@@ -51,7 +52,8 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
 
                 // 获取 Front Matter 中的状态和目标字数
                 const frontMatter = extractFrontMatter(document);
-                const status = frontMatter?.status || '草稿';
+                const statusValue = frontMatter?.status || 'draft';
+                const status = getStatusDisplayName(statusValue); // 转换为中文显示
                 const targetWords = frontMatter?.targetWords || 0;
                 const progress = targetWords > 0 ? Math.round((totalWords / targetWords) * 100) : 0;
 

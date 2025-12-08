@@ -1,0 +1,37 @@
+{
+  "noveler": {
+    "highlight": {
+      "dialogue": {
+        "color": "#ce9178",
+        "backgroundColor": "rgba(206, 145, 120, 0.15)",
+        "fontStyle": "normal"
+      },
+      "thought": {
+        "color": "#608b4e",
+        "backgroundColor": "rgba(96, 139, 78, 0.15)",
+        "fontStyle": "italic"
+      },
+      "character": {
+        "color": "#4ec9b0",
+        "backgroundColor": "rgba(78, 201, 176, 0.15)",
+        "fontWeight": "bold"
+      },
+      "ellipsis": {
+        "color": "#569cd6",
+        "backgroundColor": "rgba(86, 156, 214, 0.15)",
+        "fontWeight": "bold"
+      }
+    },
+    "format": {
+      "convertQuotes": true,
+      "autoFormat": true,
+      "chineseQuoteStyle": "\"\""
+    },
+    "wordCount": {
+      "showInStatusBar": true,
+      "includePunctuation": true
+    },
+    "autoEmptyLine": true,
+    "characters": []
+  }
+}

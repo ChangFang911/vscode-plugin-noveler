@@ -7,6 +7,7 @@ import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
+import { Logger } from '../utils/logger';
 
 /**
  * 初始化小说项目
@@ -26,6 +27,77 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
     if (!novelName) {
         return;
+    }
+
+    // 询问是否启用分卷功能
+    interface VolumeOption extends vscode.QuickPickItem {
+        value: boolean;
+    }
+
+    const volumeOptions: VolumeOption[] = [
+        {
+            label: '$(folder) 启用分卷功能',
+            description: '适合长篇小说，按卷组织章节',
+            detail: '章节会被组织到不同的卷文件夹中（如：chapters/第一卷-崛起/第001章.md）',
+            value: true
+        },
+        {
+            label: '$(file) 不启用分卷',
+            description: '适合短篇或中篇，扁平章节结构',
+            detail: '所有章节直接放在 chapters/ 目录下（如：chapters/第001章.md）',
+            value: false
+        }
+    ];
+
+    const volumeChoice = await vscode.window.showQuickPick(volumeOptions, {
+        placeHolder: '请选择章节组织方式',
+        ignoreFocusOut: true
+    });
+
+    if (!volumeChoice) {
+        return;
+    }
+
+    const enableVolumes = volumeChoice.value;
+    let numberFormat: 'arabic' | 'chinese' | 'roman' = 'arabic';
+
+    // 如果启用分卷，询问编号格式
+    if (enableVolumes) {
+        interface NumberFormatOption extends vscode.QuickPickItem {
+            value: 'arabic' | 'chinese' | 'roman';
+        }
+
+        const formatOptions: NumberFormatOption[] = [
+            {
+                label: '$(symbol-number) 阿拉伯数字',
+                description: '第01卷-崛起',
+                detail: '现代、清晰、易于排序',
+                value: 'arabic'
+            },
+            {
+                label: '$(symbol-text) 中文数字',
+                description: '第一卷-崛起',
+                detail: '传统、符合中文习惯',
+                value: 'chinese'
+            },
+            {
+                label: '$(symbol-ruler) 罗马数字',
+                description: '第I卷-崛起',
+                detail: '西式、庄重、适合史诗题材',
+                value: 'roman'
+            }
+        ];
+
+        const formatChoice = await vscode.window.showQuickPick(formatOptions, {
+            placeHolder: '请选择卷编号格式',
+            ignoreFocusOut: true
+        });
+
+        if (!formatChoice) {
+            return;
+        }
+
+        numberFormat = formatChoice.value;
     }
 
     try {
@@ -75,8 +147,16 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
         // 创建 novel.jsonc 配置文件（保留注释）
         const now = formatDateTime(new Date());
 
-        // 在模板开头插入项目元信息
+        // 提取模板中的版本号
+        const versionMatch = templateText.match(/"version":\s*"([^"]+)"/);
+        const version = versionMatch ? versionMatch[1] : '0.5.0';
+
+        // 在模板开头插入版本号和项目元信息
         const projectMeta = `{
+  // ==================== 配置版本 ====================
+  // 自动管理，请勿手动修改
+  "version": "${version}",
+
   // ==================== 项目基本信息 ====================
   "name": "${novelName}",
   "author": "",
@@ -90,11 +170,23 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
   "noveler": {
 `;
 
-        // 提取 noveler 配置部分（去掉最外层的 { "noveler": { ... } }）
-        const novelerConfigText = templateText
+        // 提取 noveler 配置部分（去掉最外层的 { "version": "...", "noveler": { ... } }）
+        let novelerConfigText = templateText
             .substring(templateText.indexOf('"noveler"'))
             .replace(/^\s*"noveler":\s*{/, '')  // 去掉 "noveler": {
-            .replace(/}\s*$/, '');  // 去掉末尾的 }
+            .replace(/}\s*}\s*$/, '');  // 去掉末尾的两个 } }（noveler 的 } 和整个 JSON 的 }）
+
+        // 根据用户选择修改分卷配置
+        if (enableVolumes) {
+            // 启用分卷：设置 enabled: true, folderStructure: "nested"
+            novelerConfigText = novelerConfigText
+                .replace(/"enabled":\s*false/, '"enabled": true')
+                .replace(/"folderStructure":\s*"flat"/, '"folderStructure": "nested"')
+                .replace(/"numberFormat":\s*"arabic"/, `"numberFormat": "${numberFormat}"`);
+        } else {
+            // 不启用分卷：保持默认 enabled: false, folderStructure: "flat"
+            // 无需修改，模板默认值已经是这样
+        }
 
         const novelConfigText = projectMeta + novelerConfigText + '\n  }\n}';
 
@@ -245,11 +337,11 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
                 await vscode.workspace.fs.writeFile(fileUri, Buffer.from(file.content, 'utf8'));
             } catch (error) {
                 // 静默失败，不影响项目初始化
-                console.warn(`创建敏感词配置文件失败: ${file.name}`, error);
+                Logger.warn(`创建敏感词配置文件失败: ${file.name}`, error);
             }
         }
 
-        handleSuccess(`小说项目"${novelName}"初始化完成！已创建目录结构和配置文件`);
+        handleSuccess(`小说项目"${novelName}"初始化完成！已创建目录结构和配置文件\n${enableVolumes ? `✅ 已启用分卷功能（${numberFormat === 'arabic' ? '阿拉伯数字' : numberFormat === 'chinese' ? '中文数字' : '罗马数字'}编号）` : '📄 使用扁平章节结构'}`);
 
         // 刷新侧边栏视图
         vscode.commands.executeCommand('noveler.refreshView');

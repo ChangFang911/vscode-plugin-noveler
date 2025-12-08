@@ -2,6 +2,8 @@
  * Front Matter 类型定义
  */
 
+import { VolumeType } from './volume';
+
 /**
  * 章节 Front Matter 接口
  */
@@ -16,6 +18,10 @@ export interface ChapterFrontMatter {
     created: string;
     modified: string;
     status: string;
+    /** 所属卷序号（可选，仅在启用分卷功能时使用） */
+    volume?: number;
+    /** 所属卷类型（可选，仅在启用分卷功能时使用） */
+    volumeType?: VolumeType;
 }
 
 /**

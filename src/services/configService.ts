@@ -5,6 +5,7 @@ import * as jsoncParser from 'jsonc-parser';
 import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
 import { SensitiveWordConfig } from '../types/sensitiveWord';
+import { VolumesConfig } from '../types/volume';
 
 /**
  * 高亮样式配置接口
@@ -67,6 +68,11 @@ export interface NovelConfig {
         /** 是否启用自动空行 */
         value?: boolean;
     };
+    /** 段落缩进配置 */
+    paragraphIndent?: {
+        /** 是否启用段落首行缩进（两个全角空格） */
+        value?: boolean;
+    };
     /** 自动保存配置 */
     autoSave?: {
         /** 是否启用自动保存 */
@@ -79,6 +85,8 @@ export interface NovelConfig {
     };
     /** 敏感词检测配置 */
     sensitiveWords?: SensitiveWordConfig;
+    /** 分卷功能配置 */
+    volumes?: VolumesConfig;
 }
 
 /**
@@ -253,6 +261,9 @@ export class ConfigService {
             autoEmptyLine: {
                 value: true
             },
+            paragraphIndent: {
+                value: false  // 默认关闭，避免影响现有用户
+            },
             autoSave: {
                 value: true
             },
@@ -349,6 +360,15 @@ export class ConfigService {
     }
 
     /**
+     * 是否启用段落首行缩进功能
+     * 在 chapters 目录下编辑时，新段落会自动添加两个全角空格缩进
+     * @returns true 表示启用，false 表示禁用，默认为 false
+     */
+    public shouldParagraphIndent(): boolean {
+        return this.config.paragraphIndent?.value === true;
+    }
+
+    /**
      * 获取自动保存配置
      * 优先从项目配置读取，否则使用默认值 true
      * @returns true 表示启用自动保存，false 表示禁用，默认为 true
@@ -371,6 +391,27 @@ export class ConfigService {
      */
     public getTargetWords(): number {
         return this.config.targetWords?.default || 2500;
+    }
+
+    /**
+     * 获取分卷功能配置
+     * @returns 分卷配置对象
+     */
+    public getVolumesConfig(): VolumesConfig {
+        return this.config.volumes || {
+            enabled: false,
+            folderStructure: 'flat',
+            numberFormat: 'arabic',
+            chapterNumbering: 'global'
+        };
+    }
+
+    /**
+     * 是否启用分卷功能
+     * @returns true 表示启用，false 表示禁用，默认为 false
+     */
+    public isVolumesEnabled(): boolean {
+        return this.config.volumes?.enabled === true;
     }
 
     /**

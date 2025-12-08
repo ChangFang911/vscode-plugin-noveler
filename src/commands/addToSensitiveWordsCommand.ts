@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as jsonc from 'jsonc-parser';
 import { CustomWordLibrary } from '../types/sensitiveWord';
+import { Logger } from '../utils/logger';
 
 /**
  * 添加选中文本到自定义敏感词库
@@ -74,7 +75,7 @@ export async function addToCustomWords(): Promise<void> {
         // 重新加载敏感词服务
         vscode.commands.executeCommand('noveler.reloadSensitiveWords');
     } catch (error) {
-        console.error('[Noveler] 添加到自定义敏感词库失败', error);
+        Logger.error('添加到自定义敏感词库失败', error);
         vscode.window.showErrorMessage('添加到自定义敏感词库失败');
     }
 }
@@ -145,7 +146,7 @@ export async function addToWhitelist(): Promise<void> {
         // 重新加载敏感词服务
         vscode.commands.executeCommand('noveler.reloadSensitiveWords');
     } catch (error) {
-        console.error('[Noveler] 添加到白名单失败', error);
+        Logger.error('添加到白名单失败', error);
         vscode.window.showErrorMessage('添加到白名单失败');
     }
 }

@@ -1,13 +1,11 @@
-/**
- * README 更新工具
- */
-
 import * as vscode from 'vscode';
 import matter from 'gray-matter';
 import { handleError, handleSuccess, ErrorSeverity } from './errorHandler';
 import { ConfigService } from '../services/configService';
+import { VolumeService } from '../services/volumeService';
 import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
 import { Logger } from './logger';
+import { getStatusDisplayName } from './statusHelper';
 
 interface ChapterInfo {
     number: number;
@@ -15,6 +13,18 @@ interface ChapterInfo {
     fileName: string;
     wordCount: number;
     status: string;
+    volume?: number;
+    volumeType?: string;
+}
+
+interface VolumeChapters {
+    volumeNumber: number;
+    volumeType: string;
+    volumeTitle: string;
+    volumeStatus: string;
+    chapters: ChapterInfo[];
+    totalWords: number;
+    completedChapters: number;
 }
 
 interface CharacterInfo {
@@ -31,6 +41,8 @@ interface ProjectStats {
     totalChapters: number;
     chapters: ChapterInfo[];
     characters: CharacterInfo[];
+    volumes?: VolumeChapters[];  // 新增：卷分组信息
+    volumesEnabled: boolean;     // 新增：是否启用分卷
 }
 
 /**
@@ -42,11 +54,98 @@ export async function scanChapters(): Promise<ProjectStats> {
         throw new Error('未找到工作区');
     }
 
+    const configService = ConfigService.getInstance();
+    const volumesEnabled = configService.isVolumesEnabled();
+
     const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
     const chapters: ChapterInfo[] = [];
     let totalWords = 0;
     let completedChapters = 0;
 
+    // 如果启用分卷，使用 VolumeService 扫描
+    if (volumesEnabled) {
+        const volumeService = VolumeService.getInstance();
+        await volumeService.scanVolumes();
+        const volumes = volumeService.getVolumes();
+
+        const volumeChapters: VolumeChapters[] = [];
+
+        for (const volume of volumes) {
+            const volumeChapterList: ChapterInfo[] = [];
+            let volumeTotalWords = 0;
+            let volumeCompletedChapters = 0;
+
+            for (const chapterFile of volume.chapters) {
+                try {
+                    const fileUri = vscode.Uri.joinPath(
+                        workspaceFolder.uri,
+                        CHAPTERS_FOLDER,
+                        volume.folderName,
+                        chapterFile
+                    );
+                    const fileData = await vscode.workspace.fs.readFile(fileUri);
+                    const fileContent = Buffer.from(fileData).toString('utf8');
+
+                    const parsed = matter(fileContent);
+                    const frontMatter = parsed.data;
+
+                    if (frontMatter && frontMatter.chapter !== undefined) {
+                        const wordCount = frontMatter.wordCount || 0;
+                        const statusValue = frontMatter.status || 'draft';
+                        const status = getStatusDisplayName(statusValue); // 转换为中文显示
+
+                        const chapterInfo: ChapterInfo = {
+                            number: frontMatter.chapter,
+                            title: frontMatter.title || chapterFile,
+                            fileName: `${volume.folderName}/${chapterFile}`,
+                            wordCount: wordCount,
+                            status: status,
+                            volume: volume.volume,
+                            volumeType: volume.volumeType
+                        };
+
+                        volumeChapterList.push(chapterInfo);
+                        chapters.push(chapterInfo);
+
+                        volumeTotalWords += wordCount;
+                        totalWords += wordCount;
+
+                        if (status === '已完成') {
+                            volumeCompletedChapters++;
+                            completedChapters++;
+                        }
+                    }
+                } catch (error) {
+                    handleError(`读取章节文件失败 ${chapterFile}`, error, ErrorSeverity.Silent);
+                }
+            }
+
+            // 按章节号排序
+            volumeChapterList.sort((a, b) => a.number - b.number);
+
+            volumeChapters.push({
+                volumeNumber: volume.volume,
+                volumeType: volume.volumeType,
+                volumeTitle: volume.title,
+                volumeStatus: volume.status,
+                chapters: volumeChapterList,
+                totalWords: volumeTotalWords,
+                completedChapters: volumeCompletedChapters
+            });
+        }
+
+        return {
+            totalWords,
+            completedChapters,
+            totalChapters: chapters.length,
+            chapters,
+            characters: [],
+            volumes: volumeChapters,
+            volumesEnabled: true
+        };
+    }
+
+    // 扁平结构（未启用分卷）
     try {
         await vscode.workspace.fs.stat(chaptersFolderUri);
 
@@ -68,7 +167,8 @@ export async function scanChapters(): Promise<ProjectStats> {
 
                 if (frontMatter && frontMatter.chapter !== undefined) {
                     const wordCount = frontMatter.wordCount || 0;
-                    const status = frontMatter.status || '草稿';
+                    const statusValue = frontMatter.status || 'draft';
+                    const status = getStatusDisplayName(statusValue); // 转换为中文显示
 
                     chapters.push({
                         number: frontMatter.chapter,
@@ -102,7 +202,8 @@ export async function scanChapters(): Promise<ProjectStats> {
         completedChapters,
         totalChapters: chapters.length,
         chapters,
-        characters: []
+        characters: [],
+        volumesEnabled: false
     };
 }
 
@@ -248,7 +349,7 @@ export async function updateReadme(silent = false): Promise<void> {
         stats.characters = characters;
 
         // 更新目录部分
-        const chapterListContent = generateChapterList(stats.chapters);
+        const chapterListContent = generateChapterList(stats);
         readmeContent = updateSection(
             readmeContent,
             '## 目录',
@@ -329,17 +430,91 @@ function appendMissingSections(content: string, hasCatalog: boolean, hasProgress
 /**
  * 生成章节列表内容
  */
-function generateChapterList(chapters: ChapterInfo[]): string {
-    if (chapters.length === 0) {
+function generateChapterList(stats: ProjectStats): string {
+    if (stats.totalChapters === 0) {
         return '\n暂无章节\n';
     }
 
     let content = '\n';
-    for (const chapter of chapters) {
-        const statusEmoji = getStatusEmoji(chapter.status);
-        content += `- [${chapter.title}](chapters/${chapter.fileName}) ${statusEmoji} (${chapter.wordCount} 字)\n`;
+
+    // 如果启用分卷，按卷分组显示
+    if (stats.volumesEnabled && stats.volumes && stats.volumes.length > 0) {
+        for (const volumeInfo of stats.volumes) {
+            const volumeLabel = getVolumeLabel(volumeInfo);
+            const statusEmoji = getVolumeStatusEmoji(volumeInfo.volumeStatus);
+
+            content += `\n### ${statusEmoji} ${volumeLabel}\n\n`;
+            content += `> ${volumeInfo.totalWords.toLocaleString()} 字 · ${volumeInfo.chapters.length} 章 · 完成 ${volumeInfo.completedChapters}/${volumeInfo.chapters.length}\n\n`;
+
+            if (volumeInfo.chapters.length === 0) {
+                content += `- *该卷暂无章节*\n`;
+            } else {
+                for (const chapter of volumeInfo.chapters) {
+                    const chapterStatusEmoji = getStatusEmoji(chapter.status);
+                    content += `- [${chapter.title}](chapters/${chapter.fileName}) ${chapterStatusEmoji} (${chapter.wordCount.toLocaleString()} 字)\n`;
+                }
+            }
+            content += '\n';
+        }
+    } else {
+        // 扁平结构：直接列出所有章节
+        for (const chapter of stats.chapters) {
+            const statusEmoji = getStatusEmoji(chapter.status);
+            content += `- [${chapter.title}](chapters/${chapter.fileName}) ${statusEmoji} (${chapter.wordCount.toLocaleString()} 字)\n`;
+        }
     }
+
     return content;
+}
+
+/**
+ * 获取卷标签（带类型和序号）
+ */
+function getVolumeLabel(volumeInfo: VolumeChapters): string {
+    let prefix = '';
+    let volumeNum = volumeInfo.volumeNumber;
+
+    switch (volumeInfo.volumeType) {
+        case 'prequel':
+            prefix = '前传';
+            volumeNum = Math.abs(volumeNum);
+            break;
+        case 'sequel':
+            prefix = '后传';
+            // If already > 1000, subtract 1000; otherwise use as-is
+            volumeNum = volumeNum >= 1000 ? volumeNum - 1000 : volumeNum;
+            break;
+        case 'extra':
+            prefix = '番外';
+            // If already > 2000, subtract 2000; otherwise use as-is
+            volumeNum = volumeNum >= 2000 ? volumeNum - 2000 : volumeNum;
+            break;
+        case 'main':
+        default:
+            prefix = '第';
+            break;
+    }
+
+    if (volumeInfo.volumeType === 'main') {
+        return `${prefix}${volumeNum}卷 ${volumeInfo.volumeTitle}`;
+    } else {
+        return `${prefix}${volumeNum} ${volumeInfo.volumeTitle}`;
+    }
+}
+
+/**
+ * 获取卷状态图标
+ */
+function getVolumeStatusEmoji(status: string): string {
+    switch (status) {
+        case 'planning':
+            return '📝';
+        case 'completed':
+            return '✅';
+        case 'writing':
+        default:
+            return '✍️';
+    }
 }
 
 /**
@@ -350,11 +525,30 @@ function generateProgressSection(stats: ProjectStats): string {
         ? Math.round((stats.completedChapters / stats.totalChapters) * 100)
         : 0;
 
-    return `
+    let content = `
 - **总字数**：${stats.totalWords.toLocaleString()} 字
 - **完成章节**：${stats.completedChapters} / ${stats.totalChapters} 章 (${completionRate}%)
-- **章节列表**：见上方目录
 `;
+
+    // 如果启用分卷，显示卷统计信息
+    if (stats.volumesEnabled && stats.volumes && stats.volumes.length > 0) {
+        content += `- **卷数**：${stats.volumes.length} 卷\n`;
+        content += `\n#### 分卷进度\n\n`;
+
+        for (const volumeInfo of stats.volumes) {
+            const volumeLabel = getVolumeLabel(volumeInfo);
+            const volumeCompletionRate = volumeInfo.chapters.length > 0
+                ? Math.round((volumeInfo.completedChapters / volumeInfo.chapters.length) * 100)
+                : 0;
+            const statusEmoji = getVolumeStatusEmoji(volumeInfo.volumeStatus);
+
+            content += `- ${statusEmoji} **${volumeLabel}**：${volumeInfo.totalWords.toLocaleString()} 字 · ${volumeInfo.completedChapters}/${volumeInfo.chapters.length} 章 (${volumeCompletionRate}%)\n`;
+        }
+    }
+
+    content += `\n- **章节列表**：见上方目录\n`;
+
+    return content;
 }
 
 /**

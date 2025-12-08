@@ -7,6 +7,7 @@ import {
     CHARACTERS_FOLDER
 } from '../constants';
 import { Logger } from '../utils/logger';
+import { getFrontmatterEndOffsetForMatching } from '../utils/frontMatterHelper';
 
 /**
  * 小说高亮提供器
@@ -242,6 +243,9 @@ export class NovelHighlightProvider {
             const dialogueRanges: vscode.Range[] = [];
             const characterRanges: vscode.Range[] = [];
 
+            // 获取 frontmatter 结束位置，用于排除该区域
+            const frontmatterEndOffset = getFrontmatterEndOffsetForMatching(text);
+
             // 从 characters/ 目录获取人物名称
             const characterNamesFromFiles = await this.getCharacterNames();
 
@@ -270,10 +274,15 @@ export class NovelHighlightProvider {
                 htmlCommentRanges.push(new vscode.Range(startPos, endPos));
             }
 
-            // 从 characters/ 目录加载的人物名高亮（排除对话和注释范围）
+            // 从 characters/ 目录加载的人物名高亮（排除对话、注释和 frontmatter 范围）
             const characterNameRegex = this.getCharacterRegex(characterNames);
             if (characterNameRegex) {
                 while ((match = characterNameRegex.exec(text)) !== null) {
+                    // 跳过 frontmatter 区域的匹配
+                    if (match.index < frontmatterEndOffset) {
+                        continue;
+                    }
+
                     const startPos = editor.document.positionAt(match.index);
                     const endPos = editor.document.positionAt(match.index + match[0].length);
                     const range = new vscode.Range(startPos, endPos);

@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { Logger } from '../utils/logger';
 
 /**
  * 打开敏感词配置文件
@@ -86,9 +87,9 @@ export async function openSensitiveWordsConfig(): Promise<void> {
             }
         }
 
-        console.log('[Noveler] 已打开敏感词配置');
+        Logger.info('已打开敏感词配置');
     } catch (error) {
-        console.error('[Noveler] 打开敏感词配置失败', error);
+        Logger.error('打开敏感词配置失败', error);
         vscode.window.showErrorMessage('打开敏感词配置失败');
     }
 }

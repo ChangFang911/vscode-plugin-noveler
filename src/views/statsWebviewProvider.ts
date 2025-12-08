@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { ProjectStatsService } from '../services/projectStatsService';
+import { ProjectStatsService, ProjectStats } from '../services/projectStatsService';
 
 export class StatsWebviewProvider {
     private static currentPanel: vscode.WebviewPanel | undefined;
@@ -84,7 +84,7 @@ export class StatsWebviewProvider {
     /**
      * 生成 HTML 内容
      */
-    private getHtmlContent(stats: any): string {
+    private getHtmlContent(stats: ProjectStats): string {
         const completionRate = stats.completionRate || 0;
         const totalWords = stats.totalWords || 0;
         const chapterCount = stats.chapterCount || 0;

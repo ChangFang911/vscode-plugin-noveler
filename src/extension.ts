@@ -9,6 +9,7 @@ import { ConfigService } from './services/configService';
 import { FocusModeService } from './services/focusModeService';
 import { ProjectStatsService } from './services/projectStatsService';
 import { SensitiveWordService } from './services/sensitiveWordService';
+import { VolumeService } from './services/volumeService';
 import { SensitiveWordDiagnosticProvider } from './providers/sensitiveWordDiagnostic';
 import { SensitiveWordCodeActionProvider } from './providers/sensitiveWordCodeAction';
 import { NovelerViewProvider } from './views/novelerViewProvider';
@@ -20,8 +21,10 @@ import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
 import { createCharacter } from './commands/createCharacter';
+import { createVolume } from './commands/createVolume';
 import { openSensitiveWordsConfig } from './commands/openSensitiveWordsConfigCommand';
 import { addToCustomWords, addToWhitelist } from './commands/addToSensitiveWordsCommand';
+import { PARAGRAPH_INDENT } from './constants/volumeConstants';
 import {
     renameChapter,
     markChapterCompleted,
@@ -31,7 +34,20 @@ import {
     renameCharacter,
     deleteCharacter
 } from './commands/contextMenuCommands';
+import {
+    renameVolume,
+    deleteVolume,
+    setVolumeStatus,
+    editVolumeInfo,
+    setVolumeType,
+    createChapterInVolume,
+    moveChapterToVolume,
+    copyChapterToVolume,
+    openVolumeOutline
+} from './commands/volumeCommands';
+import { migrateToVolumeStructure, rollbackToFlatStructure } from './commands/migrationWizard';
 import { jumpToReadmeSection } from './commands/jumpToReadme';
+import { MigrationService } from './services/migrationService';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
 import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS, CONFIG_FILE_NAME } from './constants';
@@ -71,6 +87,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // 等待配置加载完成
     await configService.waitForConfig();
+
+    // 执行配置迁移（如果需要）
+    await MigrationService.checkAndMigrate(context);
 
     // 订阅配置变更事件
     context.subscriptions.push(
@@ -246,6 +265,13 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // 注册命令：创建卷
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.createVolume', async () => {
+            await createVolume();
+        })
+    );
+
     // 注册命令：重载高亮配置
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.reloadHighlights', () => {
@@ -342,6 +368,45 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.deleteCharacter', deleteCharacter)
+    );
+
+    // 注册右键菜单命令：卷操作
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.renameVolume', renameVolume)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.deleteVolume', deleteVolume)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.setVolumeStatus', setVolumeStatus)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.editVolumeInfo', editVolumeInfo)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.setVolumeType', setVolumeType)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.createChapterInVolume', createChapterInVolume)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.moveChapterToVolume', moveChapterToVolume)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.copyChapterToVolume', copyChapterToVolume)
+    );
+
+    // 注册命令：结构迁移
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.migrateToVolumeStructure', migrateToVolumeStructure)
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.rollbackToFlatStructure', rollbackToFlatStructure)
+    );
+
+    // 注册命令：打开卷大纲
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.openVolumeOutline', openVolumeOutline)
     );
 
     // 注册命令：添加选中文本到自定义敏感词库
@@ -472,8 +537,8 @@ export async function activate(context: vscode.ExtensionContext) {
                 updateWordCountDebounced(vscode.window.activeTextEditor);
                 updateHighlightsDebounced(vscode.window.activeTextEditor);
             }
-            // 自动空行功能
-            handleAutoEmptyLine(e);
+            // 换行时的自动功能（空行 + 缩进）
+            handleLineBreak(e);
         })
     );
 
@@ -555,6 +620,33 @@ export async function activate(context: vscode.ExtensionContext) {
 
         context.subscriptions.push(configWatcher);
 
+        // 监听敏感词配置文件变化（custom-words.jsonc 和 whitelist.jsonc）
+        const sensitiveWordsPattern = new vscode.RelativePattern(
+            workspaceFolder,
+            '.noveler/sensitive-words/{custom-words.jsonc,whitelist.jsonc}'
+        );
+        const sensitiveWordsWatcher = vscode.workspace.createFileSystemWatcher(sensitiveWordsPattern);
+
+        const reloadSensitiveWords = async () => {
+            try {
+                await sensitiveWordService.reload();
+                Logger.info('敏感词库已自动重新加载');
+
+                // 重新检测当前文档
+                if (vscode.window.activeTextEditor) {
+                    sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
+                }
+            } catch (error) {
+                Logger.error('自动重新加载敏感词库失败', error);
+            }
+        };
+
+        sensitiveWordsWatcher.onDidCreate(reloadSensitiveWords);
+        sensitiveWordsWatcher.onDidChange(reloadSensitiveWords);
+        sensitiveWordsWatcher.onDidDelete(reloadSensitiveWords);
+
+        context.subscriptions.push(sensitiveWordsWatcher);
+
         // 监听 chapters 和 characters 目录本身的变化
         const dirPattern = new vscode.RelativePattern(
             workspaceFolder,
@@ -624,8 +716,30 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
     } else {
         // 显示整个文档的字数统计
         const stats = wordCountService.getWordCount(editor.document);
-        wordCountStatusBarItem.text = `$(pencil) 总计 ${stats.totalChars.toLocaleString()} | 正文 ${stats.contentChars.toLocaleString()} | 标点 ${stats.punctuation.toLocaleString()}`;
-        wordCountStatusBarItem.tooltip = `当前文档统计\n━━━━━━━━━━━━━━\n总计: ${stats.totalChars.toLocaleString()} 字\n正文: ${stats.contentChars.toLocaleString()} 字\n标点: ${stats.punctuation.toLocaleString()} 个`;
+        let statusText = `$(pencil) 总计 ${stats.totalChars.toLocaleString()} | 正文 ${stats.contentChars.toLocaleString()} | 标点 ${stats.punctuation.toLocaleString()}`;
+        let tooltipText = `当前文档统计\n━━━━━━━━━━━━━━\n总计: ${stats.totalChars.toLocaleString()} 字\n正文: ${stats.contentChars.toLocaleString()} 字\n标点: ${stats.punctuation.toLocaleString()} 个`;
+
+        // 如果启用了分卷功能，显示当前章节所属的卷信息
+        if (configService.isVolumesEnabled()) {
+            const volumeService = VolumeService.getInstance();
+            const volume = volumeService.getVolumeForChapter(editor.document.uri.fsPath);
+
+            if (volume) {
+                const typeNames: Record<string, string> = {
+                    'main': '正文',
+                    'prequel': '前传',
+                    'sequel': '后传',
+                    'extra': '番外'
+                };
+                const volumeTypeName = typeNames[volume.volumeType] || volume.volumeType;
+
+                statusText += ` | 📚 ${volume.title}`;
+                tooltipText += `\n━━━━━━━━━━━━━━\n所属卷: ${volume.title}\n卷类型: ${volumeTypeName}\n卷总字数: ${volume.stats.totalWords.toLocaleString()} 字\n卷章节数: ${volume.stats.chapterCount}`;
+            }
+        }
+
+        wordCountStatusBarItem.text = statusText;
+        wordCountStatusBarItem.tooltip = tooltipText;
     }
 
     wordCountStatusBarItem.show();
@@ -657,16 +771,24 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
 }
 
 /**
- * 处理自动空行功能
+ * 处理换行时的自动功能（空行 + 缩进）
+ * 合并处理空行和缩进，避免异步竞态问题
  */
-function handleAutoEmptyLine(event: vscode.TextDocumentChangeEvent) {
+function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
     const editor = vscode.window.activeTextEditor;
     if (!editor || event.document !== editor.document) {
         return;
     }
 
-    // 检查是否应该启用自动空行
-    if (!shouldEnableAutoEmptyLine(event.document)) {
+    // 必须是 Markdown 文件
+    if (event.document.languageId !== 'markdown') {
+        return;
+    }
+
+    // 必须在 chapters 目录下
+    const filePath = event.document.uri.fsPath;
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    if (!normalizedPath.includes(`/${CHAPTERS_FOLDER}/`)) {
         return;
     }
 
@@ -686,39 +808,61 @@ function handleAutoEmptyLine(event: vscode.TextDocumentChangeEvent) {
     const line = event.document.lineAt(change.range.start.line);
     const previousLineText = line.text.trim();
 
-    // 如果前一行为空，不插入空行（避免连续空行）
-    if (previousLineText === '') {
+    // 获取配置
+    const autoEmptyLineEnabled = configService.shouldAutoEmptyLine();
+    const paragraphIndentEnabled = configService.shouldParagraphIndent();
+
+    Logger.info(`[换行处理] 空行: ${autoEmptyLineEnabled}, 缩进: ${paragraphIndentEnabled}, 前一行: "${previousLineText}"`);
+
+    // 如果两个功能都没开启，直接返回
+    if (!autoEmptyLineEnabled && !paragraphIndentEnabled) {
         return;
     }
 
-    // 插入额外的空行
+    // 如果前一行是特殊行（标题、HTML注释、Front Matter分隔符），不处理
+    if (previousLineText.startsWith('#') || previousLineText.startsWith('<!--') || previousLineText === '---') {
+        return;
+    }
+
+    // 判断是否应该添加缩进
+    // 情况1: 启用段落缩进 + 前一行为空 → 添加缩进（新段落开始）
+    // 情况2: 启用段落缩进 + 前一行有内容 → 添加空行（如果启用）+ 缩进
+    // 情况3: 只启用空行 + 前一行有内容 → 添加空行
+    // 情况4: 只启用空行 + 前一行为空 → 不处理（避免连续空行）
+
+    const isPreviousLineEmpty = previousLineText === '';
+
+    // 如果只启用空行，且前一行为空，不处理（避免连续空行）
+    if (autoEmptyLineEnabled && !paragraphIndentEnabled && isPreviousLineEmpty) {
+        return;
+    }
+
+    // 单次编辑，原子操作
     editor.edit((editBuilder) => {
-        const position = new vscode.Position(change.range.start.line + 1, 0);
-        editBuilder.insert(position, '\n');
+        let textToInsert = '';
+
+        // 1. 如果启用自动空行，且前一行不为空，添加换行符
+        if (autoEmptyLineEnabled && !isPreviousLineEmpty) {
+            textToInsert += '\n';
+            Logger.info(`[换行处理] 添加空行`);
+        }
+
+        // 2. 如果启用段落缩进，添加缩进
+        if (paragraphIndentEnabled) {
+            textToInsert += PARAGRAPH_INDENT;
+            Logger.info(`[换行处理] 添加缩进`);
+        }
+
+        // 在光标位置（用户刚按回车后的新行）插入内容
+        if (textToInsert) {
+            const insertPos = new vscode.Position(change.range.start.line + 1, 0);
+            editBuilder.insert(insertPos, textToInsert);
+            Logger.info(`[换行处理] 在第 ${change.range.start.line + 1} 行插入: "${textToInsert.replace(/\n/g, '\\n')}"`);
+        }
     }, {
         undoStopBefore: false,
         undoStopAfter: false
     });
-}
-
-/**
- * 检查是否应该启用自动空行功能
- */
-function shouldEnableAutoEmptyLine(document: vscode.TextDocument): boolean {
-    // 1. 必须是 Markdown 文件
-    if (document.languageId !== 'markdown') {
-        return false;
-    }
-
-    // 2. 检查配置是否启用
-    if (!configService.shouldAutoEmptyLine()) {
-        return false;
-    }
-
-    // 3. 必须在 chapters 目录下
-    const filePath = document.uri.fsPath;
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    return normalizedPath.includes(`/${CHAPTERS_FOLDER}/`);
 }
 
 /**

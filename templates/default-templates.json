@@ -9,9 +9,9 @@
       "characters": [],
       "locations": [],
       "tags": [],
-      "status": "草稿"
+      "status": "draft"
     },
-    "statusOptions": ["草稿", "初稿", "修改中", "已完成"]
+    "statusOptions": ["draft", "first-draft", "revising", "completed"]
   },
   "character": {
     "frontMatter": {

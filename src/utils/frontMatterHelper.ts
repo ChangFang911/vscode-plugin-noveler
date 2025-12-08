@@ -121,3 +121,78 @@ export function getContentWithoutFrontMatter(document: vscode.TextDocument): str
         return document.getText();
     }
 }
+
+/**
+ * 提取不包含 frontmatter 的正文内容（用于文本匹配）
+ *
+ * 此函数不依赖 gray-matter，直接解析 YAML front matter 标记，
+ * 用于需要获取偏移量的场景（如高亮、敏感词检测）
+ *
+ * @param text 完整文档文本
+ * @returns 包含正文内容和偏移量的对象
+ *
+ * @example
+ * ```typescript
+ * const text = `---
+ * title: Hello
+ * ---
+ *
+ * Content here`;
+ *
+ * const { text: content, offset } = extractContentWithoutFrontmatterForMatching(text);
+ * // content: "Content here"
+ * // offset: 文档中正文开始的字符位置
+ * ```
+ */
+export function extractContentWithoutFrontmatterForMatching(text: string): { text: string; offset: number } {
+    // 检测是否有 frontmatter (以 --- 开头)
+    if (!text.startsWith('---')) {
+        return { text, offset: 0 };
+    }
+
+    // 查找第二个 --- 的位置
+    const secondDelimiterIndex = text.indexOf('\n---', 3);
+
+    if (secondDelimiterIndex === -1) {
+        // 没有找到结束的 ---，说明 frontmatter 格式不完整
+        return { text, offset: 0 };
+    }
+
+    // frontmatter 结束位置（包含换行符）
+    const frontmatterEnd = secondDelimiterIndex + 4; // "\n---".length = 4
+
+    // 跳过 frontmatter 后的换行符
+    let contentStart = frontmatterEnd;
+    while (contentStart < text.length && (text[contentStart] === '\n' || text[contentStart] === '\r')) {
+        contentStart++;
+    }
+
+    // 返回正文内容和偏移量
+    return {
+        text: text.substring(contentStart),
+        offset: contentStart
+    };
+}
+
+/**
+ * 获取 frontmatter 结束位置的偏移量（用于跳过 frontmatter 区域）
+ *
+ * @param text 文档文本
+ * @returns frontmatter 结束位置，如果没有 frontmatter 则返回 0
+ *
+ * @example
+ * ```typescript
+ * const text = `---
+ * title: Hello
+ * ---
+ *
+ * Content`;
+ *
+ * const offset = getFrontmatterEndOffsetForMatching(text);
+ * // offset: 正文开始的字符位置
+ * ```
+ */
+export function getFrontmatterEndOffsetForMatching(text: string): number {
+    const { offset } = extractContentWithoutFrontmatterForMatching(text);
+    return offset;
+}

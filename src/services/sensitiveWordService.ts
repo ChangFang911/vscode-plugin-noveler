@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as jsoncParser from 'jsonc-parser';
 import { TrieTree } from '../utils/trieTree';
 import {
     SensitiveWordConfig,
@@ -12,6 +13,7 @@ import {
 } from '../types/sensitiveWord';
 import { Logger } from '../utils/logger';
 import { ConfigService } from './configService';
+import { extractContentWithoutFrontmatterForMatching } from '../utils/frontMatterHelper';
 
 /**
  * 敏感词检测服务
@@ -258,7 +260,7 @@ export class SensitiveWordService {
 
         try {
             const content = fs.readFileSync(customPath, 'utf-8');
-            const data: CustomWordLibrary = JSON.parse(content);
+            const data: CustomWordLibrary = jsoncParser.parse(content);
 
             if (data.words && Array.isArray(data.words)) {
                 // 简化版：所有自定义敏感词都视为 high 级别
@@ -287,7 +289,7 @@ export class SensitiveWordService {
 
         try {
             const content = fs.readFileSync(whitelistPath, 'utf-8');
-            const data: CustomWordLibrary = JSON.parse(content);
+            const data: CustomWordLibrary = jsoncParser.parse(content);
 
             if (data.words && Array.isArray(data.words)) {
                 this.whitelist = new Set(data.words);
@@ -312,7 +314,7 @@ export class SensitiveWordService {
         if (fs.existsSync(blacklistPath)) {
             try {
                 const content = fs.readFileSync(blacklistPath, 'utf-8');
-                const data: CustomWordLibrary = JSON.parse(content);
+                const data: CustomWordLibrary = jsoncParser.parse(content);
                 this.trie.insertBatch(data.words, 'high'); // 自定义黑名单视为高危
                 Logger.info(`加载自定义黑名单，共 ${data.words.length} 个词`);
             } catch (error) {
@@ -325,7 +327,7 @@ export class SensitiveWordService {
         if (fs.existsSync(whitelistPath)) {
             try {
                 const content = fs.readFileSync(whitelistPath, 'utf-8');
-                const data: CustomWordLibrary = JSON.parse(content);
+                const data: CustomWordLibrary = jsoncParser.parse(content);
                 this.whitelist = new Set(data.words);
                 Logger.info(`加载自定义白名单，共 ${this.whitelist.size} 个词`);
             } catch (error) {
@@ -344,7 +346,14 @@ export class SensitiveWordService {
             return [];
         }
 
-        const text = document.getText();
+        const fullText = document.getText();
+        if (!fullText || fullText.length === 0) {
+            return [];
+        }
+
+        // 排除 frontmatter 区域，只检测正文内容
+        const { text, offset } = extractContentWithoutFrontmatterForMatching(fullText);
+
         if (!text || text.length === 0) {
             return [];
         }
@@ -354,6 +363,13 @@ export class SensitiveWordService {
 
         // 过滤白名单
         matches = matches.filter(m => !this.whitelist.has(m.word));
+
+        // 调整匹配位置（加上 frontmatter 的偏移量）
+        matches = matches.map(m => ({
+            ...m,
+            start: m.start + offset,
+            end: m.end + offset
+        }));
 
         // 标记白名单状态
         matches.forEach(m => {

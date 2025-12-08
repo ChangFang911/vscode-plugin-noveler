@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -125,6 +125,56 @@
       {
         "command": "noveler.addSelectedToWhitelist",
         "title": "Noveler: 添加到白名单"
+      },
+      {
+        "command": "noveler.createVolume",
+        "title": "创建卷",
+        "icon": "$(add)"
+      },
+      {
+        "command": "noveler.renameVolume",
+        "title": "重命名卷"
+      },
+      {
+        "command": "noveler.deleteVolume",
+        "title": "删除卷"
+      },
+      {
+        "command": "noveler.setVolumeStatus",
+        "title": "设置卷状态"
+      },
+      {
+        "command": "noveler.editVolumeInfo",
+        "title": "编辑卷信息"
+      },
+      {
+        "command": "noveler.setVolumeType",
+        "title": "设置卷类型"
+      },
+      {
+        "command": "noveler.createChapterInVolume",
+        "title": "创建章节",
+        "icon": "$(add)"
+      },
+      {
+        "command": "noveler.moveChapterToVolume",
+        "title": "移动到其他卷"
+      },
+      {
+        "command": "noveler.copyChapterToVolume",
+        "title": "复制到其他卷"
+      },
+      {
+        "command": "noveler.migrateToVolumeStructure",
+        "title": "Noveler: 迁移到分卷结构"
+      },
+      {
+        "command": "noveler.rollbackToFlatStructure",
+        "title": "Noveler: 回滚到扁平结构"
+      },
+      {
+        "command": "noveler.openVolumeOutline",
+        "title": "编辑卷大纲"
       }
     ],
     "menus": {
@@ -154,6 +204,11 @@
         {
           "command": "noveler.createChapter",
           "when": "view == novelerView && viewItem == chapterGroup",
+          "group": "inline"
+        },
+        {
+          "command": "noveler.createVolume",
+          "when": "view == novelerView && viewItem == chapterGroupWithVolumes",
           "group": "inline"
         },
         {
@@ -190,6 +245,51 @@
           "command": "noveler.deleteCharacter",
           "when": "view == novelerView && viewItem == character",
           "group": "3_delete@1"
+        },
+        {
+          "command": "noveler.createChapterInVolume",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "inline"
+        },
+        {
+          "command": "noveler.renameVolume",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "noveler.setVolumeStatus",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "2_status@1"
+        },
+        {
+          "command": "noveler.setVolumeType",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "2_status@2"
+        },
+        {
+          "command": "noveler.editVolumeInfo",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "2_status@3"
+        },
+        {
+          "command": "noveler.openVolumeOutline",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "2_status@4"
+        },
+        {
+          "command": "noveler.deleteVolume",
+          "when": "view == novelerView && viewItem == volume",
+          "group": "3_delete@1"
+        },
+        {
+          "command": "noveler.moveChapterToVolume",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "4_move@1"
+        },
+        {
+          "command": "noveler.copyChapterToVolume",
+          "when": "view == novelerView && viewItem == chapter",
+          "group": "4_move@2"
         }
       ]
     },
