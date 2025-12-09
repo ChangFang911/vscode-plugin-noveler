@@ -1,0 +1,15 @@
+{
+  "consonants": [
+    "b", "d", "f", "g", "k", "l", "m", "n", "r", "s",
+    "t", "v", "z", "th", "sh", "ch", "kr", "tr", "dr", "gr"
+  ],
+  "vowels": [
+    "a", "e", "i", "o", "u",
+    "ae", "ei", "ou", "ia", "io"
+  ],
+  "patterns": [
+    "{consonant}{vowel}",
+    "{consonant}{vowel}{consonant}",
+    "{vowel}{consonant}"
+  ]
+}

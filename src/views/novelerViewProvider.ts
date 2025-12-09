@@ -440,6 +440,18 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 undefined,
                 '重新加载章节高亮标记配置'
             ),
+            new NovelerTreeItem(
+                '🎲 随机起名',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.generateRandomName',
+                    title: '随机起名',
+                },
+                'otherActionItem',
+                undefined,
+                '生成多种风格的随机姓名'
+            ),
         ];
 
         // 如果启用了分卷功能，添加迁移相关命令

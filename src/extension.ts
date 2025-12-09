@@ -10,6 +10,7 @@ import { FocusModeService } from './services/focusModeService';
 import { ProjectStatsService } from './services/projectStatsService';
 import { SensitiveWordService } from './services/sensitiveWordService';
 import { VolumeService } from './services/volumeService';
+import { NameGeneratorService } from './services/nameGeneratorService';
 import { SensitiveWordDiagnosticProvider } from './providers/sensitiveWordDiagnostic';
 import { SensitiveWordCodeActionProvider } from './providers/sensitiveWordCodeAction';
 import { NovelerViewProvider } from './views/novelerViewProvider';
@@ -24,6 +25,7 @@ import { createCharacter } from './commands/createCharacter';
 import { createVolume } from './commands/createVolume';
 import { openSensitiveWordsConfig } from './commands/openSensitiveWordsConfigCommand';
 import { addToCustomWords, addToWhitelist } from './commands/addToSensitiveWordsCommand';
+import { generateRandomName } from './commands/generateName';
 import { PARAGRAPH_INDENT } from './constants/volumeConstants';
 import {
     renameChapter,
@@ -111,6 +113,10 @@ export async function activate(context: vscode.ExtensionContext) {
     sensitiveWordService = await SensitiveWordService.initialize(context);
     sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
     sensitiveWordDiagnostic.register(context);
+
+    // 初始化姓名生成服务
+    NameGeneratorService.initialize(context);
+    Logger.info('随机起名功能已启用');
 
     // 注册敏感词快速修复提供器
     context.subscriptions.push(
@@ -269,6 +275,13 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.createVolume', async () => {
             await createVolume();
+        })
+    );
+
+    // 注册命令：随机起名
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.generateRandomName', async () => {
+            await generateRandomName();
         })
     );
 
