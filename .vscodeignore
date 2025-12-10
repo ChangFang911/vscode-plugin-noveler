@@ -16,25 +16,53 @@ node_modules/typescript/**
 .yarnrc
 tsconfig.json
 **/.eslintrc.json
+.editorconfig
+esbuild.js
 
 # 源代码相关
 **/*.ts
 **/*.map
 
+# 编译输出（esbuild 只保留 extension.js）
+out/**
+!out/extension.js
+
 # 文档（仅保留必要的）
 技术方案.md
 vsc-extension-quickstart.md
+docs/CODING_STANDARDS.md
+docs/CONFIG_MIGRATION.md
+docs/README重构方案.md
+ARCHITECTURE_AUDIT.md
 
-# 示例项目（可选：如果不想打包示例，取消注释）
+# 示例项目
 examples/**
 
 # 测试文件
 test/**
 **/*.test.js
 
-# 临时文件
+# 临时文件和垃圾文件
 *.log
 .DS_Store
+**/.DS_Store
 
 # 开发依赖的输出
 .claude/**
+
+# 旧版本的 VSIX 文件
+*.vsix
+
+# 备份文件
+*.backup
+**/*.backup
+
+# Node modules 中的文档和测试文件
+node_modules/**/README.md
+node_modules/**/CHANGELOG.md
+node_modules/**/LICENSE.md
+node_modules/**/LICENSE.BSD
+node_modules/**/ChangeLog
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/bin/**
