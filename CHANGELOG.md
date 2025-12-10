@@ -5,6 +5,105 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.1] - 2025-12-10
+
+### 代码优化
+
+#### 🧹 架构清理
+- **合并 constants 文件**：将 `src/constants/volumeConstants.ts` 合并到 `src/constants.ts`，消除文件/文件夹命名冲突
+- **删除未使用代码**：移除 4 个未使用的工具文件，减少 680 行代码（-8.5%）
+  - `errorHelper.ts` (186 行) - 仅 1 次引用，已被 `errorHandler.ts` 替代
+  - `fileHelper.ts` (214 行) - 0 次引用
+  - `validationHelper.ts` (221 行) - 0 次引用
+  - `workspaceHelper.ts` (59 行) - 0 次引用
+- **清理废弃模板**：删除 3 个不再使用的模板文件
+  - `templates/default-config.json` - 已被 `.jsonc` 替代
+  - `templates/sensitive-words/custom-words-template.jsonc` - 改用内联模板
+  - `templates/sensitive-words/whitelist-template.jsonc` - 改用内联模板
+- **清理系统垃圾**：删除所有 `.DS_Store` 文件
+
+#### 🔧 技术改进
+- **更新 import 引用**：修改 5 个文件的 import 语句，从 `./constants/volumeConstants` 改为 `./constants`
+  - `src/extension.ts`
+  - `src/providers/formatProvider.ts`
+  - `src/services/migrationService.ts`
+  - `src/services/volumeService.ts`
+  - `src/utils/volumeHelper.ts`
+
+### 文档完善
+
+#### 📖 README 重构
+- **新增侧边栏视图章节**：详细介绍侧边栏的 5 个功能模块（项目概览、章节管理、人物设定、快捷操作、其他操作）
+- **分卷功能提升**：从路线图（v0.7.0+）提升到核心功能，补充详细使用说明
+- **优化文档结构**：调整章节顺序，突出侧边栏为主要交互方式
+
+#### 📚 新增支持文档
+- **FAQ.md**：60+ 个常见问题解答，涵盖 11 个分类
+  - 安装与配置问题
+  - 侧边栏使用问题
+  - 字数统计问题
+  - 高亮问题
+  - 格式化问题
+  - 敏感词检测问题
+  - 分卷管理问题
+  - 项目管理问题
+  - 配置文件问题
+  - 性能问题
+  - 其他问题
+
+- **文件格式说明.md**：详细的 Front Matter 字段参考
+  - 章节文件格式（15 个字段）
+  - 人物文件格式（14 个字段）
+  - 自动维护 vs 手动维护字段说明
+  - 最佳实践建议
+
+#### ⚙️ 配置文档优化
+- **完善 novel-json配置说明.md**：新增 5 个配置章节
+  - 敏感词检测配置（sensitiveWords）
+  - 分卷管理配置（volumes）
+  - 段落缩进配置（paragraphIndent）
+  - 自动保存配置（autoSave）
+  - README 更新配置（readmeAutoUpdate）
+- **配置示例补充**：每个配置都包含详细的字段说明和实际示例
+
+#### 📊 架构审计报告
+- **新增 ARCHITECTURE_AUDIT.md**：详细记录项目架构分析结果
+  - 项目规模统计（88 个文件，48 个 TS 文件）
+  - 发现的 3 类问题（废弃工具、重复模板、垃圾文件）
+  - 清理建议和风险评估
+  - 预期优化效果分析
+
+### 配置优化
+
+#### 🔒 版本控制优化
+- **更新 .gitignore**：添加 `.noveler/` 目录，防止用户自定义配置被提交
+
+#### 🐛 调试配置修复
+- **恢复 .vscode/ 目录**：修复 F5 调试时需要选择调试器的问题
+  - `launch.json` - 扩展调试配置
+  - `settings.json` - 项目设置
+  - `tasks.json` - 构建任务
+
+### 清理工作
+
+#### 🗑️ 删除已完成计划文档
+- `docs/RANDOM_NAME_GENERATOR_PLAN.md` - v0.6.0 已实现
+- `docs/VOLUME_FEATURE_PLAN.md` - v0.5.0 已实现
+- `docs/TODO_OPTIMIZATIONS.md` - 内容已过时
+
+#### 🧪 删除临时文件
+- `test-name-generator.js` - 临时测试脚本
+
+### 优化效果
+
+| 指标 | 优化前 | 优化后 | 改进 |
+|------|--------|--------|------|
+| 总代码行数 | ~8000 | ~7320 | -8.5% |
+| utils/ 文件数 | 18 | 14 | -22% |
+| 模板配置文件 | 3 | 1 | -67% |
+| 废弃文档 | 3 | 0 | -100% |
+| 垃圾文件 | 1+ | 0 | -100% |
+
 ## [0.6.0] - 2025-12-09
 
 ### 新增功能
