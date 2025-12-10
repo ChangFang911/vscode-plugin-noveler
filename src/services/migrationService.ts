@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as jsoncParser from 'jsonc-parser';
 import { Logger } from '../utils/logger';
-import { CURRENT_CONFIG_VERSION } from '../constants/volumeConstants';
+import { CURRENT_CONFIG_VERSION } from '../constants';
 import { PartialNovelConfig, NovelerConfig } from '../types/config';
 
 /**

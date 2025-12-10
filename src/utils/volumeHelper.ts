@@ -5,7 +5,7 @@
 import { VolumeType } from '../types/volume';
 import { ConfigService } from '../services/configService';
 import { convertToChineseNumber } from './chineseNumber';
-import { VOLUME_TYPE_OFFSETS, VOLUME_TYPE_NAMES } from '../constants/volumeConstants';
+import { VOLUME_TYPE_OFFSETS, VOLUME_TYPE_NAMES } from '../constants';
 
 /**
  * 生成卷文件夹名称

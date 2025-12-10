@@ -26,7 +26,7 @@ import { createVolume } from './commands/createVolume';
 import { openSensitiveWordsConfig } from './commands/openSensitiveWordsConfigCommand';
 import { addToCustomWords, addToWhitelist } from './commands/addToSensitiveWordsCommand';
 import { generateRandomName } from './commands/generateName';
-import { PARAGRAPH_INDENT } from './constants/volumeConstants';
+import { PARAGRAPH_INDENT } from './constants';
 import {
     renameChapter,
     markChapterCompleted,

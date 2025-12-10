@@ -8,7 +8,7 @@ import { ConfigService } from './configService';
 import { Logger } from '../utils/logger';
 import { WordCountService } from './wordCountService';
 import { getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
-import { VOLUME_TYPE_OFFSETS } from '../constants/volumeConstants';
+import { VOLUME_TYPE_OFFSETS } from '../constants';
 
 /**
  * 分卷管理服务

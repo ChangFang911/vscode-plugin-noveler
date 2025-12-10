@@ -4,3 +4,6 @@ out
 .vscode-test/
 .DS_Store
 examples
+
+# 用户自定义配置（项目特定）
+.noveler/

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import { PARAGRAPH_INDENT } from '../constants/volumeConstants';
+import { PARAGRAPH_INDENT } from '../constants';
 
 export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEditProvider {
     provideDocumentFormattingEdits(
