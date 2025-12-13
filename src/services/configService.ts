@@ -107,6 +107,7 @@ export interface NovelConfig {
 export class ConfigService {
     private static instance?: ConfigService;
     private config: NovelConfig = {};
+    private configLoaded: boolean = false;
     private fileWatcher?: vscode.FileSystemWatcher;
     private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
 
@@ -203,6 +204,7 @@ export class ConfigService {
                 } else {
                     this.config = fullConfig.noveler;
                 }
+                this.configLoaded = true;
 
                 // 触发配置变更事件
                 this._onDidChangeConfig.fire(this.config);
@@ -271,6 +273,7 @@ export class ConfigService {
                 list: []
             }
         };
+        this.configLoaded = false;
     }
 
     private watchConfig() {
@@ -374,6 +377,8 @@ export class ConfigService {
      * @returns true 表示启用自动保存，false 表示禁用，默认为 true
      */
     public shouldAutoSave(): boolean {
+        if (!this.configLoaded)
+            return false;
         return this.config.autoSave?.value !== false;
     }
 
