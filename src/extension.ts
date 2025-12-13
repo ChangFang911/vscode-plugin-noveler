@@ -93,12 +93,16 @@ export async function activate(context: vscode.ExtensionContext) {
     // 执行配置迁移（如果需要）
     await MigrationService.checkAndMigrate(context);
 
+    // 配置自动保存
+    configureAutoSave();
+
     // 订阅配置变更事件
     context.subscriptions.push(
         configService.onDidChangeConfig(() => {
             // 配置变更时，刷新侧边栏和 CodeLens
             vscode.commands.executeCommand('noveler.refreshView');
             codeLensProvider?.refresh();
+            configureAutoSave();
         })
     );
 
@@ -531,9 +535,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('noveler.jumpToReadmeSection', jumpToReadmeSection)
     );
 
-    // 配置自动保存
-    configureAutoSave();
-
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -712,7 +713,7 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
         return;
     }
 
-    // 使用配置服务检��是否显示字数统计（内部已处理配置回退）
+    // 使用配置服务检查是否显示字数统计（内部已处理配置回退）
     if (!configService.shouldShowWordCountInStatusBar()) {
         wordCountStatusBarItem.hide();
         return;
