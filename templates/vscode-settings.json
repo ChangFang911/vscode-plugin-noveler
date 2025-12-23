@@ -1,0 +1,34 @@
+{
+  // ==================== Noveler 推荐的 VSCode 配置 ====================
+  // 这些配置会在初始化项目时自动创建到 .vscode/settings.json
+  // 仅对当前小说项目生效，不影响其他项目
+
+  // ==================== 自动保存 ====================
+  // 写作时防止意外丢失内容
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 2000,
+
+  // ==================== 文件格式化 ====================
+  // 自动清理行尾空格，保持文件整洁
+  "files.trimTrailingWhitespace": true,
+  // 文件末尾添加换行符（符合 Unix 标准）
+  "files.insertFinalNewline": true,
+
+  // ==================== Markdown 配置 ====================
+  // 预览时自动换行（适合中文段落）
+  "markdown.preview.breaks": true,
+  // 启用智能标点（如将 -- 转为 —）
+  "markdown.preview.typographer": true,
+
+  // ==================== 文件管理 ====================
+  // 在文件树中隐藏不必要的文件
+  "files.exclude": {
+    "**/.DS_Store": true,  // macOS 系统文件
+    "**/.noveler": true    // Noveler 内部配置目录
+  },
+
+  // 搜索时排除特定目录
+  "search.exclude": {
+    "**/.noveler": true
+  }
+}

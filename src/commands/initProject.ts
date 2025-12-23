@@ -261,6 +261,90 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
             Buffer.from(referenceContent, 'utf8')
         );
 
+        // 创建 .vscode/settings.json（项目级 VSCode 配置）
+        const vscodeDir = vscode.Uri.joinPath(workspaceFolder.uri, '.vscode');
+        try {
+            await vscode.workspace.fs.stat(vscodeDir);
+        } catch {
+            await vscode.workspace.fs.createDirectory(vscodeDir);
+        }
+
+        const settingsUri = vscode.Uri.joinPath(vscodeDir, 'settings.json');
+        let createSettings = false;
+
+        try {
+            await vscode.workspace.fs.stat(settingsUri);
+            // settings.json 已存在，询问是否覆盖
+            const overwriteSettings = await vscode.window.showInformationMessage(
+                '检测到 .vscode/settings.json 已存在，是否要合并 Noveler 推荐配置？',
+                '合并', '跳过'
+            );
+            createSettings = (overwriteSettings === '合并');
+        } catch {
+            // settings.json 不存在，直接创建
+            createSettings = true;
+        }
+
+        if (createSettings) {
+            // Noveler 推荐配置
+            const novelerSettings = {
+                // 自动保存配置（写作时防止意外丢失内容）
+                "files.autoSave": "afterDelay",
+                "files.autoSaveDelay": 2000,
+
+                // 文件格式化配置
+                "files.trimTrailingWhitespace": true,
+                "files.insertFinalNewline": true,
+
+                // Markdown 配置
+                "markdown.preview.breaks": true,
+                "markdown.preview.typographer": true,
+
+                // 文件排除配置（隐藏不必要的文件）
+                "files.exclude": {
+                    "**/.DS_Store": true,
+                    "**/.noveler": true
+                },
+
+                // 搜索排除配置
+                "search.exclude": {
+                    "**/.noveler": true
+                }
+            };
+
+            // 尝试读取现有配置并合并
+            let finalSettings = novelerSettings;
+            try {
+                const existingData = await vscode.workspace.fs.readFile(settingsUri);
+                const existingSettings = JSON.parse(Buffer.from(existingData).toString('utf8'));
+
+                // 深度合并配置（现有配置优先，Noveler 配置作为默认值）
+                finalSettings = {
+                    ...novelerSettings,
+                    ...existingSettings,
+                    // 特殊处理嵌套对象（files.exclude 和 search.exclude）
+                    "files.exclude": {
+                        ...novelerSettings["files.exclude"],
+                        ...(existingSettings["files.exclude"] || {})
+                    },
+                    "search.exclude": {
+                        ...novelerSettings["search.exclude"],
+                        ...(existingSettings["search.exclude"] || {})
+                    }
+                };
+                Logger.info('合并现有 VSCode 配置与 Noveler 推荐配置');
+            } catch {
+                // 文件不存在或解析失败，使用 Noveler 默认配置
+                Logger.info('创建新的 VSCode 配置文件');
+            }
+
+            await vscode.workspace.fs.writeFile(
+                settingsUri,
+                Buffer.from(JSON.stringify(finalSettings, null, 2), 'utf8')
+            );
+            Logger.info('项目级 VSCode 配置已保存: .vscode/settings.json');
+        }
+
         // 创建 .noveler/sensitive-words 目录并创建空的配置文件
         const sensitiveWordsDir = vscode.Uri.joinPath(workspaceFolder.uri, '.noveler', 'sensitive-words');
         try {
