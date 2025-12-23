@@ -361,40 +361,16 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '隐藏其他面板，专心写作'
             ),
             new NovelerTreeItem(
-                '统计仪表板',
+                '刷新视图',
                 NodeType.ActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
-                    command: 'noveler.showStats',
-                    title: '显示统计仪表板',
+                    command: 'noveler.refresh',
+                    title: '刷新视图',
                 },
                 'actionItem',
                 undefined,
-                '查看详细的写作统计和可视化数据'
-            ),
-            new NovelerTreeItem(
-                '敏感词配置',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.openSensitiveWordsConfig',
-                    title: '打开敏感词配置',
-                },
-                'actionItem',
-                undefined,
-                '配置敏感词检测级别和自定义词库'
-            ),
-            new NovelerTreeItem(
-                '打开配置文件',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.openConfig',
-                    title: '打开配置文件',
-                },
-                'actionItem',
-                undefined,
-                '编辑小说配置（设置、人物列表等）'
+                '完整刷新：更新侧边栏和 README 统计'
             ),
         ];
     }
@@ -405,40 +381,40 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     private getOtherActionItems(): NovelerTreeItem[] {
         const items: NovelerTreeItem[] = [
             new NovelerTreeItem(
-                '更新 README 统计',
+                '统计仪表板',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
-                    command: 'noveler.updateReadme',
-                    title: '更新 README 统计',
+                    command: 'noveler.showStats',
+                    title: '显示统计仪表板',
                 },
                 'otherActionItem',
                 undefined,
-                '手动更新 README.md 中的项目统计信息'
+                '查看详细的写作统计和可视化数据'
             ),
             new NovelerTreeItem(
-                '重新加载敏感词库',
+                '配置敏感词库',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
-                    command: 'noveler.reloadSensitiveWords',
-                    title: '重新加载敏感词库',
+                    command: 'noveler.openSensitiveWordsConfig',
+                    title: '配置敏感词库',
                 },
                 'otherActionItem',
                 undefined,
-                '重新加载敏感词库配置'
+                '配置敏感词检测级别和自定义词库'
             ),
             new NovelerTreeItem(
-                '重新加载高亮配置',
+                '打开配置文件',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
-                    command: 'noveler.reloadHighlights',
-                    title: '重新加载高亮配置',
+                    command: 'noveler.openConfig',
+                    title: '打开配置文件',
                 },
                 'otherActionItem',
                 undefined,
-                '重新加载章节高亮标记配置'
+                '编辑小说配置（设置、人物列表等）'
             ),
             new NovelerTreeItem(
                 '🎲 随机起名',
@@ -452,6 +428,30 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 undefined,
                 '生成多种风格的随机姓名'
             ),
+            new NovelerTreeItem(
+                '刷新敏感词库',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.reloadSensitiveWords',
+                    title: '刷新敏感词库',
+                },
+                'otherActionItem',
+                undefined,
+                '重新加载敏感词库配置'
+            ),
+            new NovelerTreeItem(
+                '刷新高亮设置',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.reloadHighlights',
+                    title: '刷新高亮设置',
+                },
+                'otherActionItem',
+                undefined,
+                '重新加载章节高亮标记配置'
+            ),
         ];
 
         // 如果启用了分卷功能，添加迁移相关命令
@@ -459,12 +459,12 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         if (volumesEnabled) {
             items.push(
                 new NovelerTreeItem(
-                    '回退到扁平结构',
+                    '退出分卷模式',
                     NodeType.OtherActionItem,
                     vscode.TreeItemCollapsibleState.None,
                     {
                         command: 'noveler.rollbackToFlatStructure',
-                        title: '回退到扁平结构',
+                        title: '退出分卷模式',
                     },
                     'otherActionItem',
                     undefined,
@@ -474,12 +474,12 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         } else {
             items.push(
                 new NovelerTreeItem(
-                    '迁移到分卷结构',
+                    '切换到分卷模式',
                     NodeType.OtherActionItem,
                     vscode.TreeItemCollapsibleState.None,
                     {
                         command: 'noveler.migrateToVolumeStructure',
-                        title: '迁移到分卷结构',
+                        title: '切换到分卷模式',
                     },
                     'otherActionItem',
                     undefined,

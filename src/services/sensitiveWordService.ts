@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as jsoncParser from 'jsonc-parser';
 import { TrieTree } from '../utils/trieTree';
 import {
@@ -203,11 +202,15 @@ export class SensitiveWordService {
 
         // 读取元数据
         const metadataPath = path.join(libPath, 'metadata.json');
-        if (fs.existsSync(metadataPath)) {
-            const metadata: WordLibraryMetadata = JSON.parse(
-                fs.readFileSync(metadataPath, 'utf-8')
-            );
+        const metadataUri = vscode.Uri.file(metadataPath);
+
+        try {
+            const metadataBytes = await vscode.workspace.fs.readFile(metadataUri);
+            const metadataContent = Buffer.from(metadataBytes).toString('utf8');
+            const metadata: WordLibraryMetadata = JSON.parse(metadataContent);
             Logger.info(`加载内置词库 v${metadata.version}，共 ${metadata.totalWords} 个词`);
+        } catch {
+            // 元数据文件不存在，继续加载词库
         }
 
         // 根据配置加载各级别词库
@@ -226,20 +229,17 @@ export class SensitiveWordService {
      */
     private async loadLevelWords(libPath: string, level: SensitiveLevel): Promise<void> {
         const filePath = path.join(libPath, `level-${level}.json`);
-
-        if (!fs.existsSync(filePath)) {
-            Logger.warn(`词库文件不存在: ${filePath}`);
-            return;
-        }
+        const fileUri = vscode.Uri.file(filePath);
 
         try {
-            const content = fs.readFileSync(filePath, 'utf-8');
+            const contentBytes = await vscode.workspace.fs.readFile(fileUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
             const data: WordLibraryFile = JSON.parse(content);
 
             this.trie.insertBatch(data.words, level);
             Logger.info(`加载 ${level} 级别词库，共 ${data.words.length} 个词`);
         } catch (error) {
-            Logger.error(`加载词库失败: ${filePath}`, error);
+            Logger.warn(`词库文件不存在或加载失败: ${filePath}`);
         }
     }
 
@@ -253,13 +253,11 @@ export class SensitiveWordService {
         }
 
         const customPath = path.join(workspaceRoot, this.config.customLibrary!.path);
-        if (!fs.existsSync(customPath)) {
-            Logger.info(`自定义敏感词库文件不存在: ${customPath}`);
-            return;
-        }
+        const customUri = vscode.Uri.file(customPath);
 
         try {
-            const content = fs.readFileSync(customPath, 'utf-8');
+            const contentBytes = await vscode.workspace.fs.readFile(customUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
             const data: CustomWordLibrary = jsoncParser.parse(content);
 
             if (data.words && Array.isArray(data.words)) {
@@ -268,7 +266,7 @@ export class SensitiveWordService {
                 Logger.info(`加载自定义敏感词库，共 ${data.words.length} 个词`);
             }
         } catch (error) {
-            Logger.error('加载自定义敏感词库失败', error);
+            Logger.info(`自定义敏感词库文件不存在: ${customPath}`);
         }
     }
 
@@ -282,13 +280,11 @@ export class SensitiveWordService {
         }
 
         const whitelistPath = path.join(workspaceRoot, this.config.whitelist!.path);
-        if (!fs.existsSync(whitelistPath)) {
-            Logger.info(`白名单文件不存在: ${whitelistPath}`);
-            return;
-        }
+        const whitelistUri = vscode.Uri.file(whitelistPath);
 
         try {
-            const content = fs.readFileSync(whitelistPath, 'utf-8');
+            const contentBytes = await vscode.workspace.fs.readFile(whitelistUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
             const data: CustomWordLibrary = jsoncParser.parse(content);
 
             if (data.words && Array.isArray(data.words)) {
@@ -296,7 +292,7 @@ export class SensitiveWordService {
                 Logger.info(`加载白名单，共 ${this.whitelist.size} 个词`);
             }
         } catch (error) {
-            Logger.error('加载白名单失败', error);
+            Logger.info(`白名单文件不存在: ${whitelistPath}`);
         }
     }
 
@@ -311,28 +307,30 @@ export class SensitiveWordService {
 
         // 加载黑名单
         const blacklistPath = path.join(workspaceRoot, this.config.customWords!.blacklistPath);
-        if (fs.existsSync(blacklistPath)) {
-            try {
-                const content = fs.readFileSync(blacklistPath, 'utf-8');
-                const data: CustomWordLibrary = jsoncParser.parse(content);
-                this.trie.insertBatch(data.words, 'high'); // 自定义黑名单视为高危
-                Logger.info(`加载自定义黑名单，共 ${data.words.length} 个词`);
-            } catch (error) {
-                Logger.warn('加载自定义黑名单失败', error);
-            }
+        const blacklistUri = vscode.Uri.file(blacklistPath);
+
+        try {
+            const contentBytes = await vscode.workspace.fs.readFile(blacklistUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
+            const data: CustomWordLibrary = jsoncParser.parse(content);
+            this.trie.insertBatch(data.words, 'high'); // 自定义黑名单视为高危
+            Logger.info(`加载自定义黑名单，共 ${data.words.length} 个词`);
+        } catch (error) {
+            // 黑名单文件不存在，跳过
         }
 
         // 加载白名单
         const whitelistPath = path.join(workspaceRoot, this.config.customWords!.whitelistPath);
-        if (fs.existsSync(whitelistPath)) {
-            try {
-                const content = fs.readFileSync(whitelistPath, 'utf-8');
-                const data: CustomWordLibrary = jsoncParser.parse(content);
-                this.whitelist = new Set(data.words);
-                Logger.info(`加载自定义白名单，共 ${this.whitelist.size} 个词`);
-            } catch (error) {
-                Logger.warn('加载自定义白名单失败', error);
-            }
+        const whitelistUri = vscode.Uri.file(whitelistPath);
+
+        try {
+            const contentBytes = await vscode.workspace.fs.readFile(whitelistUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
+            const data: CustomWordLibrary = jsoncParser.parse(content);
+            this.whitelist = new Set(data.words);
+            Logger.info(`加载自定义白名单，共 ${this.whitelist.size} 个词`);
+        } catch (error) {
+            // 白名单文件不存在，跳过
         }
     }
 

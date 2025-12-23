@@ -9,7 +9,6 @@ import { convertToChineseNumber } from '../utils/chineseNumber';
 import { convertToRomanNumber } from '../utils/volumeHelper';
 import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
-import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
 import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING } from '../constants';
@@ -242,11 +241,8 @@ ${content}`;
         }
         handleSuccess(successMessage);
 
-        // 自动刷新侧边栏视图
-        vscode.commands.executeCommand('noveler.refreshView');
-
-        // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('创建章节失败', error);
     }

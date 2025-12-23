@@ -71,52 +71,60 @@ export async function scanChapters(): Promise<ProjectStats> {
         const volumeChapters: VolumeChapters[] = [];
 
         for (const volume of volumes) {
-            const volumeChapterList: ChapterInfo[] = [];
             let volumeTotalWords = 0;
             let volumeCompletedChapters = 0;
 
-            for (const chapterFile of volume.chapters) {
-                try {
-                    const fileUri = vscode.Uri.joinPath(
-                        workspaceFolder.uri,
-                        CHAPTERS_FOLDER,
-                        volume.folderName,
-                        chapterFile
-                    );
-                    const fileData = await vscode.workspace.fs.readFile(fileUri);
-                    const fileContent = Buffer.from(fileData).toString('utf8');
+            // 并行读取当前卷的所有章节文件以提升性能
+            const chapterResults = await Promise.all(
+                volume.chapters.map(async (chapterFile) => {
+                    try {
+                        const fileUri = vscode.Uri.joinPath(
+                            workspaceFolder.uri,
+                            CHAPTERS_FOLDER,
+                            volume.folderName,
+                            chapterFile
+                        );
+                        const fileData = await vscode.workspace.fs.readFile(fileUri);
+                        const fileContent = Buffer.from(fileData).toString('utf8');
 
-                    const parsed = matter(fileContent);
-                    const frontMatter = parsed.data;
+                        const parsed = matter(fileContent);
+                        const frontMatter = parsed.data;
 
-                    if (frontMatter && frontMatter.chapter !== undefined) {
-                        const wordCount = frontMatter.wordCount || 0;
-                        const statusValue = frontMatter.status || 'draft';
-                        const status = getStatusDisplayName(statusValue); // 转换为中文显示
+                        if (frontMatter && frontMatter.chapter !== undefined) {
+                            const wordCount = frontMatter.wordCount || 0;
+                            const statusValue = frontMatter.status || 'draft';
+                            const status = getStatusDisplayName(statusValue); // 转换为中文显示
 
-                        const chapterInfo: ChapterInfo = {
-                            number: frontMatter.chapter,
-                            title: frontMatter.title || chapterFile,
-                            fileName: `${volume.folderName}/${chapterFile}`,
-                            wordCount: wordCount,
-                            status: status,
-                            volume: volume.volume,
-                            volumeType: volume.volumeType
-                        };
-
-                        volumeChapterList.push(chapterInfo);
-                        chapters.push(chapterInfo);
-
-                        volumeTotalWords += wordCount;
-                        totalWords += wordCount;
-
-                        if (status === '已完成') {
-                            volumeCompletedChapters++;
-                            completedChapters++;
+                            return {
+                                number: frontMatter.chapter,
+                                title: frontMatter.title || chapterFile,
+                                fileName: `${volume.folderName}/${chapterFile}`,
+                                wordCount: wordCount,
+                                status: status,
+                                volume: volume.volume,
+                                volumeType: volume.volumeType
+                            } as ChapterInfo;
                         }
+                        return null;
+                    } catch (error) {
+                        handleError(`读取章节文件失败 ${chapterFile}`, error, ErrorSeverity.Silent);
+                        return null;
                     }
-                } catch (error) {
-                    handleError(`读取章节文件失败 ${chapterFile}`, error, ErrorSeverity.Silent);
+                })
+            );
+
+            // 过滤并收集有效的章节信息
+            const volumeChapterList = chapterResults.filter((info): info is ChapterInfo => info !== null);
+
+            // 计算统计数据
+            for (const chapterInfo of volumeChapterList) {
+                chapters.push(chapterInfo);
+                volumeTotalWords += chapterInfo.wordCount;
+                totalWords += chapterInfo.wordCount;
+
+                if (chapterInfo.status === '已完成') {
+                    volumeCompletedChapters++;
+                    completedChapters++;
                 }
             }
 
@@ -155,38 +163,50 @@ export async function scanChapters(): Promise<ProjectStats> {
             .map(([name]) => name)
             .sort(); // 按文件名排序
 
-        for (const fileName of mdFiles) {
-            try {
-                const fileUri = vscode.Uri.joinPath(chaptersFolderUri, fileName);
-                const fileData = await vscode.workspace.fs.readFile(fileUri);
-                const fileContent = Buffer.from(fileData).toString('utf8');
+        // 并行读取所有章节文件以提升性能
+        const chapterResults = await Promise.all(
+            mdFiles.map(async (fileName) => {
+                try {
+                    const fileUri = vscode.Uri.joinPath(chaptersFolderUri, fileName);
+                    const fileData = await vscode.workspace.fs.readFile(fileUri);
+                    const fileContent = Buffer.from(fileData).toString('utf8');
 
-                // 解析 Front Matter
-                const parsed = matter(fileContent);
-                const frontMatter = parsed.data;
+                    // 解析 Front Matter
+                    const parsed = matter(fileContent);
+                    const frontMatter = parsed.data;
 
-                if (frontMatter && frontMatter.chapter !== undefined) {
-                    const wordCount = frontMatter.wordCount || 0;
-                    const statusValue = frontMatter.status || 'draft';
-                    const status = getStatusDisplayName(statusValue); // 转换为中文显示
+                    if (frontMatter && frontMatter.chapter !== undefined) {
+                        const wordCount = frontMatter.wordCount || 0;
+                        const statusValue = frontMatter.status || 'draft';
+                        const status = getStatusDisplayName(statusValue); // 转换为中文显示
 
-                    chapters.push({
-                        number: frontMatter.chapter,
-                        title: frontMatter.title || fileName,
-                        fileName: fileName,
-                        wordCount: wordCount,
-                        status: status
-                    });
-
-                    totalWords += wordCount;
-
-                    // 统计完成的章节（状态为"已完成"）
-                    if (status === '已完成') {
-                        completedChapters++;
+                        return {
+                            number: frontMatter.chapter,
+                            title: frontMatter.title || fileName,
+                            fileName: fileName,
+                            wordCount: wordCount,
+                            status: status
+                        } as ChapterInfo;
                     }
+                    return null;
+                } catch (error) {
+                    handleError(`读取章节文件失败 ${fileName}`, error, ErrorSeverity.Silent);
+                    return null;
                 }
-            } catch (error) {
-                handleError(`读取章节文件失败 ${fileName}`, error, ErrorSeverity.Silent);
+            })
+        );
+
+        // 过滤并收集有效的章节信息
+        const validChapters = chapterResults.filter((info): info is ChapterInfo => info !== null);
+
+        // 计算统计数据
+        for (const chapterInfo of validChapters) {
+            chapters.push(chapterInfo);
+            totalWords += chapterInfo.wordCount;
+
+            // 统计完成的章节（状态为"已完成"）
+            if (chapterInfo.status === '已完成') {
+                completedChapters++;
             }
         }
 

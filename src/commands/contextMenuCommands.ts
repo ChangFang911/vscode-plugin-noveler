@@ -9,7 +9,6 @@ import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { sanitizeFileName } from '../utils/inputValidator';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
 import { COMPLETED_STATUS, IN_PROGRESS_STATUS } from '../constants';
-import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 
 /**
  * 重命名章节
@@ -104,7 +103,7 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('重命名章节失败', error, ErrorSeverity.Error);
     }
@@ -162,7 +161,7 @@ export async function updateChapterStatusWithDialog(fileUri: vscode.Uri): Promis
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
     }
@@ -194,7 +193,7 @@ async function updateChapterStatus(item: NovelerTreeItem, status: string): Promi
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
     }
@@ -230,7 +229,7 @@ export async function deleteChapter(item: NovelerTreeItem): Promise<void> {
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('删除章节失败', error, ErrorSeverity.Error);
     }
@@ -292,7 +291,7 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('重命名人物失败', error, ErrorSeverity.Error);
     }
@@ -328,7 +327,7 @@ export async function deleteCharacter(item: NovelerTreeItem): Promise<void> {
         vscode.commands.executeCommand('noveler.refreshView');
 
         // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('删除人物失败', error, ErrorSeverity.Error);
     }

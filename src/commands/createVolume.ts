@@ -5,8 +5,8 @@ import { VolumeType } from '../types/volume';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { generateVolumeFolderName } from '../utils/volumeHelper';
+import { formatDateTime } from '../utils/dateFormatter';
 
 /**
  * 创建新卷
@@ -94,13 +94,10 @@ export async function createVolume(): Promise<void> {
             await createVolumeOutline(volumeFolderPath, volumeTitle);
         }
 
-        // 刷新侧边栏
-        vscode.commands.executeCommand('noveler.refreshView');
-
         vscode.window.showInformationMessage(`✅ 成功创建卷: ${volumeTitle}`);
 
-        // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         Logger.error('创建卷失败', error);
         vscode.window.showErrorMessage(`创建卷失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -313,6 +310,13 @@ async function enableVolumes(workspaceFolder: vscode.WorkspaceFolder): Promise<v
         configText = configText.replace(
             /"folderStructure":\s*"flat"/,
             '"folderStructure": "nested"'
+        );
+
+        // 更新 modified 时间戳
+        const now = formatDateTime(new Date());
+        configText = configText.replace(
+            /"modified":\s*"[^"]*"/,
+            `"modified": "${now}"`
         );
 
         fs.writeFileSync(configPath, configText, 'utf-8');

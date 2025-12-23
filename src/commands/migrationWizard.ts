@@ -100,8 +100,14 @@ export async function migrateToVolumeStructure(): Promise<void> {
             return;
         }
 
-        // 步骤 4: 执行迁移
-        await executeMigration(chaptersPath, volumeGroups, volumesConfig.numberFormat || 'arabic');
+        // 步骤 4: 执行迁移（带进度提示）
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "迁移到分卷结构",
+            cancellable: false  // 关键操作不允许取消
+        }, async (progress) => {
+            await executeMigration(chaptersPath, volumeGroups, volumesConfig.numberFormat || 'arabic', progress);
+        });
 
         // 步骤 5: 更新配置
         await updateConfigToNested(workspaceFolder);
@@ -110,8 +116,8 @@ export async function migrateToVolumeStructure(): Promise<void> {
         const volumeService = VolumeService.getInstance();
         await volumeService.scanVolumes();
 
-        // 步骤 7: 刷新侧边栏
-        vscode.commands.executeCommand('noveler.refreshView');
+        // 步骤 7: 完整刷新（迁移后需要更新所有数据）
+        await vscode.commands.executeCommand('noveler.refresh');
 
         vscode.window.showInformationMessage(
             `✅ 结构迁移完成！\n\n已创建 ${volumeGroups.length} 个卷，移动 ${chapters.length} 个章节。`
@@ -284,9 +290,16 @@ async function confirmMigrationPlan(volumeGroups: VolumeGroup[]): Promise<boolea
 async function executeMigration(
     chaptersPath: string,
     volumeGroups: VolumeGroup[],
-    _numberFormat: string
+    _numberFormat: string,
+    progress?: vscode.Progress<{ message?: string; increment?: number }>
 ): Promise<void> {
+    // 计算总章节数用于进度计算
+    const totalChapters = volumeGroups.reduce((sum, group) => sum + group.chapters.length, 0);
+    let processedChapters = 0;
+
     // 步骤 1: 检查所有卷文件夹是否已存在（防止重复迁移）
+    progress?.report({ message: "检查目标文件夹...", increment: 0 });
+
     for (const volumeGroup of volumeGroups) {
         const volumeFolderName = generateVolumeFolderName(
             'main',
@@ -301,7 +314,8 @@ async function executeMigration(
     }
 
     // 步骤 2: 创建卷文件夹和元数据，移动章节
-    for (const volumeGroup of volumeGroups) {
+    for (let i = 0; i < volumeGroups.length; i++) {
+        const volumeGroup = volumeGroups[i];
         // 生成卷文件夹名
         const volumeFolderName = generateVolumeFolderName(
             'main',
@@ -309,6 +323,12 @@ async function executeMigration(
             volumeGroup.title
         );
         const volumePath = path.join(chaptersPath, volumeFolderName);
+
+        // 报告当前进度
+        progress?.report({
+            message: `创建卷 ${i + 1}/${volumeGroups.length}: ${volumeGroup.title}`,
+            increment: 0
+        });
 
         // 创建卷文件夹
         fs.mkdirSync(volumePath, { recursive: true });
@@ -353,18 +373,27 @@ async function executeMigration(
                 // 检查源文件是否存在
                 if (!fs.existsSync(chapter.filePath)) {
                     Logger.warn(`源文件不存在，跳过: ${chapter.fileName}`);
+                    processedChapters++;
                     continue;
                 }
 
                 // 检查目标文件是否已存在
                 if (fs.existsSync(targetPath)) {
                     Logger.warn(`目标文件已存在，跳过: ${chapter.fileName}`);
+                    processedChapters++;
                     continue;
                 }
 
                 // 移动文件
                 fs.renameSync(chapter.filePath, targetPath);
                 Logger.info(`移动章节: ${chapter.fileName} -> ${volumeFolderName}`);
+
+                // 更新进度
+                processedChapters++;
+                progress?.report({
+                    message: `移动章节 (${processedChapters}/${totalChapters})`,
+                    increment: (100 / totalChapters)
+                });
 
                 // 更新章节文件的 frontmatter，移除 volume 字段（因为现在通过文件夹结构管理）
                 try {
@@ -423,6 +452,13 @@ async function updateConfigToNested(workspaceFolder: vscode.WorkspaceFolder): Pr
         configText = configText.replace(
             /"folderStructure":\s*"flat"/g,
             '"folderStructure": "nested"'
+        );
+
+        // 更新 modified 时间戳
+        const now = formatDateTime(new Date());
+        configText = configText.replace(
+            /"modified":\s*"[^"]*"/,
+            `"modified": "${now}"`
         );
 
         fs.writeFileSync(configPath, configText, 'utf-8');
@@ -507,8 +543,8 @@ export async function rollbackToFlatStructure(): Promise<void> {
         // 刷新 VolumeService 缓存
         await volumeService.scanVolumes();
 
-        // 刷新侧边栏
-        vscode.commands.executeCommand('noveler.refreshView');
+        // 完整刷新（回滚后需要更新所有数据）
+        await vscode.commands.executeCommand('noveler.refresh');
 
         vscode.window.showInformationMessage(`✅ 已回滚到扁平结构！`);
     } catch (error) {
@@ -548,6 +584,13 @@ async function updateConfigToFlat(workspaceFolder: vscode.WorkspaceFolder): Prom
         configText = configText.replace(
             /"folderStructure":\s*"nested"/g,
             '"folderStructure": "flat"'
+        );
+
+        // 更新 modified 时间戳
+        const now = formatDateTime(new Date());
+        configText = configText.replace(
+            /"modified":\s*"[^"]*"/,
+            `"modified": "${now}"`
         );
 
         fs.writeFileSync(configPath, configText, 'utf-8');

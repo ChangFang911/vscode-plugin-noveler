@@ -157,7 +157,7 @@ export const VOLUME_TYPE_ICONS: Record<VolumeType, string> = {
 export const PARAGRAPH_INDENT = '　　';
 
 /** 配置版本 */
-export const CURRENT_CONFIG_VERSION = '0.5.0';
+export const CURRENT_CONFIG_VERSION = '0.6.1';
 
 /** 迁移相关常量 */
 export const MIN_AVG_CHAPTERS_PER_VOLUME = 2;
@@ -174,3 +174,6 @@ export const DEFAULT_AUTO_EMPTY_LINE = true;
 
 /** 默认段落缩进 */
 export const DEFAULT_PARAGRAPH_INDENT = true;
+
+/** 判断章节完成的最小字数 */
+export const MINIMUM_COMPLETED_WORD_COUNT = 100;

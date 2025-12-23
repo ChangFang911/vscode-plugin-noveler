@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as jsoncParser from 'jsonc-parser';
 import matter from 'gray-matter';
 import { VolumeInfo, VolumeMetadata, VolumeType } from '../types/volume';
@@ -8,7 +7,7 @@ import { ConfigService } from './configService';
 import { Logger } from '../utils/logger';
 import { WordCountService } from './wordCountService';
 import { getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
-import { VOLUME_TYPE_OFFSETS } from '../constants';
+import { VOLUME_TYPE_OFFSETS, MINIMUM_COMPLETED_WORD_COUNT } from '../constants';
 
 /**
  * 分卷管理服务
@@ -52,9 +51,12 @@ export class VolumeService {
         }
 
         const chaptersPath = path.join(workspaceFolder.uri.fsPath, 'chapters');
+        const chaptersUri = vscode.Uri.file(chaptersPath);
 
         // 检查 chapters 目录是否存在
-        if (!fs.existsSync(chaptersPath)) {
+        try {
+            await vscode.workspace.fs.stat(chaptersUri);
+        } catch {
             Logger.debug('chapters 目录不存在');
             return [];
         }
@@ -82,16 +84,17 @@ export class VolumeService {
         const volumes: VolumeInfo[] = [];
 
         try {
-            const entries = fs.readdirSync(chaptersPath, { withFileTypes: true });
+            const chaptersUri = vscode.Uri.file(chaptersPath);
+            const entries = await vscode.workspace.fs.readDirectory(chaptersUri);
 
-            for (const entry of entries) {
+            for (const [name, type] of entries) {
                 // 只处理文件夹
-                if (!entry.isDirectory()) {
+                if (type !== vscode.FileType.Directory) {
                     continue;
                 }
 
-                const folderPath = path.join(chaptersPath, entry.name);
-                const volumeInfo = await this.parseVolumeFolder(entry.name, folderPath);
+                const folderPath = path.join(chaptersPath, name);
+                const volumeInfo = await this.parseVolumeFolder(name, folderPath);
 
                 if (volumeInfo) {
                     volumes.push(volumeInfo);
@@ -131,7 +134,7 @@ export class VolumeService {
         const metadata = await this.loadVolumeMetadata(folderPath);
 
         // 扫描章节文件
-        const chapters = this.scanChapters(folderPath);
+        const chapters = await this.scanChapters(folderPath);
 
         // 计算统计信息
         const stats = await this.calculateVolumeStats(folderPath, chapters);
@@ -308,13 +311,17 @@ export class VolumeService {
      */
     private async loadVolumeMetadata(folderPath: string): Promise<VolumeMetadata | undefined> {
         const metadataPath = path.join(folderPath, 'volume.json');
+        const metadataUri = vscode.Uri.file(metadataPath);
 
-        if (!fs.existsSync(metadataPath)) {
+        try {
+            await vscode.workspace.fs.stat(metadataUri);
+        } catch {
             return undefined;
         }
 
         try {
-            const content = fs.readFileSync(metadataPath, 'utf-8');
+            const contentBytes = await vscode.workspace.fs.readFile(metadataUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
             const metadata = jsoncParser.parse(content) as VolumeMetadata;
             return metadata;
         } catch (error) {
@@ -326,53 +333,61 @@ export class VolumeService {
     /**
      * 扫描卷文件夹中的章节文件
      */
-    private scanChapters(folderPath: string): string[] {
+    private async scanChapters(folderPath: string): Promise<string[]> {
         const chapters: string[] = [];
 
         try {
-            const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+            const folderUri = vscode.Uri.file(folderPath);
+            const entries = await vscode.workspace.fs.readDirectory(folderUri);
 
-            for (const entry of entries) {
+            for (const [name, type] of entries) {
                 // 只处理 .md 文件，排除特殊文件
-                if (entry.isFile() && entry.name.endsWith('.md')) {
+                if (type === vscode.FileType.File && name.endsWith('.md')) {
                     // 排除以下特殊文件：
                     // - outline.md (卷大纲)
                     // - README.md (说明文档)
                     // - volume.md (卷元信息)
                     const excludedFiles = ['outline.md', 'README.md', 'readme.md', 'volume.md', 'VOLUME.md'];
 
-                    if (!excludedFiles.includes(entry.name)) {
-                        chapters.push(entry.name);
+                    if (!excludedFiles.includes(name)) {
+                        chapters.push(name);
                     }
                 }
             }
 
             // 按章节号排序（从文件 frontmatter 中读取 chapter 字段）
-            chapters.sort((a, b) => {
-                const chapterA = this.extractChapterNumber(path.join(folderPath, a));
-                const chapterB = this.extractChapterNumber(path.join(folderPath, b));
+            const chapterNumbers = await Promise.all(
+                chapters.map(async (name) => ({
+                    name,
+                    number: await this.extractChapterNumber(path.join(folderPath, name))
+                }))
+            );
 
+            chapterNumbers.sort((a, b) => {
                 // 如果都有章节号，按章节号排序
-                if (chapterA && chapterB) {
-                    return chapterA - chapterB;
+                if (a.number && b.number) {
+                    return a.number - b.number;
                 }
 
                 // 否则按文件名字母顺序排序
-                return a.localeCompare(b);
+                return a.name.localeCompare(b.name);
             });
+
+            return chapterNumbers.map(item => item.name);
         } catch (error) {
             Logger.error(`扫描章节文件失败: ${folderPath}`, error);
+            return [];
         }
-
-        return chapters;
     }
 
     /**
      * 从章节文件中提取章节号（从 frontmatter 的 chapter 字段）
      */
-    private extractChapterNumber(chapterPath: string): number | null {
+    private async extractChapterNumber(chapterPath: string): Promise<number | null> {
         try {
-            const content = fs.readFileSync(chapterPath, 'utf-8');
+            const chapterUri = vscode.Uri.file(chapterPath);
+            const contentBytes = await vscode.workspace.fs.readFile(chapterUri);
+            const content = Buffer.from(contentBytes).toString('utf8');
             const parsed = matter(content);
             return parsed.data.chapter ? Number(parsed.data.chapter) : null;
         } catch (error) {
@@ -387,24 +402,32 @@ export class VolumeService {
         let totalWords = 0;
         let completedChapters = 0;
 
-        for (const chapter of chapters) {
-            const chapterPath = path.join(folderPath, chapter);
+        // 并行读取所有章节文件以提升性能
+        const chapterStats = await Promise.all(
+            chapters.map(async (chapter) => {
+                const chapterPath = path.join(folderPath, chapter);
+                try {
+                    const chapterUri = vscode.Uri.file(chapterPath);
+                    const contentBytes = await vscode.workspace.fs.readFile(chapterUri);
+                    const content = Buffer.from(contentBytes).toString('utf8');
 
-            try {
-                const content = fs.readFileSync(chapterPath, 'utf-8');
+                    // 使用 WordCountService 统计字数（与侧边栏一致）
+                    const contentWithoutFM = getContentWithoutFrontMatter({ getText: () => content } as vscode.TextDocument);
+                    const wordCount = WordCountService.getSimpleWordCount(contentWithoutFM, true);
 
-                // 使用 WordCountService 统计字数（与侧边栏一致）
-                const contentWithoutFM = getContentWithoutFrontMatter({ getText: () => content } as vscode.TextDocument);
-                const wordCount = WordCountService.getSimpleWordCount(contentWithoutFM, true);
-
-                totalWords += wordCount;
-
-                // 如果有内容，视为完成
-                if (wordCount > 100) {
-                    completedChapters++;
+                    return { wordCount, isCompleted: wordCount > MINIMUM_COMPLETED_WORD_COUNT };
+                } catch (error) {
+                    Logger.warn(`读取章节文件失败: ${chapterPath}`, error);
+                    return { wordCount: 0, isCompleted: false };
                 }
-            } catch (error) {
-                Logger.warn(`读取章节文件失败: ${chapterPath}`, error);
+            })
+        );
+
+        // 汇总统计数据
+        for (const stat of chapterStats) {
+            totalWords += stat.wordCount;
+            if (stat.isCompleted) {
+                completedChapters++;
             }
         }
 
@@ -549,17 +572,20 @@ export class VolumeService {
         }
 
         const chaptersPath = path.join(workspaceFolder.uri.fsPath, 'chapters');
+        const chaptersUri = vscode.Uri.file(chaptersPath);
 
         // 检查 chapters 目录是否存在
-        if (!fs.existsSync(chaptersPath)) {
+        try {
+            await vscode.workspace.fs.stat(chaptersUri);
+        } catch {
             return 1;
         }
 
         try {
-            const files = fs.readdirSync(chaptersPath, { withFileTypes: true });
+            const files = await vscode.workspace.fs.readDirectory(chaptersUri);
             const mdFiles = files
-                .filter(f => f.isFile() && f.name.endsWith('.md'))
-                .map(f => f.name);
+                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
+                .map(([name]) => name);
 
             // 从文件名中提取章节号（格式：第001章-xxx.md, 001-xxx.md）
             const chapterNumbers = mdFiles

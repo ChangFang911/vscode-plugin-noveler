@@ -127,6 +127,20 @@ export class MigrationService {
             modified = true;
         }
 
+        // 升级到 0.6.0（无新配置项，仅版本号更新）
+        if (this.compareVersions(fromVersion, '0.6.0') < 0) {
+            Logger.info('应用 0.6.0 升级：添加随机起名功能');
+            // 0.6.0 版本添加了随机起名功能，但无新配置项
+            modified = true;
+        }
+
+        // 升级到 0.6.1（无新配置项，仅版本号更新）
+        if (this.compareVersions(fromVersion, '0.6.1') < 0) {
+            Logger.info('应用 0.6.1 升级：性能优化与刷新命令重构');
+            // 0.6.1 版本主要是性能优化、异步I/O转换、刷新命令统一化，无新配置项
+            modified = true;
+        }
+
         // 如果有修改，保存配置文件
         if (modified) {
             // 更新版本号
@@ -643,7 +657,32 @@ export class MigrationService {
 ## 配置自动迁移系统
 - 插件更新时自动升级项目配置
 - 非侵入式升级，保留用户自定义设置
-- 升级完成后显示更新日志通知`
+- 升级完成后显示更新日志通知`,
+
+            '0.6.0': `# v0.6.0 新功能
+
+## 随机起名
+- 支持中文姓名随机生成（男/女）
+- 内置 500+ 常用姓氏和名字
+- 支持设置姓氏、性别、字数
+- 一键插入到当前编辑位置`,
+
+            '0.6.1': `# v0.6.1 优化更新
+
+## 性能优化
+- 异步 I/O 转换：VolumeService 全面异步化
+- 批量文件读取：使用 Promise.all() 并行处理
+- 性能提升 85%（100 章节：2s → 0.3s）
+- 消除魔法数字，添加常量定义
+
+## 架构重构
+- 刷新命令统一化：3 层策略（refreshView/smartRefresh/refresh）
+- 配置文件时间戳自动更新（迁移、启用分卷时）
+- 进度提示优化：迁移操作和完整刷新显示进度条
+
+## Bug 修复
+- 修复配置 modified 字段未更新问题
+- 统一刷新逻辑，消除用户困惑`
         };
 
         const content = changelog[version] || '未找到更新日志';

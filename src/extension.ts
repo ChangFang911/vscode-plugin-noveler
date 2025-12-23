@@ -145,10 +145,43 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
     );
 
-    // 注册刷新视图命令
+    // ============ 策略 1: 轻量刷新（只刷新侧边栏UI） ============
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.refreshView', () => {
             novelerViewProvider.refresh();
+        })
+    );
+
+    // ============ 策略 2: 智能刷新（侧边栏 + 根据配置决定是否更新 README） ============
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.smartRefresh', async () => {
+            // 刷新侧边栏
+            novelerViewProvider.refresh();
+
+            // 根据配置决定是否更新 README
+            await handleReadmeAutoUpdate();
+        })
+    );
+
+    // ============ 策略 3: 完整刷新（侧边栏 + README，带进度提示） ============
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.refresh', async () => {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "刷新",
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ message: "刷新侧边栏...", increment: 0 });
+                novelerViewProvider.refresh();
+
+                // 短暂延迟让用户能看到进度
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                progress.report({ message: "更新统计数据...", increment: 50 });
+                await updateReadme(true);  // silent = true，不显示通知
+
+                progress.report({ message: "完成", increment: 50 });
+            });
         })
     );
 
@@ -230,19 +263,6 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // 注册命令：显示字数统计
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.showWordCount', () => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                const stats = wordCountService.getWordCount(editor.document);
-                vscode.window.showInformationMessage(
-                    `字数: ${stats.totalChars} | 中文: ${stats.chineseChars} | 段落: ${stats.paragraphs}`
-                );
-            }
-        })
-    );
-
     // 注册命令：创建新章节
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.createChapter', async () => {
@@ -295,10 +315,12 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // 注册命令：更新 README 统计
+    // 注册命令：更新 README 统计（已废弃，保留用于向后兼容）
+    // 建议使用 noveler.refresh 代替
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.updateReadme', async () => {
-            await updateReadme();
+            // 直接调用完整刷新
+            await vscode.commands.executeCommand('noveler.refresh');
         })
     );
 

@@ -7,7 +7,6 @@ import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { validateCharacterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
-import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { CHARACTERS_FOLDER } from '../constants';
 
 /**
@@ -132,11 +131,8 @@ ${content}`;
         await vscode.window.showTextDocument(doc);
         handleSuccess(`人物文件已创建: ${sanitizedName}`);
 
-        // 自动刷新侧边栏视图
-        vscode.commands.executeCommand('noveler.refreshView');
-
-        // 根据配置自动更新 README
-        await handleReadmeAutoUpdate();
+        // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
+        await vscode.commands.executeCommand('noveler.smartRefresh');
     } catch (error) {
         handleError('创建人物失败', error);
     }

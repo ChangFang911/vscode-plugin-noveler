@@ -343,8 +343,8 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
         handleSuccess(`小说项目"${novelName}"初始化完成！已创建目录结构和配置文件\n${enableVolumes ? `✅ 已启用分卷功能（${numberFormat === 'arabic' ? '阿拉伯数字' : numberFormat === 'chinese' ? '中文数字' : '罗马数字'}编号）` : '📄 使用扁平章节结构'}`);
 
-        // 刷新侧边栏视图
-        vscode.commands.executeCommand('noveler.refreshView');
+        // 完整刷新（初始化项目后需要更新所有数据）
+        await vscode.commands.executeCommand('noveler.refresh');
 
         // 打开 README.md
         const readmeDoc = await vscode.workspace.openTextDocument(readmeUri);
