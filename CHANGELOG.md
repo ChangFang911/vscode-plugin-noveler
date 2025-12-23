@@ -7,6 +7,33 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2025-12-23
+
+### 新增功能
+
+#### ⚙️ VSCode 项目配置自动创建
+- **功能**：初始化项目时自动创建 `.vscode/settings.json` 配置文件
+- **特点**：
+  - 仅对当前小说项目生效，不影响其他项目
+  - 智能合并策略：用户配置优先，Noveler 配置作为默认值
+  - 深度合并嵌套对象（`files.exclude`, `search.exclude`）
+- **默认配置**：
+  - 自动保存（2秒延迟，防止意外丢失内容）
+  - 文件格式化（自动清理行尾空格）
+  - Markdown 预览优化（适合中文段落）
+  - 文件隐藏（`.DS_Store`, `.noveler`）
+- **实现**：[src/commands/initProject.ts](src/commands/initProject.ts#L264-L346)
+- **文档**：
+  - [docs/VSCode配置说明.md](docs/VSCode配置说明.md) - 详细使用指南
+  - [templates/vscode-settings.json](templates/vscode-settings.json) - 配置模板
+
+### 问题修复
+
+#### 🐛 修复非小说项目配置影响问题
+- **问题**：之前的实现会修改全局 VSCode 配置，影响所有项目
+- **解决**：改为项目级配置（`.vscode/settings.json`），完全隔离
+- **关联**：Closes #2, Closes #1
+
 ## [0.6.2] - 2025-12-23
 
 ### 功能增强
