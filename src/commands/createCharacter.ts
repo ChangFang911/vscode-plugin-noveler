@@ -132,7 +132,7 @@ ${content}`;
         handleSuccess(`人物文件已创建: ${sanitizedName}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('创建人物失败', error);
     }

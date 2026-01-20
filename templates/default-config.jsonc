@@ -1,7 +1,7 @@
 {
   // ==================== 配置版本 ====================
   // 自动管理，请勿手动修改
-  "version": "0.6.1",
+  "version": "0.6.4",
 
   "noveler": {
     // ==================== 章节目标字数 ====================
@@ -19,22 +19,10 @@
         "backgroundColor": "rgba(206, 145, 120, 0.15)",
         "fontStyle": "normal"
       },
-      // 内心独白高亮样式（暂未启用）
-      "thought": {
-        "color": "#608b4e",
-        "backgroundColor": "rgba(96, 139, 78, 0.15)",
-        "fontStyle": "italic"
-      },
       // 人物名称高亮样式（自动识别 characters/ 目录中的人物）
       "character": {
         "color": "#4ec9b0",
         "backgroundColor": "rgba(78, 201, 176, 0.15)",
-        "fontWeight": "bold"
-      },
-      // 省略号高亮样式（暂未启用）
-      "ellipsis": {
-        "color": "#569cd6",
-        "backgroundColor": "rgba(86, 156, 214, 0.15)",
         "fontWeight": "bold"
       }
     },
@@ -77,12 +65,6 @@
     // 符合中文排版习惯，让文章更美观
     "paragraphIndent": {
       "value": true  // 默认开启
-    },
-
-    // ==================== 自动保存 ====================
-    // 是否启用 VSCode 自动保存功能（推荐开启，避免意外丢失内容）
-    "autoSave": {
-      "value": true
     },
 
     // ==================== 敏感词检测 ====================

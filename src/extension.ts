@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 import { ChineseNovelFormatProvider } from './providers/formatProvider';
 import { WordCountService } from './services/wordCountService';
 import { NovelHighlightProvider } from './providers/highlightProvider';
@@ -17,7 +15,6 @@ import { NovelerViewProvider } from './views/novelerViewProvider';
 import { StatsWebviewProvider } from './views/statsWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
-import { updateReadme } from './utils/readmeUpdater';
 import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
 import { initProject } from './commands/initProject';
 import { createChapter } from './commands/createChapter';
@@ -26,7 +23,7 @@ import { createVolume } from './commands/createVolume';
 import { openSensitiveWordsConfig } from './commands/openSensitiveWordsConfigCommand';
 import { addToCustomWords, addToWhitelist } from './commands/addToSensitiveWordsCommand';
 import { generateRandomName } from './commands/generateName';
-import { PARAGRAPH_INDENT } from './constants';
+import { PARAGRAPH_INDENT, VOLUME_TYPE_NAMES } from './constants';
 import {
     renameChapter,
     markChapterCompleted,
@@ -52,7 +49,7 @@ import { jumpToReadmeSection } from './commands/jumpToReadme';
 import { MigrationService } from './services/migrationService';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, AUTO_SAVE_DELAY_MS, CONFIG_FILE_NAME } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, CONFIG_FILE_NAME } from './constants';
 import { Logger, LogLevel } from './utils/logger';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
@@ -97,7 +94,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         configService.onDidChangeConfig(() => {
             // 配置变更时，刷新侧边栏和 CodeLens
-            vscode.commands.executeCommand('noveler.refreshView');
+            vscode.commands.executeCommand('noveler.refresh');
             codeLensProvider?.refresh();
         })
     );
@@ -145,43 +142,14 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
     );
 
-    // ============ 策略 1: 轻量刷新（只刷新侧边栏UI） ============
+    // ============ 智能刷新（侧边栏 + 根据配置决定是否更新 README） ============
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.refreshView', () => {
-            novelerViewProvider.refresh();
-        })
-    );
-
-    // ============ 策略 2: 智能刷新（侧边栏 + 根据配置决定是否更新 README） ============
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.smartRefresh', async () => {
+        vscode.commands.registerCommand('noveler.refresh', async () => {
             // 刷新侧边栏
             novelerViewProvider.refresh();
 
             // 根据配置决定是否更新 README
             await handleReadmeAutoUpdate();
-        })
-    );
-
-    // ============ 策略 3: 完整刷新（侧边栏 + README，带进度提示） ============
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.refresh', async () => {
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: "刷新",
-                cancellable: false
-            }, async (progress) => {
-                progress.report({ message: "刷新侧边栏...", increment: 0 });
-                novelerViewProvider.refresh();
-
-                // 短暂延迟让用户能看到进度
-                await new Promise(resolve => setTimeout(resolve, 200));
-
-                progress.report({ message: "更新统计数据...", increment: 50 });
-                await updateReadme(true);  // silent = true，不显示通知
-
-                progress.report({ message: "完成", increment: 50 });
-            });
         })
     );
 
@@ -475,31 +443,33 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.addToWhitelist', async (word: string) => {
             try {
-                const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                if (!workspaceRoot) {
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                if (!workspaceFolder) {
                     vscode.window.showErrorMessage('请先打开一个工作区');
                     return;
                 }
 
-                const whitelistDir = path.join(workspaceRoot, '.noveler', 'sensitive-words');
-                const whitelistPath = path.join(whitelistDir, 'whitelist.json');
+                const whitelistDirUri = vscode.Uri.joinPath(workspaceFolder.uri, '.noveler', 'sensitive-words');
+                const whitelistUri = vscode.Uri.joinPath(whitelistDirUri, 'whitelist.jsonc');
 
-                // 确保目录存在
-                if (!fs.existsSync(whitelistDir)) {
-                    fs.mkdirSync(whitelistDir, { recursive: true });
+                // 确保目录存在（异步）
+                try {
+                    await vscode.workspace.fs.stat(whitelistDirUri);
+                } catch {
+                    await vscode.workspace.fs.createDirectory(whitelistDirUri);
                 }
 
-                // 读取或创建白名单文件
+                // 读取或创建白名单文件（异步）
                 interface WhitelistFile {
                     description: string;
                     words: string[];
                 }
 
                 let whitelist: WhitelistFile;
-                if (fs.existsSync(whitelistPath)) {
-                    const content = fs.readFileSync(whitelistPath, 'utf-8');
-                    whitelist = JSON.parse(content);
-                } else {
+                try {
+                    const content = await vscode.workspace.fs.readFile(whitelistUri);
+                    whitelist = JSON.parse(Buffer.from(content).toString('utf8'));
+                } catch {
                     whitelist = {
                         description: '用户自定义白名单',
                         words: []
@@ -515,8 +485,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 // 添加词汇
                 whitelist.words.push(word);
 
-                // 保存文件
-                fs.writeFileSync(whitelistPath, JSON.stringify(whitelist, null, 2), 'utf-8');
+                // 保存文件（异步）
+                const encoder = new TextEncoder();
+                await vscode.workspace.fs.writeFile(whitelistUri, encoder.encode(JSON.stringify(whitelist, null, 2)));
 
                 // 重新加载词库
                 await sensitiveWordService.reload();
@@ -552,9 +523,6 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.jumpToReadmeSection', jumpToReadmeSection)
     );
-
-    // 配置自动保存
-    configureAutoSave();
 
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
@@ -760,13 +728,7 @@ function updateWordCount(editor: vscode.TextEditor | undefined) {
             const volume = volumeService.getVolumeForChapter(editor.document.uri.fsPath);
 
             if (volume) {
-                const typeNames: Record<string, string> = {
-                    'main': '正文',
-                    'prequel': '前传',
-                    'sequel': '后传',
-                    'extra': '番外'
-                };
-                const volumeTypeName = typeNames[volume.volumeType] || volume.volumeType;
+                const volumeTypeName = VOLUME_TYPE_NAMES[volume.volumeType] || volume.volumeType;
 
                 statusText += ` | 📚 ${volume.title}`;
                 tooltipText += `\n━━━━━━━━━━━━━━\n所属卷: ${volume.title}\n卷类型: ${volumeTypeName}\n卷总字数: ${volume.stats.totalWords.toLocaleString()} 字\n卷章节数: ${volume.stats.chapterCount}`;
@@ -898,26 +860,6 @@ function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
         undoStopBefore: false,
         undoStopAfter: false
     });
-}
-
-/**
- * 配置自动保存
- * 仅在工作区级别启用，不影响全局设置
- */
-function configureAutoSave() {
-    const enableAutoSave = configService.shouldAutoSave();
-
-    if (enableAutoSave) {
-        const config = vscode.workspace.getConfiguration('files');
-        const currentAutoSave = config.get('autoSave');
-
-        // 如果当前没有开启自动保存，则在工作区级别开启
-        if (currentAutoSave === 'off') {
-            config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
-            config.update('autoSaveDelay', AUTO_SAVE_DELAY_MS, vscode.ConfigurationTarget.Workspace);
-            Logger.info(`已在工作区级别启用自动保存（${AUTO_SAVE_DELAY_MS}ms 延迟）`);
-        }
-    }
 }
 
 export function deactivate() {

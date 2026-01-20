@@ -594,8 +594,6 @@ export class MigrationService {
      * @param toVersion 目标版本
      */
     private static showMigrationNotification(fromVersion: string, toVersion: string): void {
-        const message = `✅ 配置已自动升级\\n\\n从 v${fromVersion} → v${toVersion}\\n\\n新功能已启用，请查看配置文件了解详情。`;
-
         vscode.window.showInformationMessage(
             `Noveler 配置已升级到 v${toVersion}`,
             '查看配置',

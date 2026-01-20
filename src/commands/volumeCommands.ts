@@ -84,7 +84,7 @@ export async function renameVolume(item: NovelerTreeItem): Promise<void> {
         vscode.window.showInformationMessage(`✅ 成功重命名卷: ${newTitle}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('重命名卷失败', error);
         vscode.window.showErrorMessage(`重命名卷失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -120,7 +120,7 @@ export async function deleteVolume(item: NovelerTreeItem): Promise<void> {
         vscode.window.showInformationMessage(`✅ 已删除卷: ${volume.title}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('删除卷失败', error);
         vscode.window.showErrorMessage(`删除卷失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -205,7 +205,7 @@ export async function setVolumeStatus(item: NovelerTreeItem): Promise<void> {
         vscode.window.showInformationMessage(`✅ 已将卷「${volume.title}」状态设置为：${getVolumeStatusName(selected.status)}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('设置卷状态失败', error);
         vscode.window.showErrorMessage(`设置卷状态失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -346,7 +346,7 @@ export async function setVolumeType(item: NovelerTreeItem): Promise<void> {
         vscode.window.showInformationMessage(`✅ 已将卷「${volume.title}」类型设置为：${getVolumeTypeName(selected.type)}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('设置卷类型失败', error);
         vscode.window.showErrorMessage(`设置卷类型失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -413,7 +413,7 @@ targetWords: 2500
         Logger.info(`创建章节: ${filePath}`);
 
         // 刷新侧边栏
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('创建章节失败', error);
         vscode.window.showErrorMessage(`创建章节失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -592,7 +592,7 @@ export async function moveChapterToVolume(item: NovelerTreeItem): Promise<void> 
         vscode.window.showInformationMessage(`✅ 已将章节移动到卷「${selected.volume.title}」`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('移动章节失败', error);
         vscode.window.showErrorMessage(`移动章节失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -671,7 +671,7 @@ export async function copyChapterToVolume(item: NovelerTreeItem): Promise<void> 
         vscode.window.showInformationMessage(`✅ 已将章节复制到卷「${selected.volume.title}」`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('复制章节失败', error);
         vscode.window.showErrorMessage(`复制章节失败: ${error instanceof Error ? error.message : String(error)}`);

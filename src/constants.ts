@@ -112,11 +112,6 @@ export const MAX_CHARACTER_NAME_LENGTH = 50;
 /** 章节名称最大长度 */
 export const MAX_CHAPTER_NAME_LENGTH = 100;
 
-// ==================== 自动保存配置 ====================
-
-/** 自动保存延迟时间（毫秒） */
-export const AUTO_SAVE_DELAY_MS = 1000;
-
 // ==================== 分卷管理相关 ====================
 
 /**
@@ -137,10 +132,19 @@ export const VOLUME_TYPE_OFFSETS: Record<VolumeType, number> = {
  * 卷类型到中文显示名称的映射
  */
 export const VOLUME_TYPE_NAMES: Record<VolumeType, string> = {
-    main: '正传',
+    main: '正文',
     prequel: '前传',
     sequel: '后传',
     extra: '番外'
+};
+
+/**
+ * 卷状态到中文显示名称的映射
+ */
+export const VOLUME_STATUS_NAMES: Record<string, string> = {
+    planning: '计划中',
+    writing: '创作中',
+    completed: '已完成'
 };
 
 /**
@@ -157,7 +161,7 @@ export const VOLUME_TYPE_ICONS: Record<VolumeType, string> = {
 export const PARAGRAPH_INDENT = '　　';
 
 /** 配置版本 */
-export const CURRENT_CONFIG_VERSION = '0.6.1';
+export const CURRENT_CONFIG_VERSION = '0.6.4';
 
 /** 迁移相关常量 */
 export const MIN_AVG_CHAPTERS_PER_VOLUME = 2;

@@ -245,6 +245,7 @@ export class SensitiveWordService {
 
     /**
      * 加载自定义敏感词库（用户完全自定义的敏感词列表）
+     * 优先加载 .jsonc 文件，如果不存在则尝试 .json 文件（向后兼容）
      */
     private async loadCustomSensitiveLibrary(): Promise<void> {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -252,26 +253,48 @@ export class SensitiveWordService {
             return;
         }
 
-        const customPath = path.join(workspaceRoot, this.config.customLibrary!.path);
-        const customUri = vscode.Uri.file(customPath);
+        // 获取配置的路径
+        const configuredPath = this.config.customLibrary!.path;
+        const primaryPath = path.join(workspaceRoot, configuredPath);
 
-        try {
-            const contentBytes = await vscode.workspace.fs.readFile(customUri);
-            const content = Buffer.from(contentBytes).toString('utf8');
-            const data: CustomWordLibrary = jsoncParser.parse(content);
-
-            if (data.words && Array.isArray(data.words)) {
-                // 简化版：所有自定义敏感词都视为 high 级别
-                this.trie.insertBatch(data.words, 'high');
-                Logger.info(`加载自定义敏感词库，共 ${data.words.length} 个词`);
-            }
-        } catch (error) {
-            Logger.info(`自定义敏感词库文件不存在: ${customPath}`);
+        // 构建备选路径（.jsonc <-> .json 互换）
+        let fallbackPath: string | null = null;
+        if (configuredPath.endsWith('.jsonc')) {
+            fallbackPath = path.join(workspaceRoot, configuredPath.replace(/\.jsonc$/, '.json'));
+        } else if (configuredPath.endsWith('.json')) {
+            fallbackPath = path.join(workspaceRoot, configuredPath.replace(/\.json$/, '.jsonc'));
         }
+
+        // 尝试加载的路径列表
+        const pathsToTry = [primaryPath];
+        if (fallbackPath) {
+            pathsToTry.push(fallbackPath);
+        }
+
+        for (const customPath of pathsToTry) {
+            const customUri = vscode.Uri.file(customPath);
+            try {
+                const contentBytes = await vscode.workspace.fs.readFile(customUri);
+                const content = Buffer.from(contentBytes).toString('utf8');
+                const data: CustomWordLibrary = jsoncParser.parse(content);
+
+                if (data.words && Array.isArray(data.words)) {
+                    // 简化版：所有自定义敏感词都视为 high 级别
+                    this.trie.insertBatch(data.words, 'high');
+                    Logger.info(`加载自定义敏感词库，共 ${data.words.length} 个词 (${path.basename(customPath)})`);
+                    return; // 成功加载，退出
+                }
+            } catch {
+                // 文件不存在或解析失败，尝试下一个路径
+            }
+        }
+
+        Logger.info(`自定义敏感词库文件不存在: ${primaryPath}`);
     }
 
     /**
      * 加载白名单
+     * 优先加载 .jsonc 文件，如果不存在则尝试 .json 文件（向后兼容）
      */
     private async loadWhitelist(): Promise<void> {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -279,21 +302,42 @@ export class SensitiveWordService {
             return;
         }
 
-        const whitelistPath = path.join(workspaceRoot, this.config.whitelist!.path);
-        const whitelistUri = vscode.Uri.file(whitelistPath);
+        // 获取配置的路径
+        const configuredPath = this.config.whitelist!.path;
+        const primaryPath = path.join(workspaceRoot, configuredPath);
 
-        try {
-            const contentBytes = await vscode.workspace.fs.readFile(whitelistUri);
-            const content = Buffer.from(contentBytes).toString('utf8');
-            const data: CustomWordLibrary = jsoncParser.parse(content);
-
-            if (data.words && Array.isArray(data.words)) {
-                this.whitelist = new Set(data.words);
-                Logger.info(`加载白名单，共 ${this.whitelist.size} 个词`);
-            }
-        } catch (error) {
-            Logger.info(`白名单文件不存在: ${whitelistPath}`);
+        // 构建备选路径（.jsonc <-> .json 互换）
+        let fallbackPath: string | null = null;
+        if (configuredPath.endsWith('.jsonc')) {
+            fallbackPath = path.join(workspaceRoot, configuredPath.replace(/\.jsonc$/, '.json'));
+        } else if (configuredPath.endsWith('.json')) {
+            fallbackPath = path.join(workspaceRoot, configuredPath.replace(/\.json$/, '.jsonc'));
         }
+
+        // 尝试加载的路径列表
+        const pathsToTry = [primaryPath];
+        if (fallbackPath) {
+            pathsToTry.push(fallbackPath);
+        }
+
+        for (const whitelistPath of pathsToTry) {
+            const whitelistUri = vscode.Uri.file(whitelistPath);
+            try {
+                const contentBytes = await vscode.workspace.fs.readFile(whitelistUri);
+                const content = Buffer.from(contentBytes).toString('utf8');
+                const data: CustomWordLibrary = jsoncParser.parse(content);
+
+                if (data.words && Array.isArray(data.words)) {
+                    this.whitelist = new Set(data.words);
+                    Logger.info(`加载白名单，共 ${this.whitelist.size} 个词 (${path.basename(whitelistPath)})`);
+                    return; // 成功加载，退出
+                }
+            } catch {
+                // 文件不存在或解析失败，尝试下一个路径
+            }
+        }
+
+        Logger.info(`白名单文件不存在: ${primaryPath}`);
     }
 
     /**

@@ -35,12 +35,8 @@ export interface NovelConfig {
     highlight?: {
         /** 对话高亮样式 */
         dialogue?: HighlightStyle;
-        /** 内心独白高亮样式 */
-        thought?: HighlightStyle;
         /** 人物名高亮样式 */
         character?: HighlightStyle;
-        /** 省略号高亮样式 */
-        ellipsis?: HighlightStyle;
     };
     /** 格式化配置 */
     format?: {
@@ -71,11 +67,6 @@ export interface NovelConfig {
     /** 段落缩进配置 */
     paragraphIndent?: {
         /** 是否启用段落首行缩进（两个全角空格） */
-        value?: boolean;
-    };
-    /** 自动保存配置 */
-    autoSave?: {
-        /** 是否启用自动保存 */
         value?: boolean;
     };
     /** 人物配置 */
@@ -230,19 +221,9 @@ export class ConfigService {
                     backgroundColor: "rgba(206, 145, 120, 0.15)",
                     fontStyle: "normal"
                 },
-                thought: {
-                    color: "#608b4e",
-                    backgroundColor: "rgba(96, 139, 78, 0.15)",
-                    fontStyle: "italic"
-                },
                 character: {
                     color: "#4ec9b0",
                     backgroundColor: "rgba(78, 201, 176, 0.15)",
-                    fontWeight: "bold"
-                },
-                ellipsis: {
-                    color: "#569cd6",
-                    backgroundColor: "rgba(86, 156, 214, 0.15)",
                     fontWeight: "bold"
                 }
             },
@@ -262,10 +243,7 @@ export class ConfigService {
                 value: true
             },
             paragraphIndent: {
-                value: false  // 默认关闭，避免影响现有用户
-            },
-            autoSave: {
-                value: true
+                value: true  // 默认开启，与文档和模板保持一致
             },
             characters: {
                 list: []
@@ -303,10 +281,10 @@ export class ConfigService {
 
     /**
      * 获取指定类型的高亮样式
-     * @param type 高亮类型：'dialogue'（对话）, 'thought'（内心独白）, 'character'（人物名）, 'ellipsis'（省略号）
+     * @param type 高亮类型：'dialogue'（对话）, 'character'（人物名）
      * @returns 对应的高亮样式配置
      */
-    public getHighlightStyle(type: 'dialogue' | 'thought' | 'character' | 'ellipsis'): HighlightStyle {
+    public getHighlightStyle(type: 'dialogue' | 'character'): HighlightStyle {
         return this.config.highlight?.[type] || {};
     }
 
@@ -366,15 +344,6 @@ export class ConfigService {
      */
     public shouldParagraphIndent(): boolean {
         return this.config.paragraphIndent?.value === true;
-    }
-
-    /**
-     * 获取自动保存配置
-     * 优先从项目配置读取，否则使用默认值 true
-     * @returns true 表示启用自动保存，false 表示禁用，默认为 true
-     */
-    public shouldAutoSave(): boolean {
-        return this.config.autoSave?.value !== false;
     }
 
     /**

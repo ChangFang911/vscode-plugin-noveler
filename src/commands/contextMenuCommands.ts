@@ -100,10 +100,10 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
         }
 
         vscode.window.showInformationMessage(`章节已重命名为：${newTitle}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('重命名章节失败', error, ErrorSeverity.Error);
     }
@@ -125,9 +125,20 @@ export async function markChapterInProgress(item: NovelerTreeItem): Promise<void
 
 /**
  * 更新章节状态（通过对话框选择）
- * 用于 CodeLens 点击状态时调用
+ * 用于右键菜单和 CodeLens 点击状态时调用
+ * @param itemOrUri 可以是 NovelerTreeItem（右键菜单）或 vscode.Uri（CodeLens）
  */
-export async function updateChapterStatusWithDialog(fileUri: vscode.Uri): Promise<void> {
+export async function updateChapterStatusWithDialog(itemOrUri: NovelerTreeItem | vscode.Uri): Promise<void> {
+    // 兼容两种调用方式
+    const fileUri = itemOrUri instanceof vscode.Uri
+        ? itemOrUri
+        : (itemOrUri as NovelerTreeItem).resourceUri;
+
+    if (!fileUri) {
+        vscode.window.showWarningMessage('无法获取章节文件路径');
+        return;
+    }
+
     const statusOptions = [
         { label: '📝 草稿', value: '草稿' },
         { label: '✏️ 初稿', value: '初稿' },
@@ -158,10 +169,10 @@ export async function updateChapterStatusWithDialog(fileUri: vscode.Uri): Promis
         await vscode.workspace.fs.writeFile(fileUri, Buffer.from(newContent, 'utf8'));
 
         vscode.window.showInformationMessage(`章节状态已更新为：${selected.value}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
     }
@@ -190,10 +201,10 @@ async function updateChapterStatus(item: NovelerTreeItem, status: string): Promi
         await vscode.workspace.fs.writeFile(item.resourceUri, Buffer.from(newContent, 'utf8'));
 
         vscode.window.showInformationMessage(`章节状态已更新为：${status}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
     }
@@ -226,10 +237,10 @@ export async function deleteChapter(item: NovelerTreeItem): Promise<void> {
         await vscode.workspace.fs.delete(item.resourceUri);
 
         vscode.window.showInformationMessage(`已删除章节：${fileName}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('删除章节失败', error, ErrorSeverity.Error);
     }
@@ -288,10 +299,10 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
         }
 
         vscode.window.showInformationMessage(`人物名称已更新为：${newName}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('重命名人物失败', error, ErrorSeverity.Error);
     }
@@ -324,10 +335,10 @@ export async function deleteCharacter(item: NovelerTreeItem): Promise<void> {
         await vscode.workspace.fs.delete(item.resourceUri);
 
         vscode.window.showInformationMessage(`已删除人物：${fileName}`);
-        vscode.commands.executeCommand('noveler.refreshView');
+        vscode.commands.executeCommand('noveler.refresh');
 
         // 根据配置自动更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('删除人物失败', error, ErrorSeverity.Error);
     }

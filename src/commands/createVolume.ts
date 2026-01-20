@@ -97,7 +97,7 @@ export async function createVolume(): Promise<void> {
         vscode.window.showInformationMessage(`✅ 成功创建卷: ${volumeTitle}`);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         Logger.error('创建卷失败', error);
         vscode.window.showErrorMessage(`创建卷失败: ${error instanceof Error ? error.message : String(error)}`);

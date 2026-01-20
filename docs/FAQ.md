@@ -392,8 +392,8 @@ Front Matter 和 HTML 注释不会被格式化。
 **A**: 可以。大部分功能都可以在配置中禁用：
 - 字数统计：`wordCount.showInStatusBar: false`
 - 敏感词检测：`sensitiveWords.enabled: false`
-- 自动空行：`autoEmptyLine: false`
-- 自动保存：`autoSave: false`
+- 自动空行：`autoEmptyLine.value: false`
+- 段落缩进：`paragraphIndent.value: false`
 
 ### Q: 与其他 Markdown 插件冲突吗？
 **A**: 通常不会。Noveler 只在小说项目中激活特定功能。如有冲突，可以：

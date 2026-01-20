@@ -7,6 +7,37 @@
 
 ## [Unreleased]
 
+## [0.6.4] - 2025-12-23
+
+### 优化改进
+
+#### 🧹 功能简化（P0 优化）
+- **删除 autoSave 功能**：插件不再接管 VSCode 编辑器级别的自动保存配置
+  - 自动保存由 `.vscode/settings.json` 统一管理
+  - 避免与用户其他项目配置冲突
+  - 删除 `noveler.autoSave.value` 配置项
+
+- **合并刷新命令**：简化用户操作
+  - 删除 `noveler.refreshView`（只刷新侧边栏）
+  - 删除 `noveler.smartRefresh`（智能刷新）
+  - 删除 `noveler.updateReadme`（已废弃）
+  - 统一为 `noveler.refresh`（智能刷新，根据配置自动决定是否更新 README）
+
+- **删除未实现的配置**：减少配置复杂度
+  - 删除 `highlight.ellipsis`（省略号高亮，未实现）
+  - 删除 `highlight.thought`（内心独白高亮，未实现）
+  - 配置文件更简洁易懂
+
+### 文档更新
+- 更新 README.md，反映命令简化
+- 更新 FAQ.md，���除 autoSave 相关说明
+- 更新配置模板 `default-config.jsonc`
+
+### 技术改进
+- 减少 3 个命令注册
+- 减少 3 个配置项
+- 优化 ConfigService 接口
+
 ## [0.6.3] - 2025-12-23
 
 ### 新增功能

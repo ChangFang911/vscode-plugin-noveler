@@ -11,7 +11,7 @@ import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING } from '../constants';
+import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES } from '../constants';
 import { Logger } from '../utils/logger';
 import { VolumeInfo } from '../types/volume';
 
@@ -97,12 +97,7 @@ export async function createChapter(chapterName: string): Promise<void> {
 
         const volumeOptions: VolumeQuickPickItem[] = volumes.map(v => {
             // 格式化卷类型
-            const typeLabel = {
-                'prequel': '前传',
-                'main': '正文',
-                'sequel': '后传',
-                'extra': '番外'
-            }[v.volumeType];
+            const typeLabel = VOLUME_TYPE_NAMES[v.volumeType] || v.volumeType;
 
             return {
                 label: `$(book) ${v.folderName}`,
@@ -242,7 +237,7 @@ ${content}`;
         handleSuccess(successMessage);
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.smartRefresh');
+        await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('创建章节失败', error);
     }
