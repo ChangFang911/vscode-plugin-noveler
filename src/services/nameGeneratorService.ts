@@ -203,7 +203,7 @@ export class NameGeneratorService {
      */
     public async generateChineseName(
         style: ChineseNameStyle,
-        count: number = 10
+        count = 10
     ): Promise<string[]> {
         await this.loadChineseSurnames();
         await this.loadChineseGivenNames();
@@ -300,7 +300,7 @@ export class NameGeneratorService {
      */
     public async generateEnglishName(
         gender: Gender = 'random',
-        count: number = 10
+        count = 10
     ): Promise<string[]> {
         await this.loadEnglishNames();
 
@@ -329,7 +329,7 @@ export class NameGeneratorService {
      */
     public async generateJapaneseName(
         gender: Gender = 'random',
-        count: number = 10
+        count = 10
     ): Promise<string[]> {
         await this.loadJapaneseNames();
 
@@ -357,8 +357,8 @@ export class NameGeneratorService {
      * @returns 姓名数组
      */
     public async generateFantasyName(
-        syllableCount: number = 3,
-        count: number = 10
+        syllableCount = 3,
+        count = 10
     ): Promise<string[]> {
         await this.loadFantasySyllables();
 
@@ -377,7 +377,7 @@ export class NameGeneratorService {
                 const pattern = this.randomPick(this.fantasySyllables!.patterns);
 
                 // 使用全局替换确保所有占位符都被替换
-                let syllable = pattern
+                const syllable = pattern
                     .replace(/{consonant}/g, this.randomPick(this.fantasySyllables!.consonants))
                     .replace(/{vowel}/g, this.randomPick(this.fantasySyllables!.vowels));
 

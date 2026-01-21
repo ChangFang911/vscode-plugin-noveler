@@ -107,7 +107,6 @@
     // 写作辅助配置
     "autoEmptyLine": true,        // 自动空行
     "paragraphIndent": true,      // 段落缩进
-    "autoSave": true,             // 自动保存
 
     // README 自动更新配置
     "readmeAutoUpdate": "ask",    // always | ask | never

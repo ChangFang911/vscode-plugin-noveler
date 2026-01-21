@@ -89,6 +89,7 @@ async function showNameResults(
     nameGenerator: NameGeneratorService,
     styleId: string
 ): Promise<void> {
+    // eslint-disable-next-line no-constant-condition
     while (true) {
         // 生成姓名
         const names = await generateNamesByStyle(nameGenerator, styleId);
@@ -192,7 +193,7 @@ async function showActionMenu(name: string): Promise<boolean> {
             vscode.window.showInformationMessage(`已复制: ${name}`);
             return false;
 
-        case 'insert':
+        case 'insert': {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 await editor.edit(editBuilder => {
@@ -203,6 +204,7 @@ async function showActionMenu(name: string): Promise<boolean> {
                 vscode.window.showWarningMessage('没有打开的编辑器');
             }
             return false;
+        }
 
         case 'back':
             return true; // 返回重新选择

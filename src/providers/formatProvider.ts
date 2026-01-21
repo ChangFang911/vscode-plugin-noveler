@@ -144,6 +144,7 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
 
                         if (isParagraphStart) {
                             // 统一处理：移除所有前导空格（全角、半角、tab），重新添加标准缩进
+                            // eslint-disable-next-line no-irregular-whitespace
                             const trimmed = lineToAdd.replace(/^[\s　]+/, '');
                             lineToAdd = PARAGRAPH_INDENT + trimmed;
                         }
@@ -175,6 +176,7 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
 
                         if (isParagraphStart) {
                             // 统一处理：移除所有前导空格（全角、半角、tab），重新添加标准缩进
+                            // eslint-disable-next-line no-irregular-whitespace
                             const trimmed = lineToAdd.replace(/^[\s　]+/, '');
                             lineToAdd = PARAGRAPH_INDENT + trimmed;
                         }

@@ -98,8 +98,8 @@
 
 **步骤 1**：更新 `CURRENT_CONFIG_VERSION`
 ```typescript
-// src/services/migrationService.ts
-const CURRENT_CONFIG_VERSION = '0.6.0';  // 更新为新版本号
+// src/constants.ts
+export const CURRENT_CONFIG_VERSION = '0.6.0';  // 更新为新版本号
 ```
 
 **步骤 2**：添加迁移函数
