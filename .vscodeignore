@@ -62,7 +62,15 @@ node_modules/**/README.md
 node_modules/**/CHANGELOG.md
 node_modules/**/LICENSE.md
 node_modules/**/LICENSE.BSD
+node_modules/**/LICENSE
 node_modules/**/ChangeLog
 node_modules/**/test/**
 node_modules/**/tests/**
 node_modules/**/bin/**
+
+# 排除 node_modules 中不需要的文件
+node_modules/**/*.d.ts
+node_modules/**/*.map
+node_modules/**/esm/**
+node_modules/**/dist/**
+node_modules/**/argparse/**
