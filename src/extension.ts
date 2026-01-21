@@ -39,123 +39,146 @@ let highlightDebouncer: Debouncer;
 let readmeUpdateDebouncer: Debouncer;
 
 export async function activate(context: vscode.ExtensionContext) {
-    // 初始化日志系统
+    // 初始化日志系统（最先执行，确保后续能记录日志）
     Logger.initialize(context, LogLevel.Info);
-    Logger.info('Noveler 中文小说写作助手已激活');
+    Logger.info('Noveler 中文小说写作助手正在激活...');
 
-    // 初始化防抖器
-    wordCountDebouncer = new Debouncer(WORD_COUNT_DEBOUNCE_DELAY);
-    highlightDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
-    readmeUpdateDebouncer = new Debouncer(README_UPDATE_DEBOUNCE_DELAY);
+    try {
+        // 初始化防抖器
+        wordCountDebouncer = new Debouncer(WORD_COUNT_DEBOUNCE_DELAY);
+        highlightDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
+        readmeUpdateDebouncer = new Debouncer(README_UPDATE_DEBOUNCE_DELAY);
 
-    // 初始化模板加载器
-    initTemplateLoader(context);
+        // 初始化模板加载器
+        initTemplateLoader(context);
 
-    // 初始化配置服务
-    configService = ConfigService.initialize();
-    context.subscriptions.push(configService);
+        // 初始化配置服务
+        configService = ConfigService.initialize();
+        context.subscriptions.push(configService);
 
-    // 等待配置加载完成
-    await configService.waitForConfig();
+        // 初始化字数统计服务（不依赖配置加载完成）
+        wordCountService = new WordCountService();
 
-    // 执行配置迁移（如果需要）
-    await MigrationService.checkAndMigrate(context);
+        // 初始化高亮提供者
+        highlightProvider = new NovelHighlightProvider();
+        context.subscriptions.push(highlightProvider);
 
-    // 初始化字数统计服务
-    wordCountService = new WordCountService();
+        // 初始化专注模式服务
+        focusModeService = new FocusModeService();
+        context.subscriptions.push(focusModeService);
 
-    // 初始化高亮提供者
-    highlightProvider = new NovelHighlightProvider();
-    context.subscriptions.push(highlightProvider);
+        // 【关键】优先注册侧边栏视图，确保 UI 可用
+        const novelerViewProvider = new NovelerViewProvider();
+        context.subscriptions.push(
+            vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
+        );
+        Logger.info('侧边栏视图已注册');
 
-    // 初始化敏感词检测服务
-    sensitiveWordService = await SensitiveWordService.initialize(context);
-    sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
-    sensitiveWordDiagnostic.register(context);
+        // 初始化统计服务和 Webview
+        const projectStatsService = new ProjectStatsService();
+        const statsWebviewProvider = new StatsWebviewProvider(context, projectStatsService);
 
-    // 初始化姓名生成服务
-    NameGeneratorService.initialize(context);
-    Logger.info('随机起名功能已启用');
+        // 创建状态栏项
+        wordCountStatusBarItem = vscode.window.createStatusBarItem(
+            vscode.StatusBarAlignment.Left,
+            100
+        );
+        context.subscriptions.push(wordCountStatusBarItem);
 
-    // 注册敏感词快速修复提供器
-    context.subscriptions.push(
-        vscode.languages.registerCodeActionsProvider(
-            'markdown',
-            new SensitiveWordCodeActionProvider(),
-            {
-                providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
-            }
-        )
-    );
-    Logger.info('敏感词检测功能已启用');
+        // 注册格式化提供者
+        const formatProvider = new ChineseNovelFormatProvider();
+        context.subscriptions.push(
+            vscode.languages.registerDocumentFormattingEditProvider(
+                'markdown',
+                formatProvider
+            )
+        );
 
-    // 初始化 Code Lens 提供者
-    codeLensProvider = new ChapterCodeLensProvider(wordCountService);
-    context.subscriptions.push(
-        vscode.languages.registerCodeLensProvider(
-            { language: 'markdown', pattern: '**/chapters/**' },
-            codeLensProvider
-        )
-    );
+        // 【关键】优先注册所有命令，确保命令可用
+        registerAllCommands({
+            context,
+            wordCountService,
+            configService,
+            focusModeService,
+            sensitiveWordService: null as unknown as SensitiveWordService, // 稍后初始化
+            sensitiveWordDiagnostic: null as unknown as SensitiveWordDiagnosticProvider,
+            novelerViewProvider,
+            statsWebviewProvider,
+            highlightProvider,
+            updateHighlights
+        });
+        Logger.info('命令已注册');
 
-    // 订阅配置变更事件
-    context.subscriptions.push(
-        configService.onDidChangeConfig(() => {
-            vscode.commands.executeCommand('noveler.refresh');
-            codeLensProvider?.refresh();
-        })
-    );
+        // 注册事件监听器
+        registerEventListeners(context, novelerViewProvider);
 
-    // 初始化专注模式服务
-    focusModeService = new FocusModeService();
-    context.subscriptions.push(focusModeService);
+        // === 以下是可以延迟加载的服务 ===
 
-    // 注册 Noveler 侧边栏视图
-    const novelerViewProvider = new NovelerViewProvider();
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
-    );
+        // 等待配置加载完��
+        await configService.waitForConfig();
 
-    // 初始化统计服务和 Webview
-    const projectStatsService = new ProjectStatsService();
-    const statsWebviewProvider = new StatsWebviewProvider(context, projectStatsService);
+        // 执行配置迁移（如果需要）
+        try {
+            await MigrationService.checkAndMigrate(context);
+        } catch (migrationError) {
+            Logger.error('配置迁移失败，但不影响基本功能', migrationError);
+        }
 
-    // 创建状态栏项
-    wordCountStatusBarItem = vscode.window.createStatusBarItem(
-        vscode.StatusBarAlignment.Left,
-        100
-    );
-    context.subscriptions.push(wordCountStatusBarItem);
+        // 初始化敏感词检测服务
+        try {
+            sensitiveWordService = await SensitiveWordService.initialize(context);
+            sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
+            sensitiveWordDiagnostic.register(context);
 
-    // 注册格式化提供者
-    const formatProvider = new ChineseNovelFormatProvider();
-    context.subscriptions.push(
-        vscode.languages.registerDocumentFormattingEditProvider(
-            'markdown',
-            formatProvider
-        )
-    );
+            // 注册敏感词快速修复提供器
+            context.subscriptions.push(
+                vscode.languages.registerCodeActionsProvider(
+                    'markdown',
+                    new SensitiveWordCodeActionProvider(),
+                    {
+                        providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
+                    }
+                )
+            );
+            Logger.info('敏感词检测功能已启用');
+        } catch (sensitiveWordError) {
+            Logger.error('敏感词服务初始化失败，但不影响基本功能', sensitiveWordError);
+        }
 
-    // 注册所有命令
-    registerAllCommands({
-        context,
-        wordCountService,
-        configService,
-        focusModeService,
-        sensitiveWordService,
-        sensitiveWordDiagnostic,
-        novelerViewProvider,
-        statsWebviewProvider,
-        highlightProvider,
-        updateHighlights
-    });
+        // 初始化姓名生成服务
+        try {
+            NameGeneratorService.initialize(context);
+            Logger.info('随机起名功能已启用');
+        } catch (nameGenError) {
+            Logger.error('姓名生成服务初始化失败', nameGenError);
+        }
 
-    // 注册事件监听器
-    registerEventListeners(context, novelerViewProvider);
+        // 初始化 Code Lens 提供者
+        codeLensProvider = new ChapterCodeLensProvider(wordCountService);
+        context.subscriptions.push(
+            vscode.languages.registerCodeLensProvider(
+                { language: 'markdown', pattern: '**/chapters/**' },
+                codeLensProvider
+            )
+        );
 
-    // 初始更新
-    updateWordCountImmediate(vscode.window.activeTextEditor);
-    updateHighlightsImmediate(vscode.window.activeTextEditor);
+        // 订阅配置变更事件
+        context.subscriptions.push(
+            configService.onDidChangeConfig(() => {
+                vscode.commands.executeCommand('noveler.refresh');
+                codeLensProvider?.refresh();
+            })
+        );
+
+        // 初始更新
+        updateWordCountImmediate(vscode.window.activeTextEditor);
+        updateHighlightsImmediate(vscode.window.activeTextEditor);
+
+        Logger.info('Noveler 中文小说写作助手已激活');
+    } catch (error) {
+        Logger.error('Noveler 激活失败', error);
+        vscode.window.showErrorMessage(`Noveler 激活失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
 }
 
 /**
