@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
@@ -146,14 +146,15 @@ async function scanChapterFiles(chaptersPath: string): Promise<ChapterInfo[]> {
 
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
-            const parsed = matter(content);
+            const parsed = parseFrontMatter(content);
+            const data = parsed.data as Record<string, unknown>;
 
             const chapterInfo: ChapterInfo = {
                 fileName: entry.name,
                 filePath: filePath,
-                chapter: parsed.data.chapter ? Number(parsed.data.chapter) : undefined,
-                volume: parsed.data.volume ? Number(parsed.data.volume) : undefined,
-                title: parsed.data.title || entry.name.replace('.md', '')
+                chapter: data.chapter ? Number(data.chapter) : undefined,
+                volume: data.volume ? Number(data.volume) : undefined,
+                title: (data.title as string) || entry.name.replace('.md', '')
             };
 
             chapters.push(chapterInfo);
@@ -398,14 +399,15 @@ async function executeMigration(
                 // 更新章节文件的 frontmatter，移除 volume 字段（因为现在通过文件夹结构管理）
                 try {
                     const content = fs.readFileSync(targetPath, 'utf-8');
-                    const parsed = matter(content);
+                    const parsed = parseFrontMatter(content);
+                    const data = parsed.data as Record<string, unknown>;
 
                     // 如果有 volume 字段，移除它
-                    if (parsed.data.volume !== undefined) {
-                        delete parsed.data.volume;
+                    if (data.volume !== undefined) {
+                        delete data.volume;
 
                         // 重新生成文件内容
-                        const updatedContent = matter.stringify(parsed.content, parsed.data);
+                        const updatedContent = stringifyFrontMatter(parsed.content, data);
                         fs.writeFileSync(targetPath, updatedContent, 'utf-8');
                         Logger.info(`已清理章节 ${chapter.fileName} 的 volume 字段`);
                     }

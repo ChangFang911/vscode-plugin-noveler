@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as jsoncParser from 'jsonc-parser';
-import matter from 'gray-matter';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import { VolumeInfo, VolumeMetadata, VolumeType } from '../types/volume';
 import { ConfigService } from './configService';
 import { Logger } from '../utils/logger';
@@ -388,8 +388,9 @@ export class VolumeService {
             const chapterUri = vscode.Uri.file(chapterPath);
             const contentBytes = await vscode.workspace.fs.readFile(chapterUri);
             const content = Buffer.from(contentBytes).toString('utf8');
-            const parsed = matter(content);
-            return parsed.data.chapter ? Number(parsed.data.chapter) : null;
+            const parsed = parseFrontMatter(content);
+            const data = parsed.data as Record<string, unknown>;
+            return data.chapter ? Number(data.chapter) : null;
         } catch (error) {
             return null;
         }

@@ -33,7 +33,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'out/extension.js',
-		external: ['vscode', 'gray-matter', 'jsonc-parser'],
+		external: ['vscode', 'jsonc-parser'],
 		logLevel: 'silent',
 		plugins: [esbuildProblemMatcherPlugin],
 	});

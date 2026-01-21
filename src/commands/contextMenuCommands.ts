@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { sanitizeFileName } from '../utils/inputValidator';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
@@ -26,8 +26,9 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
         const text = Buffer.from(content).toString('utf8');
 
         // 解析 Front Matter 获取当前标题
-        const parsed = matter(text);
-        const currentTitle = parsed.data.title || '未命名';
+        const parsed = parseFrontMatter(text);
+        const data = parsed.data as Record<string, unknown>;
+        const currentTitle = (data.title as string) || '未命名';
 
         // 尝试从标题中提取"第X章"前缀和章节名称
         const chapterPrefixMatch = currentTitle.match(/^(第.+?章)\s+(.+)$/);
@@ -60,7 +61,7 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
         }
 
         // 更新 Front Matter 中的标题
-        parsed.data.title = newTitle;
+        data.title = newTitle;
 
         // 同时更新正文中的第一个 # 标题行
         let bodyContent = parsed.content;
@@ -70,7 +71,7 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
             bodyContent = bodyContent.replace(/^#\s+.+$/m, `# ${newTitle}`);
         }
 
-        const newContent = matter.stringify(bodyContent, parsed.data);
+        const newContent = stringifyFrontMatter(bodyContent, data);
 
         // 生成新的文件名（保留编号前缀，更新名称部分）
         const oldFileName = path.basename(item.resourceUri.fsPath);
@@ -161,9 +162,10 @@ export async function updateChapterStatusWithDialog(itemOrUri: NovelerTreeItem |
         const text = Buffer.from(content).toString('utf8');
 
         // 解析并更新 Front Matter
-        const parsed = matter(text);
-        parsed.data.status = selected.value;
-        const newContent = matter.stringify(parsed.content, parsed.data);
+        const parsed = parseFrontMatter(text);
+        const data = parsed.data as Record<string, unknown>;
+        data.status = selected.value;
+        const newContent = stringifyFrontMatter(parsed.content, data);
 
         // 写回文件
         await vscode.workspace.fs.writeFile(fileUri, Buffer.from(newContent, 'utf8'));
@@ -193,9 +195,10 @@ async function updateChapterStatus(item: NovelerTreeItem, status: string): Promi
         const text = Buffer.from(content).toString('utf8');
 
         // 解析并更新 Front Matter
-        const parsed = matter(text);
-        parsed.data.status = status;
-        const newContent = matter.stringify(parsed.content, parsed.data);
+        const parsed = parseFrontMatter(text);
+        const data = parsed.data as Record<string, unknown>;
+        data.status = status;
+        const newContent = stringifyFrontMatter(parsed.content, data);
 
         // 写回文件
         await vscode.workspace.fs.writeFile(item.resourceUri, Buffer.from(newContent, 'utf8'));
@@ -261,8 +264,9 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
         const text = Buffer.from(content).toString('utf8');
 
         // 解析 Front Matter 获取当前名称
-        const parsed = matter(text);
-        const currentName = parsed.data.name || '未命名';
+        const parsed = parseFrontMatter(text);
+        const data = parsed.data as Record<string, unknown>;
+        const currentName = (data.name as string) || '未命名';
 
         // 询问新名称
         const newName = await vscode.window.showInputBox({
@@ -282,8 +286,8 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
         }
 
         // 更新 Front Matter 中的名称
-        parsed.data.name = newName;
-        const newContent = matter.stringify(parsed.content, parsed.data);
+        data.name = newName;
+        const newContent = stringifyFrontMatter(parsed.content, data);
 
         // 生成新文件路径
         const oldPath = item.resourceUri;

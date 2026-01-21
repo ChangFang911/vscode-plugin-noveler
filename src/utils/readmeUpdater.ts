@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import matter from 'gray-matter';
+import { parseFrontMatter } from './frontMatterParser';
 import { handleError, handleSuccess, ErrorSeverity } from './errorHandler';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
@@ -87,17 +87,17 @@ export async function scanChapters(): Promise<ProjectStats> {
                         const fileData = await vscode.workspace.fs.readFile(fileUri);
                         const fileContent = Buffer.from(fileData).toString('utf8');
 
-                        const parsed = matter(fileContent);
-                        const frontMatter = parsed.data;
+                        const parsed = parseFrontMatter(fileContent);
+                        const frontMatter = parsed.data as Record<string, unknown>;
 
                         if (frontMatter && frontMatter.chapter !== undefined) {
-                            const wordCount = frontMatter.wordCount || 0;
-                            const statusValue = frontMatter.status || 'draft';
+                            const wordCount = (frontMatter.wordCount as number) || 0;
+                            const statusValue = (frontMatter.status as string) || 'draft';
                             const status = getStatusDisplayName(statusValue); // 转换为中文显示
 
                             return {
-                                number: frontMatter.chapter,
-                                title: frontMatter.title || chapterFile,
+                                number: frontMatter.chapter as number,
+                                title: (frontMatter.title as string) || chapterFile,
                                 fileName: `${volume.folderName}/${chapterFile}`,
                                 wordCount: wordCount,
                                 status: status,
@@ -172,17 +172,17 @@ export async function scanChapters(): Promise<ProjectStats> {
                     const fileContent = Buffer.from(fileData).toString('utf8');
 
                     // 解析 Front Matter
-                    const parsed = matter(fileContent);
-                    const frontMatter = parsed.data;
+                    const parsed = parseFrontMatter(fileContent);
+                    const frontMatter = parsed.data as Record<string, unknown>;
 
                     if (frontMatter && frontMatter.chapter !== undefined) {
-                        const wordCount = frontMatter.wordCount || 0;
-                        const statusValue = frontMatter.status || 'draft';
+                        const wordCount = (frontMatter.wordCount as number) || 0;
+                        const statusValue = (frontMatter.status as string) || 'draft';
                         const status = getStatusDisplayName(statusValue); // 转换为中文显示
 
                         return {
-                            number: frontMatter.chapter,
-                            title: frontMatter.title || fileName,
+                            number: frontMatter.chapter as number,
+                            title: (frontMatter.title as string) || fileName,
                             fileName: fileName,
                             wordCount: wordCount,
                             status: status
@@ -255,16 +255,16 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
                 const fileContent = Buffer.from(fileData).toString('utf8');
 
                 // 解析 Front Matter
-                const parsed = matter(fileContent);
-                const frontMatter = parsed.data;
+                const parsed = parseFrontMatter(fileContent);
+                const frontMatter = parsed.data as Record<string, unknown>;
 
                 if (frontMatter && frontMatter.name) {
                     characters.push({
-                        name: frontMatter.name || fileName.replace('.md', ''),
+                        name: (frontMatter.name as string) || fileName.replace('.md', ''),
                         fileName: fileName,
-                        importance: frontMatter.importance || '次要配角',
-                        gender: frontMatter.gender || '',
-                        firstAppearance: frontMatter.firstAppearance || ''
+                        importance: (frontMatter.importance as string) || '次要配角',
+                        gender: (frontMatter.gender as string) || '',
+                        firstAppearance: (frontMatter.firstAppearance as string) || ''
                     });
                 }
             } catch (error) {

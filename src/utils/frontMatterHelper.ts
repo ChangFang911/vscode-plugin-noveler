@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import matter from 'gray-matter';
+import { parseFrontMatter, stringifyFrontMatter } from './frontMatterParser';
 import { formatDateTime } from './dateFormatter';
 import { ChapterFrontMatter, CharacterFrontMatter, GenericFrontMatter } from '../types/frontMatter';
 import { Logger } from './logger';
@@ -22,38 +22,31 @@ export function updateFrontMatter(
     const text = document.getText();
 
     try {
-        // 使用 gray-matter 解析文档
-        const parsed = matter(text);
+        // 解析文档
+        const parsed = parseFrontMatter(text);
 
         // 如果没有 Front Matter，不处理
-        if (!parsed.data || Object.keys(parsed.data).length === 0) {
+        if (parsed.isEmpty || Object.keys(parsed.data).length === 0) {
             return edits;
         }
 
         // 更新字段
         let hasChanges = false;
+        const data = parsed.data as Record<string, unknown>;
 
-        if (parsed.data.wordCount !== undefined) {
-            parsed.data.wordCount = wordCount;
+        if (data.wordCount !== undefined) {
+            data.wordCount = wordCount;
             hasChanges = true;
         }
 
-        if (parsed.data.modified !== undefined) {
-            parsed.data.modified = formatDateTime(new Date());
+        if (data.modified !== undefined) {
+            data.modified = formatDateTime(new Date());
             hasChanges = true;
         }
 
-        // 如果有变化，使用 gray-matter 重新序列化
+        // 如果有变化，重新序列化
         if (hasChanges) {
-            // 将 Front Matter 中的空字符串转为引号包裹的空字符串
-            const cleanedData = { ...parsed.data };
-            for (const key in cleanedData) {
-                if (cleanedData[key] === "" || cleanedData[key] === null) {
-                    cleanedData[key] = "";
-                }
-            }
-
-            const updatedContent = matter.stringify(parsed.content, cleanedData);
+            const updatedContent = stringifyFrontMatter(parsed.content, data);
 
             // 替换整个文档
             const fullRange = new vscode.Range(
@@ -80,8 +73,8 @@ export function updateFrontMatter(
 export function extractFrontMatter(document: vscode.TextDocument): GenericFrontMatter {
     try {
         const text = document.getText();
-        const parsed = matter(text);
-        return parsed.data || {};
+        const parsed = parseFrontMatter(text);
+        return (parsed.data || {}) as GenericFrontMatter;
     } catch (error) {
         Logger.error('Front Matter 解析失败', error);
         return {};
@@ -114,7 +107,7 @@ export function extractCharacterFrontMatter(document: vscode.TextDocument): Part
 export function getContentWithoutFrontMatter(document: vscode.TextDocument): string {
     try {
         const text = document.getText();
-        const parsed = matter(text);
+        const parsed = parseFrontMatter(text);
         return parsed.content || text;
     } catch (error) {
         Logger.error('Front Matter 解析失败', error);

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, COMPLETED_STATUS } from '../constants';
 import { WordCountService } from './wordCountService';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
-import matter from 'gray-matter';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import { Logger } from '../utils/logger';
 
 /**
@@ -159,11 +159,10 @@ export class ProjectStatsService {
 
     /**
      * 移除 Front Matter
-     * 使用 gray-matter 统一解析
      */
     private removeFrontMatter(text: string): string {
         try {
-            const parsed = matter(text);
+            const parsed = parseFrontMatter(text);
             return parsed.content || text;
         } catch (error) {
             // 解析失败，降级到正则匹配
@@ -182,13 +181,13 @@ export class ProjectStatsService {
 
     /**
      * 检查章节是否完成
-     * 使用 gray-matter 统一解析 Front Matter
      */
     private isChapterCompleted(text: string): boolean {
         try {
-            const parsed = matter(text);
-            if (parsed.data && parsed.data.status) {
-                const status = String(parsed.data.status).trim();
+            const parsed = parseFrontMatter(text);
+            const data = parsed.data as Record<string, unknown>;
+            if (data && data.status) {
+                const status = String(data.status).trim();
                 return status === COMPLETED_STATUS || status === 'completed';
             }
         } catch (error) {

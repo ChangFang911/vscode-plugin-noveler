@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import matter from 'gray-matter';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import {
     DIALOGUE_REGEX,
     HTML_COMMENT_REGEX,
@@ -112,13 +112,14 @@ export class NovelHighlightProvider {
                     const fileData = await vscode.workspace.fs.readFile(fileUri);
                     const fileContent = Buffer.from(fileData).toString('utf8');
 
-                    // 使用 gray-matter 解��� Front Matter
-                    const parsed = matter(fileContent);
-                    if (parsed.data && parsed.data.name) {
+                    // 解析 Front Matter
+                    const parsed = parseFrontMatter(fileContent);
+                    const data = parsed.data as Record<string, unknown>;
+                    if (data && data.name) {
                         // 确保 name 是字符串类型
-                        const nameStr = typeof parsed.data.name === 'string'
-                            ? parsed.data.name
-                            : String(parsed.data.name);
+                        const nameStr = typeof data.name === 'string'
+                            ? data.name
+                            : String(data.name);
                         names.push(nameStr);
                     }
                 } catch (error) {
