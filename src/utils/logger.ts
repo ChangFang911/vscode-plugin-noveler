@@ -39,7 +39,7 @@ export class Logger {
      * @param message 日志消息
      * @param data 额外数据
      */
-    public static debug(message: string, ...data: any[]): void {
+    public static debug(message: string, ...data: unknown[]): void {
         if (this.level <= LogLevel.Debug) {
             const timestamp = this.getTimestamp();
             console.log(`[Noveler DEBUG ${timestamp}] ${message}`, ...data);
@@ -52,7 +52,7 @@ export class Logger {
      * @param message 日志消息
      * @param data 额外数据
      */
-    public static info(message: string, ...data: any[]): void {
+    public static info(message: string, ...data: unknown[]): void {
         if (this.level <= LogLevel.Info) {
             const timestamp = this.getTimestamp();
             console.log(`[Noveler INFO ${timestamp}] ${message}`, ...data);
@@ -65,7 +65,7 @@ export class Logger {
      * @param message 日志消息
      * @param data 额外数据
      */
-    public static warn(message: string, ...data: any[]): void {
+    public static warn(message: string, ...data: unknown[]): void {
         if (this.level <= LogLevel.Warn) {
             const timestamp = this.getTimestamp();
             console.warn(`[Noveler WARN ${timestamp}] ${message}`, ...data);
@@ -79,7 +79,7 @@ export class Logger {
      * @param error 错误对象
      * @param data 额外数据
      */
-    public static error(message: string, error?: Error | unknown, ...data: any[]): void {
+    public static error(message: string, error?: Error | unknown, ...data: unknown[]): void {
         const timestamp = this.getTimestamp();
         console.error(`[Noveler ERROR ${timestamp}] ${message}`, error, ...data);
 
@@ -123,7 +123,7 @@ export class Logger {
     /**
      * 格式化额外数据
      */
-    private static formatData(data: any[]): string {
+    private static formatData(data: unknown[]): string {
         if (data.length === 0) {
             return '';
         }

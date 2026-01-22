@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { getContentWithoutFrontMatter, extractFrontMatter } from '../utils/frontMatterHelper';
+import { getContentWithoutFrontMatter, extractChapterFrontMatter } from '../utils/frontMatterHelper';
 import { WordCountService } from '../services/wordCountService';
 import { getStatusDisplayName } from '../utils/statusHelper';
 
@@ -51,7 +51,7 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
                 const totalWords = stats.content + stats.punctuation;
 
                 // 获取 Front Matter 中的状态和目标字数
-                const frontMatter = extractFrontMatter(document);
+                const frontMatter = extractChapterFrontMatter(document);
                 const statusValue = frontMatter?.status || 'draft';
                 const status = getStatusDisplayName(statusValue); // 转换为中文显示
                 const targetWords = frontMatter?.targetWords || 0;

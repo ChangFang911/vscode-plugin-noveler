@@ -33,9 +33,7 @@ import {
 import {
     renameVolume,
     deleteVolume,
-    setVolumeStatus,
-    editVolumeInfo,
-    setVolumeType,
+    editVolumeProperties,
     createChapterInVolume,
     moveChapterToVolume,
     copyChapterToVolume,
@@ -221,13 +219,7 @@ function registerVolumeCommands(deps: CommandRegistrarDeps): void {
         vscode.commands.registerCommand('noveler.deleteVolume', deleteVolume)
     );
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.setVolumeStatus', setVolumeStatus)
-    );
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.editVolumeInfo', editVolumeInfo)
-    );
-    context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.setVolumeType', setVolumeType)
+        vscode.commands.registerCommand('noveler.editVolumeProperties', editVolumeProperties)
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.createChapterInVolume', createChapterInVolume)
@@ -422,70 +414,6 @@ async function formatCurrentDocument(): Promise<void> {
         }
     } catch (error) {
         vscode.window.showErrorMessage(`格式化失败: ${error}`);
-    }
-}
-
-/**
- * 添加词汇到白名单
- */
-async function addWordToWhitelist(
-    word: string,
-    sensitiveWordService: SensitiveWordService,
-    sensitiveWordDiagnostic: SensitiveWordDiagnosticProvider
-): Promise<void> {
-    try {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            vscode.window.showErrorMessage('请先打开一个工作区');
-            return;
-        }
-
-        const whitelistDirUri = vscode.Uri.joinPath(workspaceFolder.uri, '.noveler', 'sensitive-words');
-        const whitelistUri = vscode.Uri.joinPath(whitelistDirUri, 'whitelist.jsonc');
-
-        // 确保目录存在
-        try {
-            await vscode.workspace.fs.stat(whitelistDirUri);
-        } catch {
-            await vscode.workspace.fs.createDirectory(whitelistDirUri);
-        }
-
-        // 读取或创建白名单文件
-        interface WhitelistFile {
-            description: string;
-            words: string[];
-        }
-
-        let whitelist: WhitelistFile;
-        try {
-            const content = await vscode.workspace.fs.readFile(whitelistUri);
-            whitelist = JSON.parse(Buffer.from(content).toString('utf8'));
-        } catch {
-            whitelist = {
-                description: '用户自定义白名单',
-                words: []
-            };
-        }
-
-        if (whitelist.words.includes(word)) {
-            vscode.window.showInformationMessage(`"${word}" 已在白名单中`);
-            return;
-        }
-
-        whitelist.words.push(word);
-
-        const encoder = new TextEncoder();
-        await vscode.workspace.fs.writeFile(whitelistUri, encoder.encode(JSON.stringify(whitelist, null, 2)));
-
-        await sensitiveWordService.reload();
-
-        if (vscode.window.activeTextEditor) {
-            sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
-        }
-
-        vscode.window.showInformationMessage(`已将 "${word}" 添加到白名单`);
-    } catch (error) {
-        handleError('添加到白名单失败', error, ErrorSeverity.Error);
     }
 }
 

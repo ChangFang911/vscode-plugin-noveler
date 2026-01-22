@@ -167,6 +167,9 @@ export async function activate(context: vscode.ExtensionContext) {
             configService.onDidChangeConfig(() => {
                 vscode.commands.executeCommand('noveler.refresh');
                 codeLensProvider?.refresh();
+                // 自动重载高亮配置
+                highlightProvider.reloadDecorations();
+                updateHighlights(vscode.window.activeTextEditor);
             })
         );
 

@@ -384,6 +384,78 @@ export class ConfigService {
     }
 
     /**
+     * 更新配置文件
+     * 使用回调函数修改配置，保留 JSONC 注释
+     * @param updater 配置更新回调，接收当前配置的副本进行修改
+     */
+    public async updateConfig(updater: (draft: { noveler?: NovelConfig }) => void): Promise<void> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            throw new Error('未找到工作区文件夹');
+        }
+
+        const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
+
+        // 读取当前配置文件
+        let configText: string;
+        try {
+            const fileData = await vscode.workspace.fs.readFile(configUri);
+            configText = Buffer.from(fileData).toString('utf8');
+        } catch {
+            throw new Error('无法读取配置文件 novel.jsonc');
+        }
+
+        // 解析当前配置
+        const currentConfig = jsoncParser.parse(configText) || {};
+
+        // 创建副本并应用更新
+        const draft = JSON.parse(JSON.stringify(currentConfig));
+        updater(draft);
+
+        // 计算需要修改的路径和值
+        const edits: jsoncParser.EditResult = [];
+
+        // 比较并生成编辑操作
+        const generateEdits = (path: (string | number)[], oldObj: unknown, newObj: unknown) => {
+            if (typeof newObj !== 'object' || newObj === null) {
+                // 原始值，直接设置
+                if (oldObj !== newObj) {
+                    edits.push(...jsoncParser.modify(configText, path, newObj, {
+                        formattingOptions: { tabSize: 2, insertSpaces: true }
+                    }));
+                }
+            } else if (Array.isArray(newObj)) {
+                // 数组，直接替换
+                if (JSON.stringify(oldObj) !== JSON.stringify(newObj)) {
+                    edits.push(...jsoncParser.modify(configText, path, newObj, {
+                        formattingOptions: { tabSize: 2, insertSpaces: true }
+                    }));
+                }
+            } else {
+                // 对象，递归处理
+                const oldRecord = (oldObj as Record<string, unknown>) || {};
+                const newRecord = newObj as Record<string, unknown>;
+                for (const key of Object.keys(newRecord)) {
+                    generateEdits([...path, key], oldRecord[key], newRecord[key]);
+                }
+            }
+        };
+
+        generateEdits([], currentConfig, draft);
+
+        // 应用编辑
+        if (edits.length > 0) {
+            const newText = jsoncParser.applyEdits(configText, edits);
+            const encoder = new TextEncoder();
+            await vscode.workspace.fs.writeFile(configUri, encoder.encode(newText));
+
+            // 重新加载配置
+            await this.loadConfig();
+            Logger.info('配置已更新');
+        }
+    }
+
+    /**
      * 释放资源
      * 清理文件监听器和事件发射器
      */

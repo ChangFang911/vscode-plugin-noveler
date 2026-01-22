@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
-import { ProjectStatsService } from '../../services/projectStatsService';
+import { ProjectStatsService, ProjectStats } from '../../services/projectStatsService';
 import { ConfigService } from '../../services/configService';
 
 export class OverviewNodesProvider {
@@ -39,7 +39,7 @@ export class OverviewNodesProvider {
         ];
     }
 
-    private createTotalWordsItem(stats: any): NovelerTreeItem {
+    private createTotalWordsItem(stats: ProjectStats): NovelerTreeItem {
         return new NovelerTreeItem(
             '总字数',
             NodeType.OverviewItem,
@@ -55,7 +55,7 @@ export class OverviewNodesProvider {
         );
     }
 
-    private createChapterCountItem(stats: any): NovelerTreeItem {
+    private createChapterCountItem(stats: ProjectStats): NovelerTreeItem {
         return new NovelerTreeItem(
             '章节数',
             NodeType.OverviewItem,
@@ -71,7 +71,7 @@ export class OverviewNodesProvider {
         );
     }
 
-    private createCharacterCountItem(stats: any): NovelerTreeItem {
+    private createCharacterCountItem(stats: ProjectStats): NovelerTreeItem {
         return new NovelerTreeItem(
             '人物数',
             NodeType.OverviewItem,
@@ -87,7 +87,7 @@ export class OverviewNodesProvider {
         );
     }
 
-    private createCompletionItem(stats: any): NovelerTreeItem {
+    private createCompletionItem(stats: ProjectStats): NovelerTreeItem {
         return new NovelerTreeItem(
             '完成进度',
             NodeType.OverviewItem,

@@ -7,6 +7,29 @@
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-01-22
+
+### 代码质量
+
+#### 🧹 Lint 警告清零
+- **类型安全优化**：将 `GenericFrontMatter` 从 `Record<string, any>` 改为 `Record<string, unknown>`
+- **函数调用修复**：统一使用 `extractChapterFrontMatter` 获取正确类型的 Front Matter
+  - `codeLensProvider.ts` - 修复 status 和 targetWords 类型错误
+  - `chapterNodes.ts` - 修复 chapter 字段类型错误（5 处）
+- **ESLint 配置优化**：禁用 `no-non-null-assertion` 规则，减少不必要的警告
+
+#### 🧪 测试覆盖增强
+- **TrieTree 测试**：新增 21 个测试用例
+  - 基础操作：插入、查找、计数
+  - 批量插入：多词插入、空数组处理
+  - 搜索功能：文本匹配、多词匹配、最长匹配优先
+  - 边界情况：空词、单字符、重叠匹配、连续匹配
+- **测试文件**：`src/test/suite/trieTree.test.ts`
+
+#### 📖 文档更新
+- **README.md**：更新版本亮点到 v0.6.4
+- **CLAUDE.md**：同步版本号到 v0.6.6
+
 ## [0.6.4] - 2025-12-23
 
 ### 优化改进

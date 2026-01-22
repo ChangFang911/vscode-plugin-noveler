@@ -91,14 +91,6 @@
         "title": "设置章节状态"
       },
       {
-        "command": "noveler.markChapterCompleted",
-        "title": "标记为完成"
-      },
-      {
-        "command": "noveler.markChapterInProgress",
-        "title": "标记为进行中"
-      },
-      {
         "command": "noveler.deleteChapter",
         "title": "删除章节"
       },
@@ -140,16 +132,8 @@
         "title": "删除卷"
       },
       {
-        "command": "noveler.setVolumeStatus",
-        "title": "设置卷状态"
-      },
-      {
-        "command": "noveler.editVolumeInfo",
-        "title": "编辑卷信息"
-      },
-      {
-        "command": "noveler.setVolumeType",
-        "title": "设置卷类型"
+        "command": "noveler.editVolumeProperties",
+        "title": "编辑卷属性"
       },
       {
         "command": "noveler.createChapterInVolume",
@@ -262,24 +246,14 @@
           "group": "1_modification@1"
         },
         {
-          "command": "noveler.setVolumeStatus",
+          "command": "noveler.editVolumeProperties",
           "when": "view == novelerView && viewItem == volume",
           "group": "2_status@1"
         },
         {
-          "command": "noveler.setVolumeType",
-          "when": "view == novelerView && viewItem == volume",
-          "group": "2_status@2"
-        },
-        {
-          "command": "noveler.editVolumeInfo",
-          "when": "view == novelerView && viewItem == volume",
-          "group": "2_status@3"
-        },
-        {
           "command": "noveler.openVolumeOutline",
           "when": "view == novelerView && viewItem == volume",
-          "group": "2_status@4"
+          "group": "2_status@2"
         },
         {
           "command": "noveler.deleteVolume",

@@ -92,7 +92,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
 
         // 初始化节点提供器
         this.overviewNodes = new OverviewNodesProvider(this.statsService, this.configService);
-        this.actionNodes = new ActionNodesProvider(this.configService);
+        this.actionNodes = new ActionNodesProvider();
         this.chapterNodes = new ChapterNodesProvider(this.volumeService, this.configService);
         this.characterNodes = new CharacterNodesProvider();
         this.outlineNodes = new OutlineNodesProvider();

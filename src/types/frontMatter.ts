@@ -43,4 +43,4 @@ export interface CharacterFrontMatter {
 /**
  * 通用 Front Matter（用于未知类型）
  */
-export type GenericFrontMatter = Record<string, any>;
+export type GenericFrontMatter = Record<string, unknown>;

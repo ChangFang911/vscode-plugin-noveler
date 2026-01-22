@@ -7,7 +7,7 @@ import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
 import { VolumeService } from '../../services/volumeService';
 import { ConfigService } from '../../services/configService';
 import { WordCountService } from '../../services/wordCountService';
-import { extractFrontMatter, getContentWithoutFrontMatter } from '../../utils/frontMatterHelper';
+import { extractChapterFrontMatter, getContentWithoutFrontMatter } from '../../utils/frontMatterHelper';
 import { CHAPTERS_FOLDER, VOLUME_TYPE_NAMES, VOLUME_STATUS_NAMES } from '../../constants';
 import { VolumeInfo } from '../../types/volume';
 import { convertToChineseNumber } from '../../utils/chineseNumber';
@@ -137,7 +137,7 @@ export class ChapterNodesProvider {
                 const content = await vscode.workspace.fs.readFile(chapterPath);
                 const text = Buffer.from(content).toString('utf8');
 
-                const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+                const frontMatter = extractChapterFrontMatter({ getText: () => text } as vscode.TextDocument);
                 const chapterNum = frontMatter.chapter;
                 const title = this.extractTitle(text, chapterFile);
                 const contentWithoutFM = this.removeFrontMatter(text);
@@ -242,7 +242,7 @@ export class ChapterNodesProvider {
                     const filePath = vscode.Uri.joinPath(folderPath, filename);
                     const content = await vscode.workspace.fs.readFile(filePath);
                     const text = Buffer.from(content).toString('utf8');
-                    const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+                    const frontMatter = extractChapterFrontMatter({ getText: () => text } as vscode.TextDocument);
                     const chapterNum = frontMatter.chapter ? Number(frontMatter.chapter) : null;
                     filesWithMeta.push([filename, chapterNum]);
                 } catch {
@@ -272,7 +272,7 @@ export class ChapterNodesProvider {
                     const content = await vscode.workspace.fs.readFile(filePath);
                     const text = Buffer.from(content).toString('utf8');
 
-                    const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+                    const frontMatter = extractChapterFrontMatter({ getText: () => text } as vscode.TextDocument);
                     const chapterNum = frontMatter.chapter;
                     const title = this.extractTitle(text, filename);
                     const contentWithoutFM = this.removeFrontMatter(text);
@@ -398,7 +398,7 @@ export class ChapterNodesProvider {
     }
 
     private extractTitle(text: string, filename: string): string {
-        const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+        const frontMatter = extractChapterFrontMatter({ getText: () => text } as vscode.TextDocument);
 
         if (frontMatter.title) {
             return String(frontMatter.title).trim();
@@ -413,7 +413,7 @@ export class ChapterNodesProvider {
     }
 
     private extractStatus(text: string): string {
-        const frontMatter = extractFrontMatter({ getText: () => text } as vscode.TextDocument);
+        const frontMatter = extractChapterFrontMatter({ getText: () => text } as vscode.TextDocument);
         if (frontMatter.status) {
             return String(frontMatter.status).trim();
         }

@@ -128,15 +128,66 @@ export async function deleteVolume(item: NovelerTreeItem): Promise<void> {
 }
 
 /**
- * 设置卷状态
+ * 编辑卷属性（合并了设置状态、设置类型、编辑信息）
  */
-export async function setVolumeStatus(item: NovelerTreeItem): Promise<void> {
+export async function editVolumeProperties(item: NovelerTreeItem): Promise<void> {
     const volume = item.metadata;
     if (!volume) {
         vscode.window.showErrorMessage('无法获取卷信息');
         return;
     }
 
+    interface PropertyItem extends vscode.QuickPickItem {
+        action: 'status' | 'type' | 'info';
+    }
+
+    const items: PropertyItem[] = [
+        {
+            label: '$(symbol-event) 设置状态',
+            description: `当前: ${getVolumeStatusName(volume.status)}`,
+            detail: '设置卷的写作进度状态',
+            action: 'status'
+        },
+        {
+            label: '$(symbol-class) 设置类型',
+            description: `当前: ${getVolumeTypeName(volume.volumeType)}`,
+            detail: '设置卷的类型（正文/前传/后传/番外）',
+            action: 'type'
+        },
+        {
+            label: '$(json) 编辑详细信息',
+            description: '打开 volume.json',
+            detail: '编辑卷的完整元数据（描述、目标字数等）',
+            action: 'info'
+        }
+    ];
+
+    const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: `编辑卷「${volume.title}」的属性`,
+        ignoreFocusOut: true
+    });
+
+    if (!selected) {
+        return;
+    }
+
+    switch (selected.action) {
+        case 'status':
+            await setVolumeStatusInternal(volume);
+            break;
+        case 'type':
+            await setVolumeTypeInternal(volume);
+            break;
+        case 'info':
+            await editVolumeInfoInternal(volume);
+            break;
+    }
+}
+
+/**
+ * 内部方法：设置卷状态
+ */
+async function setVolumeStatusInternal(volume: VolumeInfo): Promise<void> {
     interface StatusItem extends vscode.QuickPickItem {
         status: VolumeStatus;
     }
@@ -213,53 +264,9 @@ export async function setVolumeStatus(item: NovelerTreeItem): Promise<void> {
 }
 
 /**
- * 编辑卷信息
+ * 内部方法：设置卷类型
  */
-export async function editVolumeInfo(item: NovelerTreeItem): Promise<void> {
-    const volume = item.metadata;
-    if (!volume) {
-        vscode.window.showErrorMessage('无法获取卷信息');
-        return;
-    }
-
-    const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
-
-    // 如果 volume.json 不存在，先创建
-    if (!fs.existsSync(volumeJsonPath)) {
-        const metadata = {
-            "volume": volume.volume,
-            "volumeType": volume.volumeType,
-            "title": volume.title,
-            "subtitle": "",
-            "status": volume.status,
-            "targetWords": 100000,
-            "description": "",
-            "startDate": "",
-            "endDate": "",
-            "theme": "",
-            "mainConflict": ""
-        };
-        fs.writeFileSync(volumeJsonPath, JSON.stringify(metadata, null, 2), 'utf-8');
-        Logger.info(`创建 volume.json: ${volumeJsonPath}`);
-    }
-
-    // 打开文件
-    const doc = await vscode.workspace.openTextDocument(volumeJsonPath);
-    await vscode.window.showTextDocument(doc);
-}
-
-/**
- * 设置卷类型
-/**
- * 设置卷类型
- */
-export async function setVolumeType(item: NovelerTreeItem): Promise<void> {
-    const volume = item.metadata;
-    if (!volume) {
-        vscode.window.showErrorMessage('无法获取卷信息');
-        return;
-    }
-
+async function setVolumeTypeInternal(volume: VolumeInfo): Promise<void> {
     interface TypeItem extends vscode.QuickPickItem {
         type: VolumeType;
     }
@@ -351,6 +358,36 @@ export async function setVolumeType(item: NovelerTreeItem): Promise<void> {
         Logger.error('设置卷类型失败', error);
         vscode.window.showErrorMessage(`设置卷类型失败: ${error instanceof Error ? error.message : String(error)}`);
     }
+}
+
+/**
+ * 内部方法：编辑卷信息
+ */
+async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
+    const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
+
+    // 如果 volume.json 不存在，先创建
+    if (!fs.existsSync(volumeJsonPath)) {
+        const metadata = {
+            "volume": volume.volume,
+            "volumeType": volume.volumeType,
+            "title": volume.title,
+            "subtitle": "",
+            "status": volume.status,
+            "targetWords": 100000,
+            "description": "",
+            "startDate": "",
+            "endDate": "",
+            "theme": "",
+            "mainConflict": ""
+        };
+        fs.writeFileSync(volumeJsonPath, JSON.stringify(metadata, null, 2), 'utf-8');
+        Logger.info(`创建 volume.json: ${volumeJsonPath}`);
+    }
+
+    // 打开文件
+    const doc = await vscode.workspace.openTextDocument(volumeJsonPath);
+    await vscode.window.showTextDocument(doc);
 }
 
 /**

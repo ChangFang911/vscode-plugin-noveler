@@ -42,7 +42,10 @@ export class TrieTree {
             if (!node.children.has(char)) {
                 node.children.set(char, new TrieNode());
             }
-            node = node.children.get(char)!;
+            const next = node.children.get(char);
+            if (next) {
+                node = next;
+            }
         }
 
         // 如果这个词之前没有插入过，增加计数
@@ -89,7 +92,9 @@ export class TrieTree {
 
             // 从当前位置开始尝试匹配，记录最长匹配
             while (j < text.length && node.children.has(text[j])) {
-                node = node.children.get(text[j])!;
+                const next = node.children.get(text[j]);
+                if (!next) break;
+                node = next;
                 j++;
 
                 // 如果到达词的结尾，记录为候选匹配（但继续寻找更长的匹配）
@@ -124,10 +129,11 @@ export class TrieTree {
         let node = this.root;
 
         for (const char of word) {
-            if (!node.children.has(char)) {
+            const next = node.children.get(char);
+            if (!next) {
                 return false;
             }
-            node = node.children.get(char)!;
+            node = next;
         }
 
         return node.isEnd;
