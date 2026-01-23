@@ -164,6 +164,11 @@
         "command": "noveler.generateRandomName",
         "title": "Noveler: 随机起名",
         "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "noveler.quickSettings",
+        "title": "Noveler: 快速设置",
+        "icon": "$(gear)"
       }
     ],
     "menus": {

@@ -20,6 +20,7 @@ import { createVolume } from './createVolume';
 import { openSensitiveWordsConfig } from './openSensitiveWordsConfigCommand';
 import { addToCustomWords, addToWhitelist } from './addToSensitiveWordsCommand';
 import { generateRandomName } from './generateName';
+import { quickSettings } from './quickSettings';
 import { CONFIG_FILE_NAME } from '../constants';
 import {
     renameChapter,
@@ -344,6 +345,13 @@ function registerUtilityCommands(deps: CommandRegistrarDeps): void {
     // 跳转到 README
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.jumpToReadmeSection', jumpToReadmeSection)
+    );
+
+    // 快速设置
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.quickSettings', async () => {
+            await quickSettings();
+        })
     );
 }
 
