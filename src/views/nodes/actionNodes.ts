@@ -14,6 +14,18 @@ export class ActionNodesProvider {
     getOtherActionItems(): NovelerTreeItem[] {
         const items: NovelerTreeItem[] = [
             new NovelerTreeItem(
+                '⚙️ 快速设置',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.quickSettings',
+                    title: '快速设置',
+                },
+                'otherActionItem',
+                undefined,
+                '快速配置常用选项（字数、引号、高亮颜色等）'
+            ),
+            new NovelerTreeItem(
                 '切换专注模式',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
