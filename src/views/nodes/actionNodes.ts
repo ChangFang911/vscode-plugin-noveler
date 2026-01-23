@@ -7,36 +7,24 @@ import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
 
 export class ActionNodesProvider {
     getActionItems(): NovelerTreeItem[] {
-        return [
-            new NovelerTreeItem(
-                '格式化当前章节',
-                NodeType.ActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.formatDocument',
-                    title: '格式化当前章节',
-                },
-                'actionItem',
-                undefined,
-                '修正当前打开章节的标点和格式'
-            ),
+        // 快捷操作已合并到其他操作中
+        return [];
+    }
+
+    getOtherActionItems(): NovelerTreeItem[] {
+        const items: NovelerTreeItem[] = [
             new NovelerTreeItem(
                 '切换专注模式',
-                NodeType.ActionItem,
+                NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
                     command: 'noveler.toggleFocusMode',
                     title: '切换专注模式',
                 },
-                'actionItem',
+                'otherActionItem',
                 undefined,
                 '隐藏其他面板，专心写作'
             ),
-        ];
-    }
-
-    getOtherActionItems(): NovelerTreeItem[] {
-        const items: NovelerTreeItem[] = [
             new NovelerTreeItem(
                 '统计仪表板',
                 NodeType.OtherActionItem,
@@ -48,6 +36,18 @@ export class ActionNodesProvider {
                 'otherActionItem',
                 undefined,
                 '查看详细的写作统计和可视化数据'
+            ),
+            new NovelerTreeItem(
+                '🎲 随机起名',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.generateRandomName',
+                    title: '随机起名',
+                },
+                'otherActionItem',
+                undefined,
+                '生成多种风格的随机姓名'
             ),
             new NovelerTreeItem(
                 '配置敏感词库',
@@ -72,18 +72,6 @@ export class ActionNodesProvider {
                 'otherActionItem',
                 undefined,
                 '编辑小说配置（设置、人物列表等）'
-            ),
-            new NovelerTreeItem(
-                '🎲 随机起名',
-                NodeType.OtherActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.generateRandomName',
-                    title: '随机起名',
-                },
-                'otherActionItem',
-                undefined,
-                '生成多种风格的随机姓名'
             ),
         ];
 

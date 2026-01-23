@@ -14,6 +14,9 @@ export class SensitiveWordDiagnosticProvider {
     private readonly DEBOUNCE_DELAY = 500; // 500ms 防抖
     private statusBarItem: vscode.StatusBarItem | null = null;
 
+    // 会话级别忽略列表：Map<文档URI, Set<词>>
+    private sessionIgnoreList: Map<string, Set<string>> = new Map();
+
     constructor(service: SensitiveWordService) {
         this.service = service;
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('noveler-sensitive');
@@ -114,7 +117,14 @@ export class SensitiveWordDiagnosticProvider {
         }
 
         try {
-            const matches = this.service.detect(document);
+            let matches = this.service.detect(document);
+
+            // 过滤会话级别忽略的词
+            const ignoredWords = this.sessionIgnoreList.get(document.uri.toString());
+            if (ignoredWords && ignoredWords.size > 0) {
+                matches = matches.filter(m => !ignoredWords.has(m.word));
+            }
+
             const diagnostics: vscode.Diagnostic[] = [];
 
             for (const match of matches) {
@@ -220,7 +230,23 @@ export class SensitiveWordDiagnosticProvider {
      */
     public clearAll(): void {
         this.diagnosticCollection.clear();
+        this.sessionIgnoreList.clear();
         this.updateStatusBar(0);
+    }
+
+    /**
+     * 忽略本文件中的某个敏感词（会话级别）
+     * @param documentUri 文档 URI
+     * @param word 要忽略的词
+     */
+    public ignoreWordInDocument(documentUri: string, word: string): void {
+        let ignoredWords = this.sessionIgnoreList.get(documentUri);
+        if (!ignoredWords) {
+            ignoredWords = new Set();
+            this.sessionIgnoreList.set(documentUri, ignoredWords);
+        }
+        ignoredWords.add(word);
+        Logger.info(`会话级别忽略敏感词: "${word}" (文档: ${documentUri})`);
     }
 
     /**

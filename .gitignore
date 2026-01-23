@@ -5,5 +5,10 @@ out
 .DS_Store
 examples
 
+# 测试覆盖率
+coverage/
+.c8-temp/
+.nyc_output/
+
 # 用户自定义配置（项目特定）
 .noveler/

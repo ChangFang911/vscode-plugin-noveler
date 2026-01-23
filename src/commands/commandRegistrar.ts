@@ -239,7 +239,7 @@ function registerVolumeCommands(deps: CommandRegistrarDeps): void {
  * 注册敏感词相关命令
  */
 function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
-    const { context } = deps;
+    const { context, sensitiveWordDiagnostic } = deps;
 
     // 打开敏感词配置
     context.subscriptions.push(
@@ -283,10 +283,17 @@ function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
         })
     );
 
-    // 忽略敏感词
+    // 忽略敏感词（会话级别）
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.ignoreSensitiveWord', () => {
-            // 空操作
+        vscode.commands.registerCommand('noveler.ignoreSensitiveWord', (documentUri: string, word: string) => {
+            if (sensitiveWordDiagnostic && documentUri && word) {
+                sensitiveWordDiagnostic.ignoreWordInDocument(documentUri, word);
+                // 刷新当前文档的诊断
+                const editor = vscode.window.activeTextEditor;
+                if (editor && editor.document.uri.toString() === documentUri) {
+                    sensitiveWordDiagnostic.updateDiagnostics(editor.document);
+                }
+            }
         })
     );
 

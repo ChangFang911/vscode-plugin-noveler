@@ -103,12 +103,34 @@ function isValidColor(color: string): boolean {
 }
 
 /**
+ * 深拷贝对象
+ * @param obj 要拷贝的对象
+ * @returns 深拷贝后的对象
+ */
+function deepClone<T>(obj: T): T {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(item => deepClone(item)) as unknown as T;
+    }
+    const cloned = {} as T;
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            cloned[key] = deepClone(obj[key]);
+        }
+    }
+    return cloned;
+}
+
+/**
  * 修复配置（尽可能自动修正）
  * @param config 配置对象
- * @returns 修复后的配置对象
+ * @returns 修复后的配置对象（不修改原对象）
  */
 export function fixConfig(config: NovelConfig): NovelConfig {
-    const fixed = { ...config };
+    // 深拷贝避免修改原对象
+    const fixed = deepClone(config);
 
     // 修复 targetWords
     if (fixed.targetWords?.default !== undefined) {

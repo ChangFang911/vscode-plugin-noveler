@@ -2,6 +2,7 @@
 .vscode/**
 .vscode-test/**
 src/**
+!src/data/**
 .git/**
 .github/**
 

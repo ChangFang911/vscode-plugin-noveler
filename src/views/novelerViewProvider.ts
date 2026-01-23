@@ -216,15 +216,6 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '查看项目统计信息'
             ),
             new NovelerTreeItem(
-                '⚡ 快捷操作',
-                NodeType.Actions,
-                vscode.TreeItemCollapsibleState.Expanded,
-                undefined,
-                'actions',
-                undefined,
-                '常用功能快捷入口'
-            ),
-            new NovelerTreeItem(
                 '📂 章节列表',
                 NodeType.Chapters,
                 vscode.TreeItemCollapsibleState.Expanded,
@@ -261,7 +252,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 '灵感和参考素材'
             ),
             new NovelerTreeItem(
-                '🔧 其他操作',
+                '🔧 工具与设置',
                 NodeType.OtherActions,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,

@@ -49,7 +49,7 @@ export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvide
             }
 
             // 4. 忽略此问题
-            const ignoreAction = this.createIgnoreAction(diagnostic);
+            const ignoreAction = this.createIgnoreAction(document, diagnostic);
             if (ignoreAction) {
                 actions.push(ignoreAction);
             }
@@ -134,17 +134,22 @@ export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvide
     /**
      * 创建"忽略此问题"操作
      */
-    private createIgnoreAction(diagnostic: vscode.Diagnostic): vscode.CodeAction | null {
+    private createIgnoreAction(
+        document: vscode.TextDocument,
+        diagnostic: vscode.Diagnostic
+    ): vscode.CodeAction | null {
+        const word = document.getText(diagnostic.range);
+        if (!word) return null;
+
         const action = new vscode.CodeAction(
-            '忽略此问题',
+            `忽略本文件中的 "${word}"`,
             vscode.CodeActionKind.QuickFix
         );
 
-        // 这个操作实际上不做任何事，只是提供一个选项让用户关闭提示
         action.command = {
             command: 'noveler.ignoreSensitiveWord',
-            title: '忽略',
-            arguments: []
+            title: '忽略本文件',
+            arguments: [document.uri.toString(), word]
         };
 
         action.diagnostics = [diagnostic];

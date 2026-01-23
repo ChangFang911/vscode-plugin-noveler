@@ -1,13 +1,23 @@
 import * as assert from 'assert';
+import * as sinon from 'sinon';
+import { NovelConfig } from '../../services/configService';
+import { validateConfig, fixConfig } from '../../utils/configValidator';
 
-// 模拟 ConfigService 的测试
-// 注意：完整的 ConfigService 测试需要模拟 vscode API
-// 这里只测试可以独立测试的逻辑
+// 由于 ConfigService 是单例且依赖 vscode，我们测试其核心逻辑
+// 完整的集成测试需要 E2E 环境
 
 suite('ConfigService Test Suite', () => {
+    let sandbox: sinon.SinonSandbox;
+
+    setup(() => {
+        sandbox = sinon.createSandbox();
+    });
+
+    teardown(() => {
+        sandbox.restore();
+    });
 
     suite('Default Values', () => {
-        // 测试默认配置值是否正确
         test('default target words should be 2500', () => {
             const defaultTargetWords = 2500;
             assert.strictEqual(defaultTargetWords, 2500);
@@ -40,10 +50,8 @@ suite('ConfigService Test Suite', () => {
     });
 
     suite('Config Validation Logic', () => {
-        // 测试配置值的验证逻辑
-
         test('should recognize valid quote styles', () => {
-            const validStyles = ['「」', '""'];
+            const validStyles = ['「」', '""', '""'];
             const testStyle = '「」';
             assert.ok(validStyles.includes(testStyle));
         });
@@ -70,6 +78,125 @@ suite('ConfigService Test Suite', () => {
             const validFormats = ['arabic', 'chinese', 'roman'];
             const testFormat = 'chinese';
             assert.ok(validFormats.includes(testFormat));
+        });
+    });
+
+    suite('validateConfig Integration', () => {
+        test('should validate config with valid targetWords', () => {
+            const config: NovelConfig = {
+                targetWords: { default: 3000 }
+            };
+            const errors = validateConfig(config);
+            assert.strictEqual(errors.filter(e => e.field.includes('targetWords')).length, 0);
+        });
+
+        test('should reject negative targetWords', () => {
+            const config: NovelConfig = {
+                targetWords: { default: -100 }
+            };
+            const errors = validateConfig(config);
+            const error = errors.find(e => e.field === 'targetWords.default');
+            assert.ok(error);
+            assert.strictEqual(error!.severity, 'error');
+        });
+
+        test('should warn for very large targetWords', () => {
+            const config: NovelConfig = {
+                targetWords: { default: 100000 }
+            };
+            const errors = validateConfig(config);
+            const warning = errors.find(e => e.field === 'targetWords.default');
+            assert.ok(warning);
+            assert.strictEqual(warning!.severity, 'warning');
+        });
+
+        test('should validate valid highlight colors', () => {
+            const config: NovelConfig = {
+                highlight: {
+                    dialogue: { color: '#ce9178' },
+                    character: { backgroundColor: 'rgba(78, 201, 176, 0.15)' }
+                }
+            };
+            const errors = validateConfig(config);
+            assert.strictEqual(errors.filter(e => e.field.includes('color')).length, 0);
+        });
+
+        test('should warn for invalid color format', () => {
+            const config: NovelConfig = {
+                highlight: {
+                    dialogue: { color: 'invalid-color' }
+                }
+            };
+            const errors = validateConfig(config);
+            const warning = errors.find(e => e.field === 'highlight.dialogue.color');
+            assert.ok(warning);
+            assert.strictEqual(warning!.severity, 'warning');
+        });
+
+        test('should validate valid autoUpdateReadmeOnCreate', () => {
+            const config: NovelConfig = {
+                autoUpdateReadmeOnCreate: { value: 'ask' }
+            };
+            const errors = validateConfig(config);
+            assert.strictEqual(errors.filter(e => e.field.includes('autoUpdateReadmeOnCreate')).length, 0);
+        });
+
+        test('should reject invalid autoUpdateReadmeOnCreate value', () => {
+            const config = {
+                autoUpdateReadmeOnCreate: { value: 'invalid' }
+            } as NovelConfig;
+            const errors = validateConfig(config);
+            const error = errors.find(e => e.field === 'autoUpdateReadmeOnCreate.value');
+            assert.ok(error);
+            assert.strictEqual(error!.severity, 'error');
+        });
+    });
+
+    suite('fixConfig Integration', () => {
+        test('should fix negative targetWords to default', () => {
+            const config: NovelConfig = {
+                targetWords: { default: -100 }
+            };
+            const fixed = fixConfig(config);
+            assert.strictEqual(fixed.targetWords!.default, 2500);
+        });
+
+        test('should fix invalid autoUpdateReadmeOnCreate', () => {
+            const config = {
+                autoUpdateReadmeOnCreate: { value: 'invalid' }
+            } as NovelConfig;
+            const fixed = fixConfig(config);
+            assert.strictEqual(fixed.autoUpdateReadmeOnCreate!.value, 'always');
+        });
+
+        test('should preserve valid config values', () => {
+            const config: NovelConfig = {
+                targetWords: { default: 5000 },
+                autoUpdateReadmeOnCreate: { value: 'never' }
+            };
+            const fixed = fixConfig(config);
+            assert.strictEqual(fixed.targetWords!.default, 5000);
+            assert.strictEqual(fixed.autoUpdateReadmeOnCreate!.value, 'never');
+        });
+
+        test('should not mutate original config', () => {
+            const config: NovelConfig = {
+                targetWords: { default: -100 }
+            };
+            const originalValue = config.targetWords!.default;
+            fixConfig(config);
+            assert.strictEqual(config.targetWords!.default, originalValue);
+        });
+
+        test('should deep clone nested objects', () => {
+            const config: NovelConfig = {
+                highlight: {
+                    dialogue: { color: '#fff' }
+                }
+            };
+            const fixed = fixConfig(config);
+            assert.notStrictEqual(fixed.highlight, config.highlight);
+            assert.notStrictEqual(fixed.highlight?.dialogue, config.highlight?.dialogue);
         });
     });
 
@@ -190,6 +317,155 @@ suite('ConfigService Test Suite', () => {
             testLibraries.forEach(lib => {
                 assert.ok(validLibraries.includes(lib), `${lib} should be a valid library`);
             });
+        });
+    });
+
+    suite('Config Getter Logic', () => {
+        test('getTargetWords should return default when not set', () => {
+            const config: NovelConfig = {};
+            const targetWords = config.targetWords?.default || 2500;
+            assert.strictEqual(targetWords, 2500);
+        });
+
+        test('getTargetWords should return config value when set', () => {
+            const config: NovelConfig = {
+                targetWords: { default: 5000 }
+            };
+            const targetWords = config.targetWords?.default || 2500;
+            assert.strictEqual(targetWords, 5000);
+        });
+
+        test('getChineseQuoteStyle should return default when not set', () => {
+            const config: NovelConfig = {};
+            const quoteStyle = config.format?.chineseQuoteStyle || '「」';
+            assert.strictEqual(quoteStyle, '「」');
+        });
+
+        test('shouldShowWordCountInStatusBar should default to true', () => {
+            const config: NovelConfig = {};
+            const showInStatusBar = config.wordCount?.showInStatusBar !== false;
+            assert.strictEqual(showInStatusBar, true);
+        });
+
+        test('shouldShowWordCountInStatusBar should respect false', () => {
+            const config: NovelConfig = {
+                wordCount: { showInStatusBar: false }
+            };
+            const showInStatusBar = config.wordCount?.showInStatusBar !== false;
+            assert.strictEqual(showInStatusBar, false);
+        });
+
+        test('shouldAutoFormat should default to true', () => {
+            const config: NovelConfig = {};
+            const autoFormat = config.format?.autoFormat !== false;
+            assert.strictEqual(autoFormat, true);
+        });
+
+        test('shouldAutoEmptyLine should default to true', () => {
+            const config: NovelConfig = {};
+            const autoEmptyLine = config.autoEmptyLine?.value !== false;
+            assert.strictEqual(autoEmptyLine, true);
+        });
+
+        test('shouldParagraphIndent should return true when enabled', () => {
+            const config: NovelConfig = {
+                paragraphIndent: { value: true }
+            };
+            const paragraphIndent = config.paragraphIndent?.value === true;
+            assert.strictEqual(paragraphIndent, true);
+        });
+
+        test('getReadmeAutoUpdateMode should return default when not set', () => {
+            const config: NovelConfig = {};
+            const mode = config.autoUpdateReadmeOnCreate?.value || 'always';
+            assert.strictEqual(mode, 'always');
+        });
+
+        test('isVolumesEnabled should return false by default', () => {
+            const config: NovelConfig = {};
+            const enabled = config.volumes?.enabled === true;
+            assert.strictEqual(enabled, false);
+        });
+
+        test('isVolumesEnabled should return true when enabled', () => {
+            const config: NovelConfig = {
+                volumes: {
+                    enabled: true,
+                    folderStructure: 'nested',
+                    numberFormat: 'arabic',
+                    chapterNumbering: 'global'
+                }
+            };
+            const enabled = config.volumes?.enabled === true;
+            assert.strictEqual(enabled, true);
+        });
+
+        test('getCharacters should return empty array by default', () => {
+            const config: NovelConfig = {};
+            const characters = config.characters?.list || [];
+            assert.deepStrictEqual(characters, []);
+        });
+
+        test('getCharacters should return list when set', () => {
+            const config: NovelConfig = {
+                characters: { list: ['萧炎', '萧薰儿', '药老'] }
+            };
+            const characters = config.characters?.list || [];
+            assert.deepStrictEqual(characters, ['萧炎', '萧薰儿', '药老']);
+        });
+    });
+
+    suite('getVolumesConfig Logic', () => {
+        test('should return default config when not set', () => {
+            const config: NovelConfig = {};
+            const volumesConfig = config.volumes || {
+                enabled: false,
+                folderStructure: 'flat',
+                numberFormat: 'arabic',
+                chapterNumbering: 'global'
+            };
+            assert.strictEqual(volumesConfig.enabled, false);
+            assert.strictEqual(volumesConfig.folderStructure, 'flat');
+        });
+
+        test('should merge with defaults for partial config', () => {
+            const config: NovelConfig = {
+                volumes: {
+                    enabled: true,
+                    folderStructure: 'nested',
+                    numberFormat: 'chinese',
+                    chapterNumbering: 'volume'
+                }
+            };
+            assert.strictEqual(config.volumes!.enabled, true);
+            assert.strictEqual(config.volumes!.folderStructure, 'nested');
+            assert.strictEqual(config.volumes!.numberFormat, 'chinese');
+            assert.strictEqual(config.volumes!.chapterNumbering, 'volume');
+        });
+    });
+
+    suite('Config Merge Logic', () => {
+        test('should handle undefined config gracefully', () => {
+            const config: NovelConfig = {};
+            assert.doesNotThrow(() => {
+                const _ = config.targetWords?.default;
+                const __ = config.highlight?.dialogue?.color;
+                const ___ = config.format?.chineseQuoteStyle;
+            });
+        });
+
+        test('should handle partial highlight config', () => {
+            const config: NovelConfig = {
+                highlight: {
+                    dialogue: { color: '#fff' }
+                    // character is undefined
+                }
+            };
+            const dialogueStyle = config.highlight?.dialogue || {};
+            const characterStyle = config.highlight?.character || {};
+
+            assert.strictEqual(dialogueStyle.color, '#fff');
+            assert.deepStrictEqual(characterStyle, {});
         });
     });
 });

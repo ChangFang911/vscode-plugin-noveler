@@ -164,12 +164,24 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // 订阅配置变更事件
         context.subscriptions.push(
-            configService.onDidChangeConfig(() => {
+            configService.onDidChangeConfig(async () => {
                 vscode.commands.executeCommand('noveler.refresh');
                 codeLensProvider?.refresh();
                 // 自动重载高亮配置
                 highlightProvider.reloadDecorations();
                 updateHighlights(vscode.window.activeTextEditor);
+                // 自动重载敏感词配置
+                if (sensitiveWordService) {
+                    try {
+                        await sensitiveWordService.reload();
+                        Logger.info('敏感词配置已自动重新加载');
+                        if (vscode.window.activeTextEditor) {
+                            sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
+                        }
+                    } catch (error) {
+                        Logger.error('自动重新加载敏感词配置失败', error);
+                    }
+                }
             })
         );
 

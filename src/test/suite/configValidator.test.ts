@@ -335,18 +335,16 @@ suite('ConfigValidator Test Suite', () => {
         });
 
         suite('Immutability', () => {
-            test('should deep clone nested objects (Note: current implementation mutates nested objects)', () => {
+            test('should not mutate original config (deep clone)', () => {
                 const config: NovelConfig = {
                     targetWords: { default: -100 }
                 };
                 const originalDefault = config.targetWords!.default;
                 const fixed = fixConfig(config);
-                // Note: Current fixConfig implementation does shallow copy,
-                // so nested objects are mutated. This test documents current behavior.
-                // The original config IS mutated because fixConfig uses shallow copy.
+                // 修复后的配置应该有正确的值
                 assert.strictEqual(fixed.targetWords!.default, 2500);
-                // After fix, original is also changed due to shallow copy
-                assert.strictEqual(config.targetWords!.default, 2500);
+                // 原对象应该保持不变（深拷贝）
+                assert.strictEqual(config.targetWords!.default, originalDefault);
             });
 
             test('should return new object', () => {
@@ -355,6 +353,15 @@ suite('ConfigValidator Test Suite', () => {
                 };
                 const fixed = fixConfig(config);
                 assert.notStrictEqual(fixed, config);
+            });
+
+            test('should deep clone nested objects', () => {
+                const config: NovelConfig = {
+                    targetWords: { default: 3000 }
+                };
+                const fixed = fixConfig(config);
+                // 嵌套对象也应该是不同的引用
+                assert.notStrictEqual(fixed.targetWords, config.targetWords);
             });
         });
 
