@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
-import { WordCountService, WordCountStats } from '../../services/wordCountService';
+import { WordCountService } from '../../services/wordCountService';
 
 suite('WordCountService Test Suite', () => {
     let sandbox: sinon.SinonSandbox;

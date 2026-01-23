@@ -62,7 +62,7 @@ function formatParagraphSpacing(
     text: string,
     shouldAutoEmptyLine: boolean,
     shouldParagraphIndent: boolean,
-    PARAGRAPH_INDENT: string = '　　'
+    PARAGRAPH_INDENT = '　　'
 ): string {
     const lines = text.split('\n');
     const result: string[] = [];

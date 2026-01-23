@@ -320,7 +320,7 @@ status: ${data.status}
             return `"${word}"`;
         }
 
-        function formatCustomWordEntry(word: string, level: string = 'high'): string {
+        function formatCustomWordEntry(word: string, level = 'high'): string {
             return JSON.stringify({ word, level });
         }
 

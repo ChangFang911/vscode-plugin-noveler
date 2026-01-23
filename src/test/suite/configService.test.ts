@@ -448,9 +448,9 @@ suite('ConfigService Test Suite', () => {
         test('should handle undefined config gracefully', () => {
             const config: NovelConfig = {};
             assert.doesNotThrow(() => {
-                const _ = config.targetWords?.default;
-                const __ = config.highlight?.dialogue?.color;
-                const ___ = config.format?.chineseQuoteStyle;
+                void config.targetWords?.default;
+                void config.highlight?.dialogue?.color;
+                void config.format?.chineseQuoteStyle;
             });
         });
 

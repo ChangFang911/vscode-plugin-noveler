@@ -134,7 +134,7 @@ export class MockTextLine {
  */
 export class MockTextDocument {
     private _lines: string[];
-    private _version: number = 1;
+    private _version = 1;
 
     constructor(
         public readonly uri: MockUri,
@@ -223,7 +223,7 @@ export class MockTextDocument {
     }
 
     // 创建工厂方法
-    static create(content: string, languageId: string = 'markdown'): MockTextDocument {
+    static create(content: string, languageId = 'markdown'): MockTextDocument {
         const uri = MockUri.file(`/test/document-${Date.now()}.md`);
         return new MockTextDocument(uri, content, languageId, uri.fsPath);
     }
@@ -338,10 +338,10 @@ export enum MockDiagnosticTag {
  * 模拟 VSCode StatusBarItem
  */
 export class MockStatusBarItem {
-    text: string = '';
-    tooltip: string = '';
+    text = '';
+    tooltip = '';
     command: string | undefined;
-    private _visible: boolean = false;
+    private _visible = false;
 
     show(): void {
         this._visible = true;
@@ -563,7 +563,7 @@ export interface MockCommands {
 
 export function createMockCommands(): MockCommands {
     return {
-        registerCommand: sinon.stub().returns({ dispose: () => {} }),
+        registerCommand: sinon.stub().returns({ dispose: () => { /* noop */ } }),
         executeCommand: sinon.stub().resolves()
     };
 }
@@ -580,8 +580,8 @@ export interface MockLanguages {
 export function createMockLanguages(): MockLanguages {
     return {
         createDiagnosticCollection: sinon.stub().callsFake((name: string) => new MockDiagnosticCollection(name)),
-        registerCodeActionsProvider: sinon.stub().returns({ dispose: () => {} }),
-        registerDocumentFormattingEditProvider: sinon.stub().returns({ dispose: () => {} })
+        registerCodeActionsProvider: sinon.stub().returns({ dispose: () => { /* noop */ } }),
+        registerDocumentFormattingEditProvider: sinon.stub().returns({ dispose: () => { /* noop */ } })
     };
 }
 
@@ -602,7 +602,7 @@ export interface MockExtensionContext {
     };
 }
 
-export function createMockExtensionContext(extensionPath: string = '/test/extension'): MockExtensionContext {
+export function createMockExtensionContext(extensionPath = '/test/extension'): MockExtensionContext {
     return {
         subscriptions: [],
         extensionUri: MockUri.file(extensionPath),

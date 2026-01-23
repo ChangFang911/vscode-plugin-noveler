@@ -321,7 +321,7 @@ suite('NameGeneratorService Test Suite', () => {
     });
 
     suite('Surname Probability Logic', () => {
-        function selectSurnameType(random: number, commonRatio: number = 0.7): 'common' | 'classic' {
+        function selectSurnameType(random: number, commonRatio = 0.7): 'common' | 'classic' {
             return random > (1 - commonRatio) ? 'common' : 'classic';
         }
 
@@ -342,7 +342,7 @@ suite('NameGeneratorService Test Suite', () => {
     });
 
     suite('Given Name Length Logic', () => {
-        function selectNameLength(random: number, doubleRatio: number = 0.6): 'single' | 'double' {
+        function selectNameLength(random: number, doubleRatio = 0.6): 'single' | 'double' {
             return random > (1 - doubleRatio) ? 'double' : 'single';
         }
 

@@ -356,8 +356,7 @@ suite('HighlightProvider Test Suite', () => {
 
             const startTime = Date.now();
             let count = 0;
-            let match;
-            while ((match = regex.exec(largeText)) !== null) {
+            while (regex.exec(largeText) !== null) {
                 count++;
             }
             const duration = Date.now() - startTime;
@@ -376,8 +375,7 @@ suite('HighlightProvider Test Suite', () => {
 
             const startTime = Date.now();
             let count = 0;
-            let match;
-            while ((match = regex.exec(text)) !== null) {
+            while (regex.exec(text) !== null) {
                 count++;
             }
             const duration = Date.now() - startTime;
