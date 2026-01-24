@@ -21,8 +21,18 @@ export async function createVolume(): Promise<void> {
     const configService = ConfigService.getInstance();
     const volumeService = VolumeService.getInstance();
 
-    // 检查是否启用分卷功能
+    // 检查是否启用分卷功能（嵌套结构）
+    // isVolumesEnabled() 已经同时检查 enabled=true 和 folderStructure=nested
     if (!configService.isVolumesEnabled()) {
+        const volumesConfig = configService.getVolumesConfig();
+
+        if (volumesConfig.enabled && volumesConfig.folderStructure === 'flat') {
+            // 启用了分卷但使用扁平结构
+            vscode.window.showErrorMessage('当前文件夹结构为 flat（扁平），无法创建卷。请在配置中将 folderStructure 设置为 nested');
+            return;
+        }
+
+        // 分卷功能未启用
         const enable = await vscode.window.showWarningMessage(
             '分卷功能未启用。是否要启用分卷功能？',
             '启用', '取消'
@@ -35,13 +45,6 @@ export async function createVolume(): Promise<void> {
         // 启用分卷功能
         await enableVolumes(workspaceFolder);
         vscode.window.showInformationMessage('已启用分卷功能，请重新运行创建卷命令');
-        return;
-    }
-
-    // 检查文件夹结构
-    const volumesConfig = configService.getVolumesConfig();
-    if (volumesConfig.folderStructure !== 'nested') {
-        vscode.window.showErrorMessage('当前文件夹结构为 flat（扁平），无法创建卷。请在配置中将 folderStructure 设置为 nested');
         return;
     }
 

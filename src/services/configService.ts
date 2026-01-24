@@ -385,11 +385,13 @@ export class ConfigService {
     }
 
     /**
-     * 是否启用分卷功能
-     * @returns true 表示启用，false 表示禁用，默认为 false
+     * 是否启用分卷功能（嵌套结构）
+     * 只有当 enabled=true 且 folderStructure=nested 时才返回 true
+     * @returns true 表示启用嵌套分卷模式，false 表示使用扁平结构
      */
     public isVolumesEnabled(): boolean {
-        return this.config.volumes?.enabled === true;
+        const volumes = this.config.volumes;
+        return volumes?.enabled === true && volumes?.folderStructure === 'nested';
     }
 
     /**

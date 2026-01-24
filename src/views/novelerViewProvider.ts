@@ -203,9 +203,8 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         }
 
         // 已初始化，显示正常结构
-        const volumesConfig = this.configService.getVolumesConfig();
-        // 只有启用分卷且使用嵌套结构时，才显示创建卷的入口
-        const canCreateVolumes = volumesConfig.enabled && volumesConfig.folderStructure === 'nested';
+        // isVolumesEnabled() 已经同时检查 enabled 和 folderStructure=nested
+        const canCreateVolumes = this.configService.isVolumesEnabled();
 
         return [
             new NovelerTreeItem(
