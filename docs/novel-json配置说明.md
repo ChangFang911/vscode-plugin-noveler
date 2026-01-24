@@ -568,6 +568,7 @@
 - **v0.3.4**：新增 sensitiveWords（敏感词检测）
 - **v0.5.0**：新增 volumes（分卷管理）、paragraphIndent
 - **v0.6.0**：新增 readmeAutoUpdate
+- **v0.6.8**：新增快速设置命令（QuickPick 界面）
 
 ---
 

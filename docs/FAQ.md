@@ -341,6 +341,28 @@ Front Matter 和 HTML 注释不会被格式化。
 2. 提交到 Git 仓库共享
 3. 备份到云端
 
+### Q: .vscode/settings.json 是什么？
+**A**: 这是 VSCode 项目级配置文件，Noveler 在初始化项目时会创建，包含：
+- 自动保存（2秒延迟）
+- 行尾空格清理
+- Markdown 预览优化
+
+**重要**：这些配置只对当前小说项目生效，不影响其他 VSCode 项目。
+
+### Q: 如何关闭自动保存？
+**A**: 编辑 `.vscode/settings.json`：
+```json
+{
+  "files.autoSave": "off"
+}
+```
+
+### Q: 初始化时没有创建 .vscode/settings.json？
+**A**: 可能是选择了"跳过"。手动创建：
+1. 在项目根目录创建 `.vscode` 文件夹
+2. 创建 `settings.json` 文件
+3. 添加需要的配置
+
 ---
 
 ## 性能问题
