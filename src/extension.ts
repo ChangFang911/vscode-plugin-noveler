@@ -420,7 +420,7 @@ function updateHighlights(editor: vscode.TextEditor | undefined) {
  * 同步护眼模式主题状态
  * 确保 VSCode 主题与 novel.jsonc 中的配置一致
  */
-async function syncEyeCareModeTheme(context: vscode.ExtensionContext): Promise<void> {
+async function syncEyeCareModeTheme(_context: vscode.ExtensionContext): Promise<void> {
     try {
         const eyeCareModeEnabled = configService.isEyeCareModeEnabled();
         const workbenchConfig = vscode.workspace.getConfiguration('workbench');
