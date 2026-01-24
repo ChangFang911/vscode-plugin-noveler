@@ -203,7 +203,9 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         }
 
         // 已初始化，显示正常结构
-        const volumesEnabled = this.configService.isVolumesEnabled();
+        const volumesConfig = this.configService.getVolumesConfig();
+        // 只有启用分卷且使用嵌套结构时，才显示创建卷的入口
+        const canCreateVolumes = volumesConfig.enabled && volumesConfig.folderStructure === 'nested';
 
         return [
             new NovelerTreeItem(
@@ -220,8 +222,8 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 NodeType.Chapters,
                 vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
-                volumesEnabled ? 'chapterGroupWithVolumes' : 'chapterGroup',
-                volumesEnabled ? '点击 ➕ 创建章节或卷' : '点击 ➕ 创建章节',
+                canCreateVolumes ? 'chapterGroupWithVolumes' : 'chapterGroup',
+                canCreateVolumes ? '点击 ➕ 创建章节或卷' : '点击 ➕ 创建章节',
                 '浏览和管理章节'
             ),
             new NovelerTreeItem(
