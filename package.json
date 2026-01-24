@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.6.8",
+  "version": "0.7.0",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -54,6 +54,10 @@
       {
         "command": "noveler.showStats",
         "title": "Noveler: 显示统计仪表板"
+      },
+      {
+        "command": "noveler.showWelcome",
+        "title": "Noveler: 显示欢迎页面"
       },
       {
         "command": "noveler.createChapter",

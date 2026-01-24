@@ -13,6 +13,7 @@ import { SensitiveWordDiagnosticProvider } from './providers/sensitiveWordDiagno
 import { SensitiveWordCodeActionProvider } from './providers/sensitiveWordCodeAction';
 import { NovelerViewProvider } from './views/novelerViewProvider';
 import { StatsWebviewProvider } from './views/statsWebviewProvider';
+import { WelcomeWebviewProvider } from './views/welcomeWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
@@ -78,6 +79,9 @@ export async function activate(context: vscode.ExtensionContext) {
         const projectStatsService = new ProjectStatsService();
         const statsWebviewProvider = new StatsWebviewProvider(context, projectStatsService);
 
+        // 初始化欢迎页面 Webview
+        const welcomeWebviewProvider = new WelcomeWebviewProvider(context);
+
         // 创建状态栏项
         wordCountStatusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
@@ -104,6 +108,7 @@ export async function activate(context: vscode.ExtensionContext) {
             sensitiveWordDiagnostic: null as unknown as SensitiveWordDiagnosticProvider,
             novelerViewProvider,
             statsWebviewProvider,
+            welcomeWebviewProvider,
             highlightProvider,
             updateHighlights
         });
@@ -188,6 +193,19 @@ export async function activate(context: vscode.ExtensionContext) {
         // 初始更新
         updateWordCountImmediate(vscode.window.activeTextEditor);
         updateHighlightsImmediate(vscode.window.activeTextEditor);
+
+        // 检查是否需要显示欢迎页面（首次安装）
+        if (welcomeWebviewProvider.shouldShowWelcome()) {
+            // 延迟显示，确保 UI 完全加载
+            setTimeout(async () => {
+                try {
+                    await welcomeWebviewProvider.show(true);
+                    Logger.info('首次启动，显示欢迎页面');
+                } catch (error) {
+                    Logger.error('显示欢迎页面失败', error);
+                }
+            }, 1000);
+        }
 
         Logger.info('Noveler 中文小说写作助手已激活');
     } catch (error) {
