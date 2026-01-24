@@ -371,7 +371,7 @@ export class WelcomeWebviewProvider {
             <input type="checkbox" id="dontShowAgain" onchange="handleDontShowAgain(this.checked)" />
             <label for="dontShowAgain">不再显示此页面</label>
         </div>
-        <div class="version">Noveler v0.7.0</div>
+        <div class="version">Noveler v0.7.1</div>
     </div>
 
     <script>

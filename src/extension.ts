@@ -42,7 +42,7 @@ let readmeUpdateDebouncer: Debouncer;
 export async function activate(context: vscode.ExtensionContext) {
     // 初始化日志系统（最先执行，确保后续能记录日志）
     Logger.initialize(context, LogLevel.Info);
-    Logger.info('Noveler 中文小说写作助手正在激活...');
+    Logger.info('[Noveler] 中文小说写作助手正在激活...');
 
     try {
         // 初始化防抖器
@@ -73,7 +73,7 @@ export async function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(
             vscode.window.registerTreeDataProvider('novelerView', novelerViewProvider)
         );
-        Logger.info('侧边栏视图已注册');
+        Logger.info('[Noveler] 侧边栏视图已注册');
 
         // 初始化统计服务和 Webview
         const projectStatsService = new ProjectStatsService();
@@ -112,7 +112,7 @@ export async function activate(context: vscode.ExtensionContext) {
             highlightProvider,
             updateHighlights
         });
-        Logger.info('命令已注册');
+        Logger.info('[Noveler] 命令已注册');
 
         // 注册事件监听器
         registerEventListeners(context, novelerViewProvider);
@@ -126,7 +126,7 @@ export async function activate(context: vscode.ExtensionContext) {
         try {
             await MigrationService.checkAndMigrate(context);
         } catch (migrationError) {
-            Logger.error('配置迁移失败，但不影响基本功能', migrationError);
+            Logger.error('[Noveler] 配置迁移失败，但不影响基本功能', migrationError);
         }
 
         // 初始化敏感词检测服务
@@ -145,17 +145,17 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
                 )
             );
-            Logger.info('敏感词检测功能已启用');
+            Logger.info('[Noveler] 敏感词检测功能已启用');
         } catch (sensitiveWordError) {
-            Logger.error('敏感词服务初始化失败，但不影响基本功能', sensitiveWordError);
+            Logger.error('[Noveler] 敏感词服务初始化失败，但不影响基本功能', sensitiveWordError);
         }
 
         // 初始化姓名生成服务
         try {
             NameGeneratorService.initialize(context);
-            Logger.info('随机起名功能已启用');
+            Logger.info('[Noveler] 随机起名功能已启用');
         } catch (nameGenError) {
-            Logger.error('姓名生成服务初始化失败', nameGenError);
+            Logger.error('[Noveler] 姓名生成服务初始化失败', nameGenError);
         }
 
         // 初始化 Code Lens 提供者
@@ -179,12 +179,12 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (sensitiveWordService) {
                     try {
                         await sensitiveWordService.reload();
-                        Logger.info('敏感词配置已自动重新加载');
+                        Logger.info('[Noveler] 敏感词配置已自动重新加载');
                         if (vscode.window.activeTextEditor) {
                             sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
                         }
                     } catch (error) {
-                        Logger.error('自动重新加载敏感词配置失败', error);
+                        Logger.error('[Noveler] 自动重新加载敏感词配置失败', error);
                     }
                 }
             })
@@ -194,22 +194,25 @@ export async function activate(context: vscode.ExtensionContext) {
         updateWordCountImmediate(vscode.window.activeTextEditor);
         updateHighlightsImmediate(vscode.window.activeTextEditor);
 
+        // 同步护眼模式状态（确保主题与配置一致）
+        await syncEyeCareModeTheme(context);
+
         // 检查是否需要显示欢迎页面（首次安装）
         if (welcomeWebviewProvider.shouldShowWelcome()) {
             // 延迟显示，确保 UI 完全加载
             setTimeout(async () => {
                 try {
                     await welcomeWebviewProvider.show(true);
-                    Logger.info('首次启动，显示欢迎页面');
+                    Logger.info('[Noveler] 首次启动，显示欢迎页面');
                 } catch (error) {
-                    Logger.error('显示欢迎页面失败', error);
+                    Logger.error('[Noveler] 显示欢迎页面失败', error);
                 }
             }, 1000);
         }
 
-        Logger.info('Noveler 中文小说写作助手已激活');
+        Logger.info('[Noveler] 中文小说写作助手已激活');
     } catch (error) {
-        Logger.error('Noveler 激活失败', error);
+        Logger.error('[Noveler] 激活失败', error);
         vscode.window.showErrorMessage(`Noveler 激活失败: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
@@ -323,13 +326,13 @@ function registerFileSystemWatchers(
     const reloadSensitiveWords = async () => {
         try {
             await sensitiveWordService.reload();
-            Logger.info('敏感词库已自动重新加载');
+            Logger.info('[Noveler] 敏感词库已自动重新加载');
 
             if (vscode.window.activeTextEditor) {
                 sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
             }
         } catch (error) {
-            Logger.error('自动重新加载敏感词库失败', error);
+            Logger.error('[Noveler] 自动重新加载敏感词库失败', error);
         }
     };
 
@@ -412,6 +415,47 @@ function updateHighlights(editor: vscode.TextEditor | undefined) {
 }
 
 // ============ 保存和换行处理 ============
+
+/**
+ * 同步护眼模式主题状态
+ * 确保 VSCode 主题与 novel.jsonc 中的配置一致
+ */
+async function syncEyeCareModeTheme(context: vscode.ExtensionContext): Promise<void> {
+    try {
+        const eyeCareModeEnabled = configService.isEyeCareModeEnabled();
+        const workbenchConfig = vscode.workspace.getConfiguration('workbench');
+        const eyeCareThemeName = 'Noveler 护眼模式';
+
+        // 获取配置信息
+        const inspected = workbenchConfig.inspect<string>('colorTheme');
+        const workspaceTheme = inspected?.workspaceValue;
+
+        Logger.info(`[Noveler] [护眼模式同步] enabled=${eyeCareModeEnabled}, workspaceTheme=${workspaceTheme}`);
+
+        if (eyeCareModeEnabled) {
+            // 护眼模式启用，确保使用护眼主题
+            if (workspaceTheme !== eyeCareThemeName) {
+                await workbenchConfig.update('colorTheme', eyeCareThemeName, vscode.ConfigurationTarget.Workspace);
+                Logger.info('[Noveler] [护眼模式同步] 已切换到护眼主题');
+            }
+        } else {
+            // 护眼模式禁用，确保不使用护眼主题
+            if (workspaceTheme === eyeCareThemeName) {
+                // 恢复之前保存的主题
+                const previousTheme = configService.getConfig().eyeCareMode?.previousTheme;
+                if (previousTheme) {
+                    await workbenchConfig.update('colorTheme', previousTheme, vscode.ConfigurationTarget.Workspace);
+                    Logger.info(`[Noveler] [护眼模式同步] 已恢复主题: ${previousTheme}`);
+                } else {
+                    await workbenchConfig.update('colorTheme', undefined, vscode.ConfigurationTarget.Workspace);
+                    Logger.info('[Noveler] [护眼模式同步] 已清除工作区主题设置');
+                }
+            }
+        }
+    } catch (error) {
+        Logger.error('[Noveler] 同步护眼模式主题失败', error);
+    }
+}
 
 async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<vscode.TextEdit[]> {
     try {
@@ -496,7 +540,7 @@ function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
 }
 
 export function deactivate() {
-    Logger.info('Noveler 已停用');
+    Logger.info('[Noveler] 已停用');
 
     wordCountDebouncer?.dispose();
     highlightDebouncer?.dispose();

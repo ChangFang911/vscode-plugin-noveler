@@ -1,0 +1,384 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Noveler 护眼模式",
+  "type": "dark",
+  "colors": {
+    // ==================== 编辑器 ====================
+    // 背景使用低饱和度暖灰绿，减少纯绿色的视觉疲劳
+    "editor.background": "#2d3830",
+    "editor.foreground": "#e8f0e4",
+    "editor.lineHighlightBackground": "#384538",
+    "editor.selectionBackground": "#4a6a5090",
+    "editor.selectionHighlightBackground": "#4a6a5050",
+    "editor.wordHighlightBackground": "#4a6a5060",
+    "editor.wordHighlightStrongBackground": "#5a7a6060",
+    "editor.findMatchBackground": "#7a9a6090",
+    "editor.findMatchHighlightBackground": "#5a7a6060",
+    "editor.hoverHighlightBackground": "#4a6a5050",
+    "editorCursor.foreground": "#b0e8b0",
+    "editorWhitespace.foreground": "#4a5a4a",
+    "editorIndentGuide.background1": "#3a4a3c",
+    "editorIndentGuide.activeBackground1": "#6a8a70",
+    "editorLineNumber.foreground": "#8aaa90",
+    "editorLineNumber.activeForeground": "#c8f0cc",
+    "editorRuler.foreground": "#4a5a4c",
+    "editorBracketMatch.background": "#5a7a6060",
+    "editorBracketMatch.border": "#8aaa90",
+    "editorGutter.background": "#2d3830",
+
+    // ==================== 编辑器小部件 ====================
+    "editorWidget.background": "#263028",
+    "editorWidget.foreground": "#e8f0e4",
+    "editorWidget.border": "#5a7a60",
+    "editorSuggestWidget.background": "#263028",
+    "editorSuggestWidget.foreground": "#e8f0e4",
+    "editorSuggestWidget.selectedBackground": "#3a5a40",
+    "editorSuggestWidget.highlightForeground": "#c8f8c8",
+    "editorHoverWidget.background": "#263028",
+    "editorHoverWidget.foreground": "#e8f0e4",
+    "editorHoverWidget.border": "#5a7a60",
+
+    // ==================== 编辑器组和标签 ====================
+    "editorGroup.border": "#4a5a4c",
+    "editorGroupHeader.tabsBackground": "#242e26",
+    "tab.activeBackground": "#2d3830",
+    "tab.activeForeground": "#f0f8ec",
+    "tab.inactiveBackground": "#242e26",
+    "tab.inactiveForeground": "#a8b8a8",
+    "tab.border": "#1e2820",
+    "tab.hoverBackground": "#384538",
+    "tab.activeModifiedBorder": "#90aa90",
+
+    // ==================== 活动栏 ====================
+    "activityBar.background": "#1e2820",
+    "activityBar.foreground": "#d0ecd0",
+    "activityBar.inactiveForeground": "#8aaa8c",
+    "activityBar.border": "#2a3a2c",
+    "activityBarBadge.background": "#5a9a60",
+    "activityBarBadge.foreground": "#ffffff",
+
+    // ==================== 侧边栏 ====================
+    "sideBar.background": "#263028",
+    "sideBar.foreground": "#d8ecd8",
+    "sideBar.border": "#2a3a2c",
+    "sideBarTitle.foreground": "#e8f8e8",
+    "sideBarSectionHeader.background": "#2a3a2c",
+    "sideBarSectionHeader.foreground": "#d8ecd8",
+
+    // ==================== 列表和树 ====================
+    "list.activeSelectionBackground": "#3a5a40",
+    "list.activeSelectionForeground": "#f8fff8",
+    "list.inactiveSelectionBackground": "#384538",
+    "list.inactiveSelectionForeground": "#e8f8e8",
+    "list.hoverBackground": "#324538",
+    "list.hoverForeground": "#f8fff8",
+    "list.focusBackground": "#3a5a40",
+    "list.focusForeground": "#f8fff8",
+    "list.highlightForeground": "#b8f8b8",
+    "tree.indentGuidesStroke": "#5a6a5c",
+
+    // ==================== 状态栏 ====================
+    "statusBar.background": "#1e2820",
+    "statusBar.foreground": "#c8e8c8",
+    "statusBar.border": "#2a3a2c",
+    "statusBar.noFolderBackground": "#1e2820",
+    "statusBarItem.hoverBackground": "#3a5a40",
+    "statusBarItem.activeBackground": "#4a6a50",
+
+    // ==================== 标题栏 ====================
+    "titleBar.activeBackground": "#1e2820",
+    "titleBar.activeForeground": "#d8f8d8",
+    "titleBar.inactiveBackground": "#1a241c",
+    "titleBar.inactiveForeground": "#9aaa9c",
+    "titleBar.border": "#2a3a2c",
+
+    // ==================== 面板 ====================
+    "panel.background": "#263028",
+    "panel.border": "#4a5a4c",
+    "panelTitle.activeBorder": "#90aa90",
+    "panelTitle.activeForeground": "#e8f8e8",
+    "panelTitle.inactiveForeground": "#9aaa9c",
+
+    // ==================== 终端 ====================
+    "terminal.background": "#1e2820",
+    "terminal.foreground": "#d8ecd8",
+    "terminal.ansiBlack": "#1e2820",
+    "terminal.ansiRed": "#e8a090",
+    "terminal.ansiGreen": "#90e898",
+    "terminal.ansiYellow": "#e8e090",
+    "terminal.ansiBlue": "#90a8e8",
+    "terminal.ansiMagenta": "#e898e8",
+    "terminal.ansiCyan": "#90e8e8",
+    "terminal.ansiWhite": "#e8f8e8",
+    "terminal.ansiBrightBlack": "#4a5a4c",
+    "terminal.ansiBrightRed": "#f8b0a0",
+    "terminal.ansiBrightGreen": "#a8f8b0",
+    "terminal.ansiBrightYellow": "#f8f0a0",
+    "terminal.ansiBrightBlue": "#a8b8f8",
+    "terminal.ansiBrightMagenta": "#f8a8f8",
+    "terminal.ansiBrightCyan": "#a8f8f8",
+    "terminal.ansiBrightWhite": "#f8fff8",
+
+    // ==================== 输入框 ====================
+    "input.background": "#1e2820",
+    "input.foreground": "#e8f8e8",
+    "input.border": "#5a7a60",
+    "input.placeholderForeground": "#8aaa90",
+    "inputOption.activeBackground": "#3a5a40",
+    "inputOption.activeBorder": "#90aa90",
+    "inputValidation.errorBackground": "#4a2c28",
+    "inputValidation.errorBorder": "#b06050",
+    "inputValidation.warningBackground": "#4a4828",
+    "inputValidation.warningBorder": "#b0a850",
+
+    // ==================== 下拉框 ====================
+    "dropdown.background": "#1e2820",
+    "dropdown.foreground": "#e8f8e8",
+    "dropdown.border": "#5a7a60",
+    "dropdown.listBackground": "#263028",
+
+    // ==================== 按钮 ====================
+    "button.background": "#508a58",
+    "button.foreground": "#ffffff",
+    "button.hoverBackground": "#60a068",
+    "button.secondaryBackground": "#3a5a40",
+    "button.secondaryForeground": "#e8f8e8",
+    "button.secondaryHoverBackground": "#4a6a50",
+
+    // ==================== 滚动条 ====================
+    "scrollbar.shadow": "#00000040",
+    "scrollbarSlider.background": "#5a7a6060",
+    "scrollbarSlider.hoverBackground": "#6a8a7080",
+    "scrollbarSlider.activeBackground": "#7a9a80a0",
+
+    // ==================== 面包屑 ====================
+    "breadcrumb.background": "#2d3830",
+    "breadcrumb.foreground": "#a8c8b0",
+    "breadcrumb.focusForeground": "#e8f8e8",
+    "breadcrumbPicker.background": "#263028",
+
+    // ==================== 通知 ====================
+    "notificationCenter.border": "#5a7a60",
+    "notificationCenterHeader.background": "#283830",
+    "notifications.background": "#283830",
+    "notifications.foreground": "#e8f8e8",
+    "notifications.border": "#5a7a60",
+
+    // ==================== 快速输入 ====================
+    "quickInput.background": "#263028",
+    "quickInput.foreground": "#e8f8e8",
+    "quickInputTitle.background": "#1e2820",
+    "pickerGroup.border": "#5a7a60",
+    "pickerGroup.foreground": "#8aaa90",
+
+    // ==================== 菜单 ====================
+    "menu.background": "#263028",
+    "menu.foreground": "#e8f8e8",
+    "menu.selectionBackground": "#3a5a40",
+    "menu.selectionForeground": "#f8fff8",
+    "menu.separatorBackground": "#5a7a60",
+    "menubar.selectionBackground": "#3a5a40",
+    "menubar.selectionForeground": "#f8fff8",
+
+    // ==================== 问题诊断（敏感词波浪线等） ====================
+    // 使用高对比度的暖色，在绿色背景上更醒目
+    "editorWarning.foreground": "#f0c860",
+    "editorWarning.background": "#f0c86020",
+    "editorWarning.border": "#f0c860",
+    "editorInfo.foreground": "#70c8f0",
+    "editorInfo.background": "#70c8f020",
+    "editorError.foreground": "#f07070",
+    "editorError.background": "#f0707020",
+    "problemsWarningIcon.foreground": "#f0c860",
+    "problemsInfoIcon.foreground": "#70c8f0",
+    "problemsErrorIcon.foreground": "#f07070",
+    "list.warningForeground": "#f0c860",
+    "list.errorForeground": "#f07070",
+
+    // ==================== Git 装饰 ====================
+    "gitDecoration.modifiedResourceForeground": "#b0e0b0",
+    "gitDecoration.deletedResourceForeground": "#f0a8a8",
+    "gitDecoration.untrackedResourceForeground": "#98e0a0",
+    "gitDecoration.ignoredResourceForeground": "#7a8a7c",
+    "gitDecoration.conflictingResourceForeground": "#f0c088",
+    "gitDecoration.stageModifiedResourceForeground": "#b0e0b0",
+
+    // ==================== 差异编辑器 ====================
+    "diffEditor.insertedTextBackground": "#40884028",
+    "diffEditor.removedTextBackground": "#88404028",
+    "diffEditor.insertedLineBackground": "#40884018",
+    "diffEditor.removedLineBackground": "#88404018",
+
+    // ==================== 迷你地图 ====================
+    "minimap.background": "#2d3830",
+    "minimap.selectionHighlight": "#5a8a6080",
+    "minimap.findMatchHighlight": "#7a9a6080",
+
+    // ==================== 其他 ====================
+    "focusBorder": "#70a070",
+    "foreground": "#e0f0e0",
+    "descriptionForeground": "#a8c8b0",
+    "errorForeground": "#f0a8a8",
+    "widget.shadow": "#00000050",
+    "selection.background": "#5a8a6080",
+    "icon.foreground": "#b8e0b8",
+    "textLink.foreground": "#88c8f0",
+    "textLink.activeForeground": "#a8d8f8",
+    "textBlockQuote.background": "#384538",
+    "textBlockQuote.border": "#5a7a60",
+    "textCodeBlock.background": "#384538",
+    "textPreformat.foreground": "#c8e0a8"
+  },
+  "tokenColors": [
+    // ==================== 注��� ====================
+    // 使用柔和的灰绿色，不抢眼但可读
+    {
+      "scope": ["comment", "punctuation.definition.comment"],
+      "settings": {
+        "foreground": "#80a888",
+        "fontStyle": "italic"
+      }
+    },
+    // ==================== 字符串（对话内容会使用此颜色） ====================
+    // 使用暖橙色，与绿色形成补色对比，突出对话
+    {
+      "scope": ["string", "string.quoted"],
+      "settings": {
+        "foreground": "#e8c090"
+      }
+    },
+    // ==================== 关键字 ====================
+    {
+      "scope": ["keyword", "storage.type", "storage.modifier"],
+      "settings": {
+        "foreground": "#a8d0f0"
+      }
+    },
+    // ==================== 函数 ====================
+    {
+      "scope": ["entity.name.function", "support.function"],
+      "settings": {
+        "foreground": "#f0e0a8"
+      }
+    },
+    // ==================== 变量 ====================
+    // 使用接近前景色的暖白色
+    {
+      "scope": ["variable", "variable.other"],
+      "settings": {
+        "foreground": "#e8f8e8"
+      }
+    },
+    // ==================== 常量和数字 ====================
+    {
+      "scope": ["constant", "constant.numeric"],
+      "settings": {
+        "foreground": "#d8b8f0"
+      }
+    },
+    // ==================== 类型 ====================
+    // 使用青绿色，与人物高亮色相近
+    {
+      "scope": ["entity.name.type", "entity.name.class", "support.type"],
+      "settings": {
+        "foreground": "#78d8b8"
+      }
+    },
+    // ==================== 属性 ====================
+    {
+      "scope": ["entity.other.attribute-name"],
+      "settings": {
+        "foreground": "#b8d8f0"
+      }
+    },
+    // ==================== 标签 ====================
+    {
+      "scope": ["entity.name.tag"],
+      "settings": {
+        "foreground": "#a8c8f0"
+      }
+    },
+    // ==================== 标点符号 ====================
+    {
+      "scope": ["punctuation"],
+      "settings": {
+        "foreground": "#b8d0b8"
+      }
+    },
+    // ==================== Markdown 标题 ====================
+    // 使用亮绿色，突出章节标题
+    {
+      "scope": ["markup.heading", "entity.name.section.markdown"],
+      "settings": {
+        "foreground": "#b8f0b8",
+        "fontStyle": "bold"
+      }
+    },
+    // ==================== Markdown 粗体 ====================
+    {
+      "scope": ["markup.bold"],
+      "settings": {
+        "foreground": "#f0e0b8",
+        "fontStyle": "bold"
+      }
+    },
+    // ==================== Markdown 斜体 ====================
+    {
+      "scope": ["markup.italic"],
+      "settings": {
+        "foreground": "#d8f0b8",
+        "fontStyle": "italic"
+      }
+    },
+    // ==================== Markdown 链接 ====================
+    {
+      "scope": ["markup.underline.link"],
+      "settings": {
+        "foreground": "#98d0f0"
+      }
+    },
+    // ==================== Markdown 代码 ====================
+    {
+      "scope": ["markup.inline.raw", "markup.fenced_code"],
+      "settings": {
+        "foreground": "#c8e0b8"
+      }
+    },
+    // ==================== Markdown 引用 ====================
+    {
+      "scope": ["markup.quote"],
+      "settings": {
+        "foreground": "#a8c0a8",
+        "fontStyle": "italic"
+      }
+    },
+    // ==================== Markdown 列表 ====================
+    {
+      "scope": ["markup.list"],
+      "settings": {
+        "foreground": "#e8f8e8"
+      }
+    },
+    // ==================== JSON 属性 ====================
+    {
+      "scope": ["support.type.property-name.json"],
+      "settings": {
+        "foreground": "#a8d8c8"
+      }
+    },
+    // ==================== YAML 键 ====================
+    {
+      "scope": ["entity.name.tag.yaml"],
+      "settings": {
+        "foreground": "#a8d8c8"
+      }
+    },
+    // ==================== Front Matter ====================
+    {
+      "scope": ["meta.embedded.block.frontmatter"],
+      "settings": {
+        "foreground": "#b0d0b0"
+      }
+    }
+  ]
+}

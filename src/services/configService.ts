@@ -78,6 +78,15 @@ export interface NovelConfig {
     sensitiveWords?: SensitiveWordConfig;
     /** 分卷功能配置 */
     volumes?: VolumesConfig;
+    /** 护眼模式配置 */
+    eyeCareMode?: {
+        /** 是否启用 */
+        enabled?: boolean;
+        /** 背景颜色 */
+        backgroundColor?: string;
+        /** 用户之前使用的主题（禁用时恢复） */
+        previousTheme?: string;
+    };
 }
 
 /**
@@ -381,6 +390,91 @@ export class ConfigService {
      */
     public isVolumesEnabled(): boolean {
         return this.config.volumes?.enabled === true;
+    }
+
+    /**
+     * 获取护眼模式配置
+     * @returns 护眼模式配置对象
+     */
+    public getEyeCareMode(): { enabled: boolean; backgroundColor: string } {
+        return {
+            enabled: this.config.eyeCareMode?.enabled ?? false,
+            backgroundColor: this.config.eyeCareMode?.backgroundColor ?? '#C7EDCC'  // 豆沙绿
+        };
+    }
+
+    /**
+     * 是否启用护眼模式
+     * @returns true 表示启用，false 表示禁用
+     */
+    public isEyeCareModeEnabled(): boolean {
+        return this.config.eyeCareMode?.enabled === true;
+    }
+
+    /** 护眼主题名称 */
+    private static readonly EYE_CARE_THEME_NAME = 'Noveler 护眼模式';
+
+    /**
+     * 切换护眼模式
+     * 通过切换 VSCode 主题实现
+     * - 启用时：保存当前主题到配置，设置护眼主题
+     * - 禁用时：恢复之前保存的主题
+     * @param forceState 强制设置状态，不传则切换
+     */
+    public async toggleEyeCareMode(forceState?: boolean): Promise<boolean> {
+        const currentEnabled = this.isEyeCareModeEnabled();
+        const newEnabled = forceState !== undefined ? forceState : !currentEnabled;
+
+        const workbenchConfig = vscode.workspace.getConfiguration('workbench');
+        const inspected = workbenchConfig.inspect<string>('colorTheme');
+        const currentWorkspaceTheme = inspected?.workspaceValue;
+
+        if (newEnabled) {
+            // 启用护眼模式：保存当前工作区主题，然后切换到护眼主题
+            if (currentWorkspaceTheme && currentWorkspaceTheme !== ConfigService.EYE_CARE_THEME_NAME) {
+                // 保存当前工作区主题到 novel.jsonc
+                await this.updateConfig((draft) => {
+                    if (!draft.noveler) {
+                        draft.noveler = {};
+                    }
+                    if (!draft.noveler.eyeCareMode) {
+                        draft.noveler.eyeCareMode = {};
+                    }
+                    draft.noveler.eyeCareMode.previousTheme = currentWorkspaceTheme;
+                });
+            }
+
+            // 设置护眼主题
+            await workbenchConfig.update('colorTheme', ConfigService.EYE_CARE_THEME_NAME, vscode.ConfigurationTarget.Workspace);
+        } else {
+            // 禁用护眼模式：恢复之前的主题
+            const previousTheme = this.config.eyeCareMode?.previousTheme;
+
+            if (previousTheme) {
+                // 恢复之前保存的主题
+                await workbenchConfig.update('colorTheme', previousTheme, vscode.ConfigurationTarget.Workspace);
+            } else {
+                // 没有保存的主题，清除工作区设置
+                await workbenchConfig.update('colorTheme', undefined, vscode.ConfigurationTarget.Workspace);
+            }
+
+            // 清除 colorCustomizations（如果之前有残留）
+            await workbenchConfig.update('colorCustomizations', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+
+        // 更新 novel.jsonc 配置中的 enabled 状态
+        await this.updateConfig((draft) => {
+            if (!draft.noveler) {
+                draft.noveler = {};
+            }
+            if (!draft.noveler.eyeCareMode) {
+                draft.noveler.eyeCareMode = {};
+            }
+            draft.noveler.eyeCareMode.enabled = newEnabled;
+        });
+
+        Logger.info(`[Noveler] 护眼模式已${newEnabled ? '启用' : '禁用'}`);
+        return newEnabled;
     }
 
     /**

@@ -362,6 +362,36 @@ function registerUtilityCommands(deps: CommandRegistrarDeps): void {
             await quickSettings();
         })
     );
+
+    // 切换护眼模式
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.toggleEyeCareMode', async () => {
+            try {
+                const configService = ConfigService.getInstance();
+                const newEnabled = await configService.toggleEyeCareMode();
+                vscode.window.showInformationMessage(
+                    `护眼模式已${newEnabled ? '启用' : '禁用'}（仅当前项目生效）`
+                );
+            } catch (error) {
+                handleError('切换护眼模式失败', error);
+            }
+        })
+    );
+
+    // 刷新护眼模式（重新应用颜色配置）
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.refreshEyeCareMode', async () => {
+            try {
+                const configService = ConfigService.getInstance();
+                if (configService.isEyeCareModeEnabled()) {
+                    await configService.toggleEyeCareMode(true);  // 强制重新应用
+                    vscode.window.showInformationMessage('护眼模式已刷新');
+                }
+            } catch (error) {
+                handleError('刷新护眼模式失败', error);
+            }
+        })
+    );
 }
 
 /**

@@ -40,15 +40,19 @@ export async function quickSettings(): Promise<void> {
             },
             {
                 id: 'autoEmptyLine',
-                label: '$(whitespace) 自动空行',
-                description: configService.shouldAutoEmptyLine() ? '已启用' : '已禁用',
+                label: configService.shouldAutoEmptyLine()
+                    ? '$(x) 禁用自动空行'
+                    : '$(check) 启用自动空行',
+                description: configService.shouldAutoEmptyLine() ? '当前已启用' : '当前已禁用',
                 detail: '在段落之间自动添加空行',
                 getValue: () => configService.shouldAutoEmptyLine() ? '已启用' : '已禁用'
             },
             {
                 id: 'paragraphIndent',
-                label: '$(indent) 段落缩进',
-                description: configService.shouldParagraphIndent() ? '已启用' : '已禁用',
+                label: configService.shouldParagraphIndent()
+                    ? '$(x) 禁用段落缩进'
+                    : '$(check) 启用段落缩进',
+                description: configService.shouldParagraphIndent() ? '当前已启用' : '当前已禁用',
                 detail: '段落首行自动添加两个全角空格',
                 getValue: () => configService.shouldParagraphIndent() ? '已启用' : '已禁用'
             },
@@ -65,6 +69,15 @@ export async function quickSettings(): Promise<void> {
                 description: `当前: ${configService.getHighlightStyle('character').color || '默认'}`,
                 detail: '人物名称的高亮颜色',
                 getValue: () => configService.getHighlightStyle('character').color || '#4ec9b0'
+            },
+            {
+                id: 'eyeCareMode',
+                label: configService.isEyeCareModeEnabled()
+                    ? '$(eye-closed) 禁用护眼模式'
+                    : '$(eye) 启用护眼模式',
+                description: configService.isEyeCareModeEnabled() ? '当前已启用' : '当前已禁用',
+                detail: '使用豆沙绿背景保护眼睛（仅当前项目）',
+                getValue: () => configService.isEyeCareModeEnabled() ? '已启用' : '已禁用'
             }
         ];
 
@@ -88,16 +101,19 @@ export async function quickSettings(): Promise<void> {
                 await configureQuoteStyle();
                 break;
             case 'autoEmptyLine':
-                await configureAutoEmptyLine();
+                await toggleAutoEmptyLineDirect();
                 break;
             case 'paragraphIndent':
-                await configureParagraphIndent();
+                await toggleParagraphIndentDirect();
                 break;
             case 'dialogueColor':
                 await configureColor('dialogue', '对话高亮颜色');
                 break;
             case 'characterColor':
                 await configureColor('character', '人物高亮颜色');
+                break;
+            case 'eyeCareMode':
+                await toggleEyeCareModeDirect();
                 break;
         }
 
@@ -177,64 +193,42 @@ async function configureQuoteStyle(): Promise<void> {
 }
 
 /**
- * 配置自动空行
+ * 直接切换自动空行
  */
-async function configureAutoEmptyLine(): Promise<void> {
+async function toggleAutoEmptyLineDirect(): Promise<void> {
     const configService = ConfigService.getInstance();
-
-    const options = [
-        { label: '$(check) 启用', description: '在段落之间自动添加空行', value: true },
-        { label: '$(x) 禁用', description: '不自动添加空行', value: false }
-    ];
-
-    const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: '是否启用自动空行'
-    });
-
-    if (!selected) {
-        return;
-    }
+    const currentEnabled = configService.shouldAutoEmptyLine();
+    const newEnabled = !currentEnabled;
 
     await configService.updateConfig((draft) => {
         if (!draft.noveler) {
             draft.noveler = {};
         }
-        draft.noveler.autoEmptyLine = { value: selected.value };
+        draft.noveler.autoEmptyLine = { value: newEnabled };
     });
 
     vscode.window.showInformationMessage(
-        `已${selected.value ? '启用' : '禁用'}自动空行`
+        `已${newEnabled ? '启用' : '禁用'}自动空行`
     );
 }
 
 /**
- * 配置段落缩进
+ * 直接切换段落缩进
  */
-async function configureParagraphIndent(): Promise<void> {
+async function toggleParagraphIndentDirect(): Promise<void> {
     const configService = ConfigService.getInstance();
-
-    const options = [
-        { label: '$(check) 启用', description: '段落首行自动添加两个全角空格', value: true },
-        { label: '$(x) 禁用', description: '不添加段落缩进', value: false }
-    ];
-
-    const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: '是否启用段落缩进'
-    });
-
-    if (!selected) {
-        return;
-    }
+    const currentEnabled = configService.shouldParagraphIndent();
+    const newEnabled = !currentEnabled;
 
     await configService.updateConfig((draft) => {
         if (!draft.noveler) {
             draft.noveler = {};
         }
-        draft.noveler.paragraphIndent = { value: selected.value };
+        draft.noveler.paragraphIndent = { value: newEnabled };
     });
 
     vscode.window.showInformationMessage(
-        `已${selected.value ? '启用' : '禁用'}段落缩进`
+        `已${newEnabled ? '启用' : '禁用'}段落缩进`
     );
 }
 
@@ -300,4 +294,19 @@ async function configureColor(type: 'dialogue' | 'character', label: string): Pr
     });
 
     vscode.window.showInformationMessage(`已设置${label}为 ${color}`);
+}
+
+/**
+ * 直接切换护眼模式
+ */
+async function toggleEyeCareModeDirect(): Promise<void> {
+    const configService = ConfigService.getInstance();
+    const currentEnabled = configService.isEyeCareModeEnabled();
+
+    // 直接切换状态
+    const newEnabled = await configService.toggleEyeCareMode(!currentEnabled);
+
+    vscode.window.showInformationMessage(
+        `已${newEnabled ? '启用' : '禁用'}护眼模式（仅当前项目生效）`
+    );
 }
