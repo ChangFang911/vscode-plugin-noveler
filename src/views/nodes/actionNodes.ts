@@ -38,6 +38,18 @@ export class ActionNodesProvider {
                 '隐藏其他面板，专心写作'
             ),
             new NovelerTreeItem(
+                '👁 切换护眼模式',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.toggleEyeCareMode',
+                    title: '切换护眼模式',
+                },
+                'otherActionItem',
+                undefined,
+                '使用护眼主题保护视力（仅当前项目）'
+            ),
+            new NovelerTreeItem(
                 '统计仪表板',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
