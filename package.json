@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -178,6 +178,11 @@
         "command": "noveler.toggleEyeCareMode",
         "title": "Noveler: 切换护眼模式",
         "icon": "$(eye)"
+      },
+      {
+        "command": "noveler.showPreview",
+        "title": "Noveler: 手机阅读预览",
+        "icon": "$(device-mobile)"
       }
     ],
     "menus": {
@@ -188,19 +193,24 @@
           "group": "noveler@1"
         },
         {
-          "command": "noveler.toggleFocusMode",
+          "command": "noveler.showPreview",
           "when": "editorLangId == markdown",
           "group": "noveler@2"
         },
         {
+          "command": "noveler.toggleFocusMode",
+          "when": "editorLangId == markdown",
+          "group": "noveler@3"
+        },
+        {
           "command": "noveler.addToCustomWords",
           "when": "editorLangId == markdown && editorHasSelection",
-          "group": "noveler@3"
+          "group": "noveler@4"
         },
         {
           "command": "noveler.addSelectedToWhitelist",
           "when": "editorLangId == markdown && editorHasSelection",
-          "group": "noveler@4"
+          "group": "noveler@5"
         }
       ],
       "view/item/context": [

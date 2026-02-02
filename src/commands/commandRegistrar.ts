@@ -13,6 +13,7 @@ import { SensitiveWordDiagnosticProvider } from '../providers/sensitiveWordDiagn
 import { NovelerViewProvider } from '../views/novelerViewProvider';
 import { StatsWebviewProvider } from '../views/statsWebviewProvider';
 import { WelcomeWebviewProvider } from '../views/welcomeWebviewProvider';
+import { PreviewWebviewProvider } from '../views/previewWebviewProvider';
 import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { initProject } from './initProject';
 import { createChapter } from './createChapter';
@@ -60,6 +61,7 @@ export interface CommandRegistrarDeps {
     novelerViewProvider: NovelerViewProvider;
     statsWebviewProvider: StatsWebviewProvider;
     welcomeWebviewProvider: WelcomeWebviewProvider;
+    previewWebviewProvider: PreviewWebviewProvider;
     highlightProvider: NovelHighlightProvider;
     updateHighlights: (editor: vscode.TextEditor | undefined) => void;
 }
@@ -81,7 +83,7 @@ export function registerAllCommands(deps: CommandRegistrarDeps): void {
  * 注册核心命令
  */
 function registerCoreCommands(deps: CommandRegistrarDeps): void {
-    const { context, novelerViewProvider, statsWebviewProvider, welcomeWebviewProvider, focusModeService } = deps;
+    const { context, novelerViewProvider, statsWebviewProvider, welcomeWebviewProvider, previewWebviewProvider, focusModeService } = deps;
 
     // 刷新命令
     context.subscriptions.push(
@@ -102,6 +104,13 @@ function registerCoreCommands(deps: CommandRegistrarDeps): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.showWelcome', async () => {
             await welcomeWebviewProvider.show(false);
+        })
+    );
+
+    // 显示手机预览
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.showPreview', async () => {
+            await previewWebviewProvider.show();
         })
     );
 

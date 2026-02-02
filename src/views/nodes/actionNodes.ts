@@ -50,6 +50,18 @@ export class ActionNodesProvider {
                 '使用护眼主题保护视力（仅当前项目）'
             ),
             new NovelerTreeItem(
+                '📱 手机预览',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                {
+                    command: 'noveler.showPreview',
+                    title: '手机阅读预览',
+                },
+                'otherActionItem',
+                undefined,
+                '模拟手机屏幕预览阅读效果'
+            ),
+            new NovelerTreeItem(
                 '统计仪表板',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,

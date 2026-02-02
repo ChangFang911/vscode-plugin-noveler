@@ -14,6 +14,7 @@ import { SensitiveWordCodeActionProvider } from './providers/sensitiveWordCodeAc
 import { NovelerViewProvider } from './views/novelerViewProvider';
 import { StatsWebviewProvider } from './views/statsWebviewProvider';
 import { WelcomeWebviewProvider } from './views/welcomeWebviewProvider';
+import { PreviewWebviewProvider } from './views/previewWebviewProvider';
 import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
@@ -82,6 +83,9 @@ export async function activate(context: vscode.ExtensionContext) {
         // 初始化欢迎页面 Webview
         const welcomeWebviewProvider = new WelcomeWebviewProvider(context);
 
+        // 初始化手机预览 Webview
+        const previewWebviewProvider = new PreviewWebviewProvider(context);
+
         // 创建状态栏项
         wordCountStatusBarItem = vscode.window.createStatusBarItem(
             vscode.StatusBarAlignment.Left,
@@ -109,6 +113,7 @@ export async function activate(context: vscode.ExtensionContext) {
             novelerViewProvider,
             statsWebviewProvider,
             welcomeWebviewProvider,
+            previewWebviewProvider,
             highlightProvider,
             updateHighlights
         });
