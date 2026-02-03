@@ -17,9 +17,13 @@ export class VolumeService {
     private static instance?: VolumeService;
     private volumes: VolumeInfo[] = [];
     private configService: ConfigService;
+    private cacheTimestamp = 0;
+    private fileWatcher?: vscode.FileSystemWatcher;
+    private static readonly CACHE_TTL = 30 * 1000; // 缓存有效期：30 秒
 
     private constructor() {
         this.configService = ConfigService.getInstance();
+        this.setupFileWatcher();
     }
 
     /**
@@ -33,10 +37,40 @@ export class VolumeService {
     }
 
     /**
+     * 设置文件监听器，当 chapters 目录变化时失效缓存
+     */
+    private setupFileWatcher(): void {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const pattern = new vscode.RelativePattern(workspaceFolder, 'chapters/**');
+        this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        const invalidateCache = () => {
+            this.cacheTimestamp = 0; // 失效缓存
+            Logger.debug('VolumeService: 缓存已失效');
+        };
+
+        this.fileWatcher.onDidCreate(invalidateCache);
+        this.fileWatcher.onDidDelete(invalidateCache);
+        this.fileWatcher.onDidChange(invalidateCache);
+    }
+
+    /**
      * 扫描并识别所有卷
      * 根据配置的文件夹结构类型进行扫描
+     * 使用缓存机制避免频繁扫描
      */
-    public async scanVolumes(): Promise<VolumeInfo[]> {
+    public async scanVolumes(forceRefresh = false): Promise<VolumeInfo[]> {
+        const now = Date.now();
+
+        // 如果缓存有效且不强制刷新，直接返回缓存
+        if (!forceRefresh && this.volumes.length > 0 && (now - this.cacheTimestamp) < VolumeService.CACHE_TTL) {
+            return this.volumes;
+        }
+
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             return [];
@@ -71,6 +105,9 @@ export class VolumeService {
 
         // 对卷进行排序
         this.sortVolumes();
+
+        // 更新缓存时间戳
+        this.cacheTimestamp = Date.now();
 
         Logger.debug(`扫描到 ${this.volumes.length} 个卷`);
         return this.volumes;
@@ -610,5 +647,19 @@ export class VolumeService {
         }
 
         return 1;
+    }
+
+    /**
+     * 失效缓存，强制下次扫描重新读取
+     */
+    public invalidateCache(): void {
+        this.cacheTimestamp = 0;
+    }
+
+    /**
+     * 释放资源
+     */
+    public dispose(): void {
+        this.fileWatcher?.dispose();
     }
 }

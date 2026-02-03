@@ -109,6 +109,7 @@ export class ConfigService {
     private config: NovelConfig = {};
     private fileWatcher?: vscode.FileSystemWatcher;
     private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
+    private isLoading = false; // 加载锁，防止并发加载
 
     // 配置变更事件发射器
     private _onDidChangeConfig = new vscode.EventEmitter<NovelConfig>();
@@ -158,60 +159,72 @@ export class ConfigService {
     }
 
     private async loadConfig() {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
+        // 防止并发加载
+        if (this.isLoading) {
+            Logger.debug('ConfigService: 配置正在加载中，跳过重复加载');
             return;
         }
 
-        const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
+        this.isLoading = true;
 
         try {
-            const fileData = await vscode.workspace.fs.readFile(configUri);
-            const configText = Buffer.from(fileData).toString('utf8');
-
-            let fullConfig;
-            try {
-                // 使用 jsonc-parser 解析 JSONC（支持注释）
-                fullConfig = jsoncParser.parse(configText);
-            } catch (parseError) {
-                handleError('novel.jsonc 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
                 return;
             }
 
-            // 提取 noveler 配置部分
-            if (fullConfig.noveler) {
-                // 验证配置
-                const errors = validateConfig(fullConfig.noveler);
-                if (errors.length > 0) {
-                    const errorMessages = errors.filter(e => e.severity === 'error');
-                    const warningMessages = errors.filter(e => e.severity === 'warning');
+            const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
 
-                    if (errorMessages.length > 0) {
-                        const msg = errorMessages.map(e => `${e.field}: ${e.message}`).join('\n');
-                        handleError(`配置验证失败:\n${msg}`, new Error('Configuration validation failed'), ErrorSeverity.Error);
-                        // 尝试修复配置
-                        this.config = fixConfig(fullConfig.noveler);
+            try {
+                const fileData = await vscode.workspace.fs.readFile(configUri);
+                const configText = Buffer.from(fileData).toString('utf8');
+
+                let fullConfig;
+                try {
+                    // 使用 jsonc-parser 解析 JSONC（支持注释）
+                    fullConfig = jsoncParser.parse(configText);
+                } catch (parseError) {
+                    handleError('novel.jsonc 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
+                    return;
+                }
+
+                // 提取 noveler 配置部分
+                if (fullConfig.noveler) {
+                    // 验证配置
+                    const errors = validateConfig(fullConfig.noveler);
+                    if (errors.length > 0) {
+                        const errorMessages = errors.filter(e => e.severity === 'error');
+                        const warningMessages = errors.filter(e => e.severity === 'warning');
+
+                        if (errorMessages.length > 0) {
+                            const msg = errorMessages.map(e => `${e.field}: ${e.message}`).join('\n');
+                            handleError(`配置验证失败:\n${msg}`, new Error('Configuration validation failed'), ErrorSeverity.Error);
+                            // 尝试修复配置
+                            this.config = fixConfig(fullConfig.noveler);
+                        } else {
+                            this.config = fullConfig.noveler;
+                        }
+
+                        // 显示警告
+                        if (warningMessages.length > 0) {
+                            const msg = warningMessages.map(e => `${e.field}: ${e.message}`).join('\n');
+                            vscode.window.showWarningMessage(`配置警告:\n${msg}`);
+                        }
                     } else {
                         this.config = fullConfig.noveler;
                     }
 
-                    // 显示警告
-                    if (warningMessages.length > 0) {
-                        const msg = warningMessages.map(e => `${e.field}: ${e.message}`).join('\n');
-                        vscode.window.showWarningMessage(`配置警告:\n${msg}`);
-                    }
-                } else {
-                    this.config = fullConfig.noveler;
+                    // 触发配置变更事件
+                    this._onDidChangeConfig.fire(this.config);
+                    // 配置加载完成，触发重新加载高亮
+                    vscode.commands.executeCommand('noveler.reloadHighlights');
                 }
-
-                // 触发配置变更事件
-                this._onDidChangeConfig.fire(this.config);
-                // 配置加载完成，触发重新加载高亮
-                vscode.commands.executeCommand('noveler.reloadHighlights');
+            } catch (error) {
+                // 配置文件不存在，使用默认配置（不是错误）
+                Logger.debug('novel.jsonc 不存在，使用默认配置');
             }
-        } catch (error) {
-            // 配置文件不存在，使用默认配置（不是错误）
-            Logger.debug('novel.jsonc 不存在，使用默认配置');
+        } finally {
+            this.isLoading = false;
         }
     }
 

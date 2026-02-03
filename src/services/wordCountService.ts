@@ -45,7 +45,11 @@ export interface WordCountStats {
  */
 export class WordCountService {
     // 缓存：存储文档 URI 到统计结果的映射
-    private cache = new Map<string, { stats: WordCountStats; version: number }>();
+    private cache = new Map<string, { stats: WordCountStats; version: number; timestamp: number }>();
+
+    // 缓存配置
+    private static readonly MAX_CACHE_SIZE = 100; // 最大缓存条目数
+    private static readonly CACHE_TTL = 5 * 60 * 1000; // 缓存过期时间：5 分钟
 
     // 预编译的正则表达式（静态成员，所有实例共享）
     private static readonly HEADER_REGEX = /^#+\s+/;
@@ -185,9 +189,10 @@ export class WordCountService {
     getWordCount(document: vscode.TextDocument): WordCountStats {
         const uri = document.uri.toString();
         const cached = this.cache.get(uri);
+        const now = Date.now();
 
-        // 如果文档版本未变化，返回缓存
-        if (cached && cached.version === document.version) {
+        // 如果文档版本未变化且缓存未过期，返回缓存
+        if (cached && cached.version === document.version && (now - cached.timestamp) < WordCountService.CACHE_TTL) {
             return cached.stats;
         }
 
@@ -196,10 +201,39 @@ export class WordCountService {
         // 文档统计：排除标题，仅统计正文
         const stats = this.calculateStats(text, document.lineCount, true);
 
+        // 清理过期缓存
+        this.cleanupCache();
+
         // 更新缓存
-        this.cache.set(uri, { stats, version: document.version });
+        this.cache.set(uri, { stats, version: document.version, timestamp: now });
 
         return stats;
+    }
+
+    /**
+     * 清理过期和超量的缓存
+     */
+    private cleanupCache(): void {
+        const now = Date.now();
+
+        // 删除过期条目
+        for (const [uri, entry] of this.cache.entries()) {
+            if (now - entry.timestamp > WordCountService.CACHE_TTL) {
+                this.cache.delete(uri);
+            }
+        }
+
+        // 如果仍然超过最大数量，删除最旧的条目
+        if (this.cache.size >= WordCountService.MAX_CACHE_SIZE) {
+            const entries = Array.from(this.cache.entries())
+                .sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+            // 删除最旧的 20% 条目
+            const deleteCount = Math.ceil(WordCountService.MAX_CACHE_SIZE * 0.2);
+            for (let i = 0; i < deleteCount && i < entries.length; i++) {
+                this.cache.delete(entries[i][0]);
+            }
+        }
     }
 
     /**
