@@ -401,7 +401,7 @@ export class PreviewWebviewProvider {
             background: var(--vscode-editor-background);
             padding: 20px;
             font-family: ${fontFamilyMap[fontFamily]};
-            overflow: hidden;
+            overflow: auto;
         }
 
         /* 隐藏外层滚动条 */
@@ -420,6 +420,23 @@ export class PreviewWebviewProvider {
             flex-direction: column;
             align-items: center;
             gap: 16px;
+            /* 自适应缩放：在小屏幕上缩小 */
+            transform-origin: top center;
+            transform: scale(min(1, calc((100vh - 40px) / 900px)));
+        }
+
+        /* 小屏幕适配 */
+        @media (max-height: 800px) {
+            .phone-container {
+                transform: scale(0.75);
+            }
+        }
+
+        @media (max-height: 700px) {
+            .phone-container {
+                transform: scale(0.65);
+            }
+        }
         }
 
         /* 手机外壳 */

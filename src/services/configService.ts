@@ -432,9 +432,11 @@ export class ConfigService {
         const currentWorkspaceTheme = inspected?.workspaceValue;
 
         if (newEnabled) {
-            // 启用护眼模式：保存当前工作区主题，然后切换到护眼主题
-            if (currentWorkspaceTheme && currentWorkspaceTheme !== ConfigService.EYE_CARE_THEME_NAME) {
-                // 保存当前工作区主题到 novel.jsonc
+            // 启用护眼模式：保存当前主题，然后切换到护眼主题
+            // 获取当前实际使用的主题（工作区设置 > 全局设置）
+            const currentTheme = currentWorkspaceTheme || inspected?.globalValue || 'Default Dark+';
+            if (currentTheme !== ConfigService.EYE_CARE_THEME_NAME) {
+                // 保存当前主题到 novel.jsonc
                 await this.updateConfig((draft) => {
                     if (!draft.noveler) {
                         draft.noveler = {};
@@ -442,7 +444,7 @@ export class ConfigService {
                     if (!draft.noveler.eyeCareMode) {
                         draft.noveler.eyeCareMode = {};
                     }
-                    draft.noveler.eyeCareMode.previousTheme = currentWorkspaceTheme;
+                    draft.noveler.eyeCareMode.previousTheme = currentTheme;
                 });
             }
 
