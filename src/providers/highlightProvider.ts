@@ -8,6 +8,7 @@ import {
 } from '../constants';
 import { Logger } from '../utils/logger';
 import { getFrontmatterEndOffsetForMatching } from '../utils/frontMatterHelper';
+import { SimpleTrieTree } from '../utils/simpleTrieTree';
 
 /**
  * 小说高亮提供器
@@ -32,8 +33,8 @@ export class NovelHighlightProvider {
     private characterNamesCache: string[] = [];
     private lastCacheUpdate = 0;
 
-    // 正则缓存
-    private cachedCharacterRegex: RegExp | null = null;
+    // Trie 树缓存（替代正则）
+    private cachedCharacterTrie: SimpleTrieTree | null = null;
     private cachedCharacterNamesCacheKey = '';
 
     // 文件系统监视器，用于自动更新人物缓存
@@ -182,8 +183,8 @@ export class NovelHighlightProvider {
         return this.characterNamesCache;
     }
 
-    // 获取或创建人物名称正则（带缓存）
-    private getCharacterRegex(characterNames: string[]): RegExp | null {
+    // 获取或创建人物名称 Trie 树（带缓存）
+    private getCharacterTrie(characterNames: string[]): SimpleTrieTree | null {
         if (characterNames.length === 0) {
             return null;
         }
@@ -198,25 +199,18 @@ export class NovelHighlightProvider {
         const cacheKey = [...validNames].sort().join('|');
 
         // 如果缓存命中，直接返回
-        if (this.cachedCharacterRegex && this.cachedCharacterNamesCacheKey === cacheKey) {
-            // 重置 lastIndex 以确保从头开始匹配
-            this.cachedCharacterRegex.lastIndex = 0;
-            return this.cachedCharacterRegex;
+        if (this.cachedCharacterTrie && this.cachedCharacterNamesCacheKey === cacheKey) {
+            return this.cachedCharacterTrie;
         }
 
-        // 按名称长度从长到短排序，避免短名称匹配到长名称的一部分
-        // 例如：先匹配"豆豆王子"，再匹配"豆豆"
-        const sortedNames = [...validNames].sort((a, b) => b.length - a.length);
-
-        // 构建新的正则并缓存
-        const escapedNames = sortedNames.map(name =>
-            name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        );
-        const namesPattern = escapedNames.join('|');
-        this.cachedCharacterRegex = new RegExp(namesPattern, 'g');
+        // 构建新的 Trie 树并缓存
+        this.cachedCharacterTrie = new SimpleTrieTree();
+        this.cachedCharacterTrie.insertBatch(validNames);
         this.cachedCharacterNamesCacheKey = cacheKey;
 
-        return this.cachedCharacterRegex;
+        Logger.debug(`人物名 Trie 树已构建，共 ${validNames.length} 个名称`);
+
+        return this.cachedCharacterTrie;
     }
 
     /**
@@ -275,20 +269,21 @@ export class NovelHighlightProvider {
                 htmlCommentRanges.push(new vscode.Range(startPos, endPos));
             }
 
-            // 从 characters/ 目录加载的人物名高亮（排除对话、注释和 frontmatter 范围）
-            const characterNameRegex = this.getCharacterRegex(characterNames);
-            if (characterNameRegex) {
-                while ((match = characterNameRegex.exec(text)) !== null) {
+            // 使用 Trie 树匹配人物名（排除对话、注释和 frontmatter 范围）
+            const characterTrie = this.getCharacterTrie(characterNames);
+            if (characterTrie) {
+                const matches = characterTrie.search(text);
+                for (const match of matches) {
                     // 跳过 frontmatter 区域的匹配
-                    if (match.index < frontmatterEndOffset) {
+                    if (match.start < frontmatterEndOffset) {
                         continue;
                     }
 
-                    const startPos = editor.document.positionAt(match.index);
-                    const endPos = editor.document.positionAt(match.index + match[0].length);
+                    const startPos = editor.document.positionAt(match.start);
+                    const endPos = editor.document.positionAt(match.end);
                     const range = new vscode.Range(startPos, endPos);
 
-                    // 优化：使用独立方法检查范围
+                    // 排除对话和注释范围
                     if (!this.isRangeInExcludedAreas(range, dialogueRanges, htmlCommentRanges)) {
                         characterRanges.push(range);
                     }
