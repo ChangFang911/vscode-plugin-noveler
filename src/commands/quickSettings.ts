@@ -78,6 +78,13 @@ export async function quickSettings(): Promise<void> {
                 description: configService.isEyeCareModeEnabled() ? '当前已启用' : '当前已禁用',
                 detail: '使用豆沙绿背景保护眼睛（仅当前项目）',
                 getValue: () => configService.isEyeCareModeEnabled() ? '已启用' : '已禁用'
+            },
+            {
+                id: 'focusMode',
+                label: '$(symbol-keyword) 专注模式',
+                description: '打字机模式 + 打字音效',
+                detail: '提供沉浸式写作体验',
+                getValue: () => ''
             }
         ];
 
@@ -114,6 +121,9 @@ export async function quickSettings(): Promise<void> {
                 break;
             case 'eyeCareMode':
                 await toggleEyeCareModeDirect();
+                break;
+            case 'focusMode':
+                await vscode.commands.executeCommand('noveler.focusModeSettings');
                 break;
         }
 

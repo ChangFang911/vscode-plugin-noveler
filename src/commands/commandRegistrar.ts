@@ -121,10 +121,17 @@ function registerCoreCommands(deps: CommandRegistrarDeps): void {
         })
     );
 
-    // 切换专注模式
+    // 切换专注模式（改为显示设置菜单）
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.toggleFocusMode', async () => {
-            await focusModeService.toggle();
+            await focusModeService.showSettingsMenu();
+        })
+    );
+
+    // 专注模式设置（独立入口）
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.focusModeSettings', async () => {
+            await focusModeService.showSettingsMenu();
         })
     );
 

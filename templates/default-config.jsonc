@@ -139,6 +139,20 @@
       "enabled": false
     },
 
+    // ==================== 专注模式 ====================
+    // 提供沉浸式写作体验
+    "focusMode": {
+      // 打字音效：none | mechanical | typewriter | bubble | pop | click | click2 | click3 | custom
+      // 默认关闭，可在「专注模式设置」中开启并试听
+      "typingSound": "none",
+      // 音效音量：0-100
+      "typingSoundVolume": 50
+      // 自定义音效文件路径列表（通过菜单添加）
+      // "customSoundPaths": []
+      // 当前选中的自定义音效
+      // "activeCustomSound": ""
+    },
+
     // ==================== 全局人物列表 ====================
     // 已弃用：推荐使用 characters/ 目录管理人物
     // 此配置项将在未来版本移除

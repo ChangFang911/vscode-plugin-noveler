@@ -183,6 +183,11 @@
         "command": "noveler.showPreview",
         "title": "Noveler: 手机阅读预览",
         "icon": "$(device-mobile)"
+      },
+      {
+        "command": "noveler.focusModeSettings",
+        "title": "Noveler: 专注模式设置",
+        "icon": "$(eye)"
       }
     ],
     "menus": {

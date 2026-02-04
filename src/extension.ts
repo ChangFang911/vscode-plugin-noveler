@@ -67,6 +67,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // 初始化专注模式服务
         focusModeService = new FocusModeService();
+        focusModeService.setExtensionContext(context);
         context.subscriptions.push(focusModeService);
 
         // 【关键】优先注册侧边栏视图，确保 UI 可用

@@ -6,6 +6,7 @@ import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
 import { SensitiveWordConfig } from '../types/sensitiveWord';
 import { VolumesConfig } from '../types/volume';
+import type { FocusModeConfig, TypingSoundType, TypewriterPosition } from './focusModeService';
 
 /**
  * 高亮样式配置接口
@@ -86,6 +87,21 @@ export interface NovelConfig {
         backgroundColor?: string;
         /** 用户之前使用的主题（禁用时恢复） */
         previousTheme?: string;
+    };
+    /** 专注模式配置 */
+    focusMode?: {
+        /** 打字机模式开关 */
+        typewriter?: boolean;
+        /** 打字机位置 */
+        typewriterPosition?: TypewriterPosition;
+        /** 打字音效类型 */
+        typingSound?: TypingSoundType;
+        /** 音效音量 */
+        typingSoundVolume?: number;
+        /** 自定义音效文件路径列表 */
+        customSoundPaths?: string[];
+        /** 当前选中的自定义音效路径 */
+        activeCustomSound?: string;
     };
 }
 
@@ -492,6 +508,55 @@ export class ConfigService {
 
         Logger.info(`[Noveler] 护眼模式已${newEnabled ? '启用' : '禁用'}`);
         return newEnabled;
+    }
+
+    /**
+     * 获取专注模式配置
+     * @returns 专注模式配置对象
+     */
+    public getFocusModeConfig(): FocusModeConfig {
+        return {
+            typewriter: this.config.focusMode?.typewriter ?? false,
+            typewriterPosition: this.config.focusMode?.typewriterPosition ?? 'center',
+            typingSound: this.config.focusMode?.typingSound ?? 'none',
+            typingSoundVolume: this.config.focusMode?.typingSoundVolume ?? 50,
+            customSoundPaths: this.config.focusMode?.customSoundPaths ?? [],
+            activeCustomSound: this.config.focusMode?.activeCustomSound
+        };
+    }
+
+    /**
+     * 更新专注模式配置
+     * @param updates 要更新的配置项
+     */
+    public async updateFocusModeConfig(updates: Partial<FocusModeConfig>): Promise<void> {
+        await this.updateConfig((draft) => {
+            if (!draft.noveler) {
+                draft.noveler = {};
+            }
+            if (!draft.noveler.focusMode) {
+                draft.noveler.focusMode = {};
+            }
+
+            if (updates.typewriter !== undefined) {
+                draft.noveler.focusMode.typewriter = updates.typewriter;
+            }
+            if (updates.typewriterPosition !== undefined) {
+                draft.noveler.focusMode.typewriterPosition = updates.typewriterPosition;
+            }
+            if (updates.typingSound !== undefined) {
+                draft.noveler.focusMode.typingSound = updates.typingSound;
+            }
+            if (updates.typingSoundVolume !== undefined) {
+                draft.noveler.focusMode.typingSoundVolume = updates.typingSoundVolume;
+            }
+            if (updates.customSoundPaths !== undefined) {
+                draft.noveler.focusMode.customSoundPaths = updates.customSoundPaths;
+            }
+            if (updates.activeCustomSound !== undefined) {
+                draft.noveler.focusMode.activeCustomSound = updates.activeCustomSound;
+            }
+        });
     }
 
     /**
