@@ -8,7 +8,8 @@ import {
 } from '../constants';
 import { Logger } from '../utils/logger';
 import { getFrontmatterEndOffsetForMatching } from '../utils/frontMatterHelper';
-import { SimpleTrieTree } from '../utils/simpleTrieTree';
+import { AhoCorasick } from '../utils/ahoCorasick';
+import { MatchSelectionService } from '../services/matchSelectionService';
 
 /**
  * 小说高亮提供器
@@ -33,15 +34,18 @@ export class NovelHighlightProvider {
     private characterNamesCache: string[] = [];
     private lastCacheUpdate = 0;
 
-    // Trie 树缓存（替代正则）
-    private cachedCharacterTrie: SimpleTrieTree | null = null;
+    // Trie 树缓存（使用 AC 自动机替代 Trie）
+    private cachedCharacterTrie: AhoCorasick | null = null;
     private cachedCharacterNamesCacheKey = '';
+
+    private readonly matchSelectionService: MatchSelectionService;
 
     // 文件系统监视器，用于自动更新人物缓存
     private characterFolderWatcher?: vscode.FileSystemWatcher;
 
     constructor() {
         this.configService = ConfigService.getInstance();
+        this.matchSelectionService = MatchSelectionService.getInstance();
         this.createDecorationTypes();
         this.loadCharacterNames(); // 初始化时加载人物名称
         this.watchCharactersFolder(); // 监视 characters/ 目录变化
@@ -183,8 +187,8 @@ export class NovelHighlightProvider {
         return this.characterNamesCache;
     }
 
-    // 获取或创建人物名称 Trie 树（带缓存）
-    private getCharacterTrie(characterNames: string[]): SimpleTrieTree | null {
+    // 获取或创建人物名称 AC 自动机（带缓存）
+    private getCharacterTrie(characterNames: string[]): AhoCorasick | null {
         if (characterNames.length === 0) {
             return null;
         }
@@ -203,12 +207,12 @@ export class NovelHighlightProvider {
             return this.cachedCharacterTrie;
         }
 
-        // 构建新的 Trie 树并缓存
-        this.cachedCharacterTrie = new SimpleTrieTree();
+        // 构建新的 AC 自动机并缓存
+        this.cachedCharacterTrie = new AhoCorasick();
         this.cachedCharacterTrie.insertBatch(validNames);
         this.cachedCharacterNamesCacheKey = cacheKey;
 
-        Logger.debug(`人物名 Trie 树已构建，共 ${validNames.length} 个名称`);
+        Logger.debug(`人物名 AC 自动机已构建，共 ${validNames.length} 个名称`);
 
         return this.cachedCharacterTrie;
     }
@@ -269,10 +273,12 @@ export class NovelHighlightProvider {
                 htmlCommentRanges.push(new vscode.Range(startPos, endPos));
             }
 
-            // 使用 Trie 树匹配人物名（排除对话、注释和 frontmatter 范围）
+            // 使用 AC 自动机匹配人物名（排除对话、注释和 frontmatter 范围）
             const characterTrie = this.getCharacterTrie(characterNames);
             if (characterTrie) {
                 const matches = characterTrie.search(text);
+                const filteredMatches: Array<{ word: string; start: number; end: number }> = [];
+
                 for (const match of matches) {
                     // 跳过 frontmatter 区域的匹配
                     if (match.start < frontmatterEndOffset) {
@@ -285,8 +291,28 @@ export class NovelHighlightProvider {
 
                     // 排除对话和注释范围
                     if (!this.isRangeInExcludedAreas(range, dialogueRanges, htmlCommentRanges)) {
-                        characterRanges.push(range);
+                        filteredMatches.push(match);
                     }
+                }
+
+                // 先应用手动选择策略，再做默认冲突处理。
+                // 关键：如果先“最长优先”再过滤，会导致用户手选的短词（如“张三”）
+                // 在冲突解析阶段被提前丢弃，后续无法恢复高亮。
+                const selectedMatches = this.matchSelectionService.filterMatches(
+                    editor.document.uri.toString(),
+                    filteredMatches,
+                    'character'
+                );
+
+                // 对未被手选覆盖的位置，仍按默认最长优先处理重叠
+                const resolvedMatches = this.resolveOverlappingCharacterMatches(
+                    selectedMatches
+                );
+
+                for (const resolved of resolvedMatches) {
+                    const startPos = editor.document.positionAt(resolved.start);
+                    const endPos = editor.document.positionAt(resolved.end);
+                    characterRanges.push(new vscode.Range(startPos, endPos));
                 }
             }
 
@@ -296,6 +322,260 @@ export class NovelHighlightProvider {
         } catch (error) {
             Logger.error('更新高亮时发生错误', error);
         }
+    }
+
+    /**
+     * 在光标所在冲突位置手动选择匹配项（仅影响当前位置）
+     */
+    public async chooseCharacterMatchAtCursor(editor?: vscode.TextEditor): Promise<void> {
+        const targetEditor = editor ?? vscode.window.activeTextEditor;
+        if (!targetEditor || targetEditor.document.languageId !== 'markdown') {
+            vscode.window.showInformationMessage('请先在 Markdown 文档中使用该命令');
+            return;
+        }
+
+        const text = targetEditor.document.getText();
+        const cursorOffset = targetEditor.document.offsetAt(targetEditor.selection.active);
+        const frontmatterEndOffset = getFrontmatterEndOffsetForMatching(text);
+
+        // 对话与注释范围
+        const dialogueRanges: vscode.Range[] = [];
+        const htmlCommentRanges: vscode.Range[] = [];
+        let regexMatch: RegExpExecArray | null;
+
+        const dialogueRegex = new RegExp(DIALOGUE_REGEX.source, 'g');
+        while ((regexMatch = dialogueRegex.exec(text)) !== null) {
+            dialogueRanges.push(
+                new vscode.Range(
+                    targetEditor.document.positionAt(regexMatch.index),
+                    targetEditor.document.positionAt(regexMatch.index + regexMatch[0].length)
+                )
+            );
+        }
+
+        const commentRegex = new RegExp(HTML_COMMENT_REGEX.source, 'g');
+        while ((regexMatch = commentRegex.exec(text)) !== null) {
+            htmlCommentRanges.push(
+                new vscode.Range(
+                    targetEditor.document.positionAt(regexMatch.index),
+                    targetEditor.document.positionAt(regexMatch.index + regexMatch[0].length)
+                )
+            );
+        }
+
+        const overlapCluster = await this.getCharacterOverlapClusterAtOffset(targetEditor, cursorOffset, {
+            frontmatterEndOffset,
+            dialogueRanges,
+            htmlCommentRanges,
+            text
+        });
+        if (!overlapCluster || overlapCluster.matches.length < 2) {
+            vscode.window.showInformationMessage('光标位置没有可选择的覆盖匹配项');
+            return;
+        }
+
+        const picked = await vscode.window.showQuickPick(
+            overlapCluster.matches
+                .sort((a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start)
+                .map(m => ({
+                    label: m.word,
+                    description: `[${m.start}, ${m.end})`,
+                    detail: targetEditor.document.getText(new vscode.Range(
+                        targetEditor.document.positionAt(m.start),
+                        targetEditor.document.positionAt(m.end)
+                    )),
+                    match: m
+                })),
+            {
+                placeHolder: '选择该冲突位置应采用的人物名匹配（仅影响该位置）'
+            }
+        );
+
+        if (!picked) return;
+
+        this.matchSelectionService.setSelection(
+            targetEditor.document.uri.toString(),
+            cursorOffset,
+            {
+                kind: 'character',
+                word: picked.match.word,
+                start: picked.match.start,
+                end: picked.match.end
+            }
+        );
+
+        await this.updateHighlights(targetEditor);
+        vscode.window.showInformationMessage(`已在当前位置采用匹配：${picked.match.word}`);
+    }
+
+    /**
+     * 获取指定光标位置的人物名冲突簇（供跨类型匹配选择复用）
+     */
+    public async getCharacterMatchesAtOffset(
+        editor: vscode.TextEditor,
+        offset: number
+    ): Promise<Array<{ word: string; start: number; end: number }>> {
+        if (!editor || editor.document.languageId !== 'markdown') {
+            return [];
+        }
+
+        const text = editor.document.getText();
+        const frontmatterEndOffset = getFrontmatterEndOffsetForMatching(text);
+
+        const dialogueRanges: vscode.Range[] = [];
+        const htmlCommentRanges: vscode.Range[] = [];
+        let regexMatch: RegExpExecArray | null;
+
+        const dialogueRegex = new RegExp(DIALOGUE_REGEX.source, 'g');
+        while ((regexMatch = dialogueRegex.exec(text)) !== null) {
+            dialogueRanges.push(
+                new vscode.Range(
+                    editor.document.positionAt(regexMatch.index),
+                    editor.document.positionAt(regexMatch.index + regexMatch[0].length)
+                )
+            );
+        }
+
+        const commentRegex = new RegExp(HTML_COMMENT_REGEX.source, 'g');
+        while ((regexMatch = commentRegex.exec(text)) !== null) {
+            htmlCommentRanges.push(
+                new vscode.Range(
+                    editor.document.positionAt(regexMatch.index),
+                    editor.document.positionAt(regexMatch.index + regexMatch[0].length)
+                )
+            );
+        }
+
+        const overlapCluster = await this.getCharacterOverlapClusterAtOffset(editor, offset, {
+            frontmatterEndOffset,
+            dialogueRanges,
+            htmlCommentRanges,
+            text
+        });
+
+        return overlapCluster?.matches ?? [];
+    }
+
+    private async getCharacterOverlapClusterAtOffset(
+        editor: vscode.TextEditor,
+        offset: number,
+        context: {
+            frontmatterEndOffset: number;
+            dialogueRanges: vscode.Range[];
+            htmlCommentRanges: vscode.Range[];
+            text: string;
+        }
+    ): Promise<{ start: number; end: number; matches: Array<{ word: string; start: number; end: number }> } | null> {
+        const characterNamesFromFiles = await this.getCharacterNames();
+        const characterNamesFromConfig = this.configService.getCharacters();
+        const characterNames = [...new Set([...characterNamesFromFiles, ...characterNamesFromConfig])];
+
+        const characterTrie = this.getCharacterTrie(characterNames);
+        if (!characterTrie) {
+            vscode.window.showInformationMessage('未检测到可用人物名匹配');
+            return null;
+        }
+
+        const matches = characterTrie.search(context.text);
+        const filteredMatches: Array<{ word: string; start: number; end: number }> = [];
+        for (const match of matches) {
+            if (match.start < context.frontmatterEndOffset) continue;
+
+            const range = new vscode.Range(
+                editor.document.positionAt(match.start),
+                editor.document.positionAt(match.end)
+            );
+            if (!this.isRangeInExcludedAreas(range, context.dialogueRanges, context.htmlCommentRanges)) {
+                filteredMatches.push(match);
+            }
+        }
+
+        return this.getOverlapClusterAtOffset(filteredMatches, offset);
+    }
+
+    /**
+     * 解析重叠匹配：默认最长匹配，若用户在该冲突簇手动选择则优先用户选择
+     */
+    private resolveOverlappingCharacterMatches(
+        matches: Array<{ word: string; start: number; end: number }>
+    ): Array<{ word: string; start: number; end: number }> {
+        if (matches.length <= 1) return matches;
+
+        const sorted = [...matches].sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+        const result: Array<{ word: string; start: number; end: number }> = [];
+
+        let cluster: Array<{ word: string; start: number; end: number }> = [];
+        let clusterStart = -1;
+        let clusterEnd = -1;
+
+        const flushCluster = () => {
+            if (cluster.length === 0) return;
+            if (cluster.length === 1) {
+                result.push(cluster[0]);
+                return;
+            }
+
+            // 默认策略：最长优先，起点更靠前优先
+            const best = [...cluster].sort((a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start)[0];
+            result.push(best);
+        };
+
+        for (const m of sorted) {
+            if (cluster.length === 0) {
+                cluster = [m];
+                clusterStart = m.start;
+                clusterEnd = m.end;
+                continue;
+            }
+
+            if (m.start < clusterEnd) {
+                cluster.push(m);
+                clusterStart = Math.min(clusterStart, m.start);
+                clusterEnd = Math.max(clusterEnd, m.end);
+            } else {
+                flushCluster();
+                cluster = [m];
+                clusterStart = m.start;
+                clusterEnd = m.end;
+            }
+        }
+
+        flushCluster();
+        return result;
+    }
+
+    /**
+     * 获取光标所在位置的重叠冲突簇
+     */
+    private getOverlapClusterAtOffset(
+        matches: Array<{ word: string; start: number; end: number }>,
+        offset: number
+    ): { start: number; end: number; matches: Array<{ word: string; start: number; end: number }> } | null {
+        const atPoint = matches.filter(m => m.start <= offset && offset < m.end);
+        if (atPoint.length === 0) return null;
+
+        let clusterStart = Math.min(...atPoint.map(m => m.start));
+        let clusterEnd = Math.max(...atPoint.map(m => m.end));
+
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const m of matches) {
+                const overlaps = m.start < clusterEnd && m.end > clusterStart;
+                if (!overlaps) continue;
+
+                const nextStart = Math.min(clusterStart, m.start);
+                const nextEnd = Math.max(clusterEnd, m.end);
+                if (nextStart !== clusterStart || nextEnd !== clusterEnd) {
+                    clusterStart = nextStart;
+                    clusterEnd = nextEnd;
+                    changed = true;
+                }
+            }
+        }
+
+        const clusterMatches = matches.filter(m => m.start < clusterEnd && m.end > clusterStart);
+        return { start: clusterStart, end: clusterEnd, matches: clusterMatches };
     }
 
     /**

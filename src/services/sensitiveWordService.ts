@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as jsoncParser from 'jsonc-parser';
-import { TrieTree } from '../utils/trieTree';
+import { AhoCorasickLevel } from '../utils/ahoCorasickLevel';
 import {
     SensitiveWordConfig,
     SensitiveLevel,
@@ -13,6 +13,7 @@ import {
 import { Logger } from '../utils/logger';
 import { ConfigService } from './configService';
 import { extractContentWithoutFrontmatterForMatching } from '../utils/frontMatterHelper';
+import { MatchSelectionService } from './matchSelectionService';
 
 /**
  * 敏感词检测服务
@@ -26,13 +27,16 @@ import { extractContentWithoutFrontmatterForMatching } from '../utils/frontMatte
  */
 export class SensitiveWordService {
     private static instance: SensitiveWordService | null = null;
-    private trie: TrieTree = new TrieTree();
+    private trie: AhoCorasickLevel = new AhoCorasickLevel();
     private whitelist: Set<string> = new Set();
     private config!: SensitiveWordConfig;
     private context!: vscode.ExtensionContext;
+    private readonly matchSelectionService: MatchSelectionService;
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    private constructor() {}
+    private constructor() {
+        this.matchSelectionService = MatchSelectionService.getInstance();
+    }
 
     /**
      * 初始化服务（单例）
@@ -93,6 +97,9 @@ export class SensitiveWordService {
             if (this.config.customWords?.enabled) {
                 await this.loadCustomLibrary();
             }
+
+            // 构建 AC 自动机
+            this.trie.build();
 
             Logger.info(`敏感词检测服务初始化完成，共加载 ${this.trie.getWordCount()} 个敏感词`);
         } catch (error) {
@@ -383,7 +390,7 @@ export class SensitiveWordService {
      * @param document VSCode 文档
      * @returns 匹配结果数组
      */
-    public detect(document: vscode.TextDocument): SensitiveMatch[] {
+    public detect(document: vscode.TextDocument, applyManualSelection = true): SensitiveMatch[] {
         if (!this.config.enabled || document.languageId !== 'markdown') {
             return [];
         }
@@ -400,7 +407,7 @@ export class SensitiveWordService {
             return [];
         }
 
-        // 使用 Trie 树检测
+        // 使用 AC 自动机检测
         let matches = this.trie.search(text);
 
         // 过滤白名单
@@ -417,6 +424,15 @@ export class SensitiveWordService {
         matches.forEach(m => {
             m.inWhitelist = this.whitelist.has(m.word);
         });
+
+        // 应用跨类型统一选择策略（仅影响当前位置）
+        if (applyManualSelection) {
+            matches = this.matchSelectionService.filterMatches(
+                document.uri.toString(),
+                matches,
+                'sensitive'
+            );
+        }
 
         return matches;
     }

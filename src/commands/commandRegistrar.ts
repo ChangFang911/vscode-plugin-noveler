@@ -47,6 +47,7 @@ import { jumpToReadmeSection } from './jumpToReadme';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { Logger } from '../utils/logger';
 import { NovelHighlightProvider } from '../providers/highlightProvider';
+import { chooseMatchAtCursor } from './matchSelectionCommand';
 
 /**
  * 命令注册器依赖项
@@ -357,6 +358,16 @@ function registerUtilityCommands(deps: CommandRegistrarDeps): void {
             highlightProvider.reloadDecorations();
             updateHighlights(vscode.window.activeTextEditor);
             Logger.info('高亮配置已重新加载');
+        })
+    );
+
+    // 在冲突位置手动选择匹配项（跨类型：人物名/敏感词，仅影响当前位置）
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.chooseMatchAtCursor', async () => {
+            // extension 激活早期 registerAllCommands 可能传入了占位 null，这里兜底获取真实实例
+            const safeSensitiveService = deps.sensitiveWordService
+                ?? SensitiveWordService.getInstance();
+            await chooseMatchAtCursor(highlightProvider, safeSensitiveService, deps.sensitiveWordDiagnostic);
         })
     );
 

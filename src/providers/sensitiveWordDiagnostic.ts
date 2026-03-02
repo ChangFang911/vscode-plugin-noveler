@@ -8,6 +8,7 @@ import { Logger } from '../utils/logger';
  * 负责在 VSCode 中显示敏感词检测结果
  */
 export class SensitiveWordDiagnosticProvider {
+    private static instance: SensitiveWordDiagnosticProvider | null = null;
     private diagnosticCollection: vscode.DiagnosticCollection;
     private service: SensitiveWordService;
     private debounceTimer: NodeJS.Timeout | null = null;
@@ -18,8 +19,13 @@ export class SensitiveWordDiagnosticProvider {
     private sessionIgnoreList: Map<string, Set<string>> = new Map();
 
     constructor(service: SensitiveWordService) {
+        SensitiveWordDiagnosticProvider.instance = this;
         this.service = service;
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('noveler-sensitive');
+    }
+
+    public static getInstance(): SensitiveWordDiagnosticProvider | null {
+        return SensitiveWordDiagnosticProvider.instance;
     }
 
     /**

@@ -183,6 +183,11 @@
         "command": "noveler.showPreview",
         "title": "Noveler: 手机阅读预览",
         "icon": "$(device-mobile)"
+      },
+      {
+        "command": "noveler.chooseMatchAtCursor",
+        "title": "Noveler: 选择当前位置关键词匹配",
+        "icon": "$(symbol-misc)"
       }
     ],
     "menus": {
@@ -211,6 +216,11 @@
           "command": "noveler.addSelectedToWhitelist",
           "when": "editorLangId == markdown && editorHasSelection",
           "group": "noveler@5"
+        },
+        {
+          "command": "noveler.chooseMatchAtCursor",
+          "when": "editorLangId == markdown",
+          "group": "noveler@6"
         }
       ],
       "view/item/context": [
