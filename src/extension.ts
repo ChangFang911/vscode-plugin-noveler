@@ -153,47 +153,25 @@ export async function activate(context: vscode.ExtensionContext) {
             Logger.error('[Noveler] 配置迁移失败，但不影响基本功能', migrationError);
         }
 
-        // 延迟加载敏感词服务（不阻塞初始化）
-        // 用户首次需要敏感词检测时才初始化
-        let sensitiveWordServicePromise: Promise<SensitiveWordService | null> | null = null;
+        // 初始化敏感词检测服务
+        try {
+            sensitiveWordService = await SensitiveWordService.initialize(context);
+            sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
+            sensitiveWordDiagnostic.register(context);
 
-        const initializeSensitiveWordService = async () => {
-            if (sensitiveWordService) {
-                return sensitiveWordService;
-            }
-            if (!sensitiveWordServicePromise) {
-                sensitiveWordServicePromise = (async () => {
-                    try {
-                        const service = await SensitiveWordService.initialize(context);
-                        sensitiveWordService = service;
-                        sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
-                        sensitiveWordDiagnostic.register(context);
-
-                        // 注册敏感词快速修复提供器
-                        context.subscriptions.push(
-                            vscode.languages.registerCodeActionsProvider(
-                                'markdown',
-                                new SensitiveWordCodeActionProvider(),
-                                {
-                                    providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
-                                }
-                            )
-                        );
-                        Logger.info('[Noveler] 敏感词检测功能已启用（延迟加载）');
-                        return service;
-                    } catch (error) {
-                        Logger.error('[Noveler] 敏感词服务初始化失败，但不影响基本功能', error);
-                        return null;
+            context.subscriptions.push(
+                vscode.languages.registerCodeActionsProvider(
+                    'markdown',
+                    new SensitiveWordCodeActionProvider(),
+                    {
+                        providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
                     }
-                })();
-            }
-            return await sensitiveWordServicePromise;
-        };
-
-        // 触发后台初始化（不阻塞启动）
-        void initializeSensitiveWordService();
-
-        // 🚀 姓名生成服务已在并行加载中处理，此处移除重复初始化
+                )
+            );
+            Logger.info('[Noveler] 敏感词检测功能已启用');
+        } catch (sensitiveWordError) {
+            Logger.error('[Noveler] 敏感词服务初始化失败，但不影响基本功能', sensitiveWordError);
+        }
 
         // 初始化 Code Lens 提供者
         codeLensProvider = new ChapterCodeLensProvider(wordCountService);
