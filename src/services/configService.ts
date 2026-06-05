@@ -464,7 +464,7 @@ export class ConfigService {
             enabled: false,
             folderStructure: 'flat',
             numberFormat: 'arabic',
-            chapterNumbering: 'global'
+            chapterNumbering: 'volume'
         };
     }
 

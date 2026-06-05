@@ -80,6 +80,13 @@ export async function quickSettings(): Promise<void> {
                 getValue: () => configService.isEyeCareModeEnabled() ? '已启用' : '已禁用'
             },
             {
+                id: 'chapterNumbering',
+                label: '$(list-ordered) 章节编号模式',
+                description: `当前: ${{ global: '全局连续', volume: '按卷重置', mixed: '混合' }[configService.getVolumesConfig().chapterNumbering] ?? '按卷重置'}`,
+                detail: '分卷模式下章节序号的计算方式',
+                getValue: () => configService.getVolumesConfig().chapterNumbering
+            },
+            {
                 id: 'focusMode',
                 label: '$(symbol-keyword) 专注模式',
                 description: '打字机模式 + 打字音效',
@@ -121,6 +128,9 @@ export async function quickSettings(): Promise<void> {
                 break;
             case 'eyeCareMode':
                 await toggleEyeCareModeDirect();
+                break;
+            case 'chapterNumbering':
+                await configureChapterNumbering();
                 break;
             case 'focusMode':
                 await vscode.commands.executeCommand('noveler.focusModeSettings');
@@ -319,4 +329,55 @@ async function toggleEyeCareModeDirect(): Promise<void> {
     vscode.window.showInformationMessage(
         `已${newEnabled ? '启用' : '禁用'}护眼模式（仅当前项目生效）`
     );
+}
+
+/**
+ * 配置章节编号模式
+ */
+async function configureChapterNumbering(): Promise<void> {
+    const configService = ConfigService.getInstance();
+    const current = configService.getVolumesConfig().chapterNumbering;
+
+    const modeLabels: Record<string, string> = { global: '全局连续', volume: '按卷重置', mixed: '混合' };
+
+    const options = [
+        {
+            label: '按卷重置',
+            description: '每卷从第1章开始（推荐）',
+            detail: '卷一第1章、卷二第1章各自独立计数，适合大多数长篇小说',
+            value: 'volume'
+        },
+        {
+            label: '全局连续',
+            description: '所有卷章节序号连续递增',
+            detail: '跨卷不重置，全书唯一编号，适合章节顺序固定不变的项目',
+            value: 'global'
+        },
+        {
+            label: '混合',
+            description: '正文卷全局连续，其他卷独立计数',
+            detail: '番外、前传、后传从第1章开始，正文卷保持全局序号',
+            value: 'mixed'
+        }
+    ].map(o => ({ ...o, picked: o.value === current }));
+
+    const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: `当前模式：${modeLabels[current] ?? current}，选择新模式`
+    });
+
+    if (!selected || selected.value === current) {
+        return;
+    }
+
+    await configService.updateConfig((draft) => {
+        if (!draft.noveler) {
+            draft.noveler = {};
+        }
+        if (!draft.noveler.volumes) {
+            draft.noveler.volumes = { enabled: false, folderStructure: 'flat', numberFormat: 'arabic', chapterNumbering: 'volume' };
+        }
+        draft.noveler.volumes.chapterNumbering = selected.value as 'global' | 'volume' | 'mixed';
+    });
+
+    vscode.window.showInformationMessage(`已将章节编号模式设置为「${selected.label}」`);
 }
