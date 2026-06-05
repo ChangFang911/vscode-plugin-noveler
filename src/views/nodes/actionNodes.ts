@@ -7,110 +7,102 @@ import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
 
 export class ActionNodesProvider {
     getActionItems(): NovelerTreeItem[] {
-        // 快捷操作已合并到其他操作中
         return [];
     }
 
+    /**
+     * 工具与设置：返回两个子分组节点
+     */
     getOtherActionItems(): NovelerTreeItem[] {
-        const items: NovelerTreeItem[] = [
+        return [
             new NovelerTreeItem(
-                '⚙️ 快速设置',
-                NodeType.OtherActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.quickSettings',
-                    title: '快速设置',
-                },
-                'otherActionItem',
+                '✍️ 写作工具',
+                NodeType.Tools,
+                vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
-                '快速配置常用选项（字数、引号、高亮颜色等）'
+                'toolsGroup',
+                undefined,
+                '统计、预览、起名等写作辅助工具'
             ),
             new NovelerTreeItem(
-                '切换专注模式',
-                NodeType.OtherActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.toggleFocusMode',
-                    title: '切换专注模式',
-                },
-                'otherActionItem',
+                '⚙️ 项目设置',
+                NodeType.Settings,
+                vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
-                '隐藏其他面板，专心写作'
-            ),
-            new NovelerTreeItem(
-                '👁 切换护眼模式',
-                NodeType.OtherActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.toggleEyeCareMode',
-                    title: '切换护眼模式',
-                },
-                'otherActionItem',
+                'settingsGroup',
                 undefined,
-                '使用护眼主题保护视力（仅当前项目）'
+                '快速设置、敏感词库、配置文件'
             ),
+        ];
+    }
+
+    /**
+     * 写作工具子项
+     */
+    getToolItems(): NovelerTreeItem[] {
+        return [
             new NovelerTreeItem(
-                '📱 手机预览',
+                '📊 统计仪表板',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.showPreview',
-                    title: '手机阅读预览',
-                },
-                'otherActionItem',
-                undefined,
-                '模拟手机屏幕预览阅读效果'
-            ),
-            new NovelerTreeItem(
-                '统计仪表板',
-                NodeType.OtherActionItem,
-                vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.showStats',
-                    title: '显示统计仪表板',
-                },
+                { command: 'noveler.showStats', title: '显示统计仪表板' },
                 'otherActionItem',
                 undefined,
                 '查看详细的写作统计和可视化数据'
             ),
             new NovelerTreeItem(
+                '📱 手机预览',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.showPreview', title: '手机阅读预览' },
+                'otherActionItem',
+                undefined,
+                '模拟手机屏幕预览阅读效果'
+            ),
+            new NovelerTreeItem(
                 '🎲 随机起名',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.generateRandomName',
-                    title: '随机起名',
-                },
+                { command: 'noveler.generateRandomName', title: '随机起名' },
                 'otherActionItem',
                 undefined,
                 '生成多种风格的随机姓名'
             ),
+        ];
+    }
+
+    /**
+     * 项目设置子项
+     */
+    getSettingsItems(): NovelerTreeItem[] {
+        return [
             new NovelerTreeItem(
-                '配置敏感词库',
+                '⚙️ 快速设置',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.openSensitiveWordsConfig',
-                    title: '配置敏感词库',
-                },
+                { command: 'noveler.quickSettings', title: '快速设置' },
+                'otherActionItem',
+                undefined,
+                '快速配置常用选项（字数、引号、高亮颜色等）'
+            ),
+            new NovelerTreeItem(
+                '🔍 敏感词库配置',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.openSensitiveWordsConfig', title: '配置敏感词库' },
                 'otherActionItem',
                 undefined,
                 '配置敏感词检测级别和自定义词库'
             ),
             new NovelerTreeItem(
-                '打开配置文件',
+                '📄 打开配置文件',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
-                {
-                    command: 'noveler.openConfig',
-                    title: '打开配置文件',
-                },
+                { command: 'noveler.openConfig', title: '打开配置文件' },
                 'otherActionItem',
                 undefined,
-                '编辑小说配置（设置、人物列表等）'
+                '直接编辑 novel.jsonc 配置文件'
             ),
         ];
-
-        return items;
     }
 }

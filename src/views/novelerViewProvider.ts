@@ -19,6 +19,8 @@ export enum NodeType {
     Overview = 'overview',        // 项目概览
     Actions = 'actions',          // 快捷操作
     OtherActions = 'otherActions', // 其他操作
+    Tools = 'tools',               // 写作工具（子分组）
+    Settings = 'settings',         // 项目设置（子分组）
     Chapters = 'chapters',        // 章节列表
     Characters = 'characters',    // 人物管理
     Outlines = 'outlines',        // 大纲列表
@@ -148,6 +150,10 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                     return this.actionNodes.getActionItems();
                 case NodeType.OtherActions:
                     return this.actionNodes.getOtherActionItems();
+                case NodeType.Tools:
+                    return this.actionNodes.getToolItems();
+                case NodeType.Settings:
+                    return this.actionNodes.getSettingsItems();
                 case NodeType.Chapters:
                     return await this.chapterNodes.getChapterItems();
                 case NodeType.Volume:
