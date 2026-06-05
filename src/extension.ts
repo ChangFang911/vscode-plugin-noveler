@@ -110,8 +110,6 @@ export async function activate(context: vscode.ExtensionContext) {
             wordCountService,
             configService,
             focusModeService,
-            sensitiveWordService: null as unknown as SensitiveWordService,
-            sensitiveWordDiagnostic: null as unknown as SensitiveWordDiagnosticProvider,
             getSensitiveWordDiagnostic: () => sensitiveWordDiagnostic,
             novelerViewProvider,
             statsWebviewProvider,

@@ -57,8 +57,6 @@ export interface CommandRegistrarDeps {
     wordCountService: WordCountService;
     configService: ConfigService;
     focusModeService: FocusModeService;
-    sensitiveWordService: SensitiveWordService;
-    sensitiveWordDiagnostic: SensitiveWordDiagnosticProvider;
     novelerViewProvider: NovelerViewProvider;
     statsWebviewProvider: StatsWebviewProvider;
     welcomeWebviewProvider: WelcomeWebviewProvider;
