@@ -7,12 +7,18 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { handleError } from '../utils/errorHandler';
 
-/**
- * 配置项定义
- */
 interface SettingItem extends vscode.QuickPickItem {
     id: string;
-    getValue: () => string;
+}
+
+const NUMBERING_LABELS: Record<string, string> = {
+    global:  '全局连续',
+    volume:  '按卷重置',
+    mixed:   '混合（正文全局 + 番外独立）',
+};
+
+function statusLabel(enabled: boolean): string {
+    return enabled ? '$(check) 已启用' : '$(circle-slash) 已禁用';
 }
 
 /**
@@ -21,120 +27,104 @@ interface SettingItem extends vscode.QuickPickItem {
 export async function quickSettings(): Promise<void> {
     try {
         const configService = ConfigService.getInstance();
+        const volumesEnabled  = configService.isVolumesEnabled();
+        const numberingMode   = configService.getVolumesConfig().chapterNumbering;
 
-        // 构建配置项列表
-        const items: SettingItem[] = [
+        const sep = (label: string): vscode.QuickPickItem =>
+            ({ label, kind: vscode.QuickPickItemKind.Separator });
+
+        const items: (SettingItem | vscode.QuickPickItem)[] = [
+
+            // ── 写作格式 ──────────────────────────────────────────
+            sep('写作格式'),
             {
                 id: 'targetWords',
                 label: '$(symbol-number) 目标字数',
-                description: `当前: ${configService.getTargetWords()} 字`,
+                description: `${configService.getTargetWords()} 字`,
                 detail: '创建新章节时的默认字数目标',
-                getValue: () => configService.getTargetWords().toString()
             },
             {
                 id: 'quoteStyle',
                 label: '$(symbol-string) 引号样式',
-                description: `当前: ${configService.getChineseQuoteStyle()}`,
-                detail: '中文引号的样式',
-                getValue: () => configService.getChineseQuoteStyle()
+                description: configService.getChineseQuoteStyle(),
+                detail: '格式化时使用的中文引号',
             },
             {
                 id: 'autoEmptyLine',
-                label: configService.shouldAutoEmptyLine()
-                    ? '$(x) 禁用自动空行'
-                    : '$(check) 启用自动空行',
-                description: configService.shouldAutoEmptyLine() ? '当前已启用' : '当前已禁用',
-                detail: '在段落之间自动添加空行',
-                getValue: () => configService.shouldAutoEmptyLine() ? '已启用' : '已禁用'
+                label: '$(list-flat) 自动空行',
+                description: statusLabel(configService.shouldAutoEmptyLine()),
+                detail: '格式化时在段落之间自动添加空行',
             },
             {
                 id: 'paragraphIndent',
-                label: configService.shouldParagraphIndent()
-                    ? '$(x) 禁用段落缩进'
-                    : '$(check) 启用段落缩进',
-                description: configService.shouldParagraphIndent() ? '当前已启用' : '当前已禁用',
-                detail: '段落首行自动添加两个全角空格',
-                getValue: () => configService.shouldParagraphIndent() ? '已启用' : '已禁用'
+                label: '$(text-size) 段落首行缩进',
+                description: statusLabel(configService.shouldParagraphIndent()),
+                detail: '格式化时段落首行自动添加两个全角空格',
             },
+
+            // ── 视觉样式 ──────────────────────────────────────────
+            sep('视觉样式'),
             {
                 id: 'dialogueColor',
                 label: '$(symbol-color) 对话高亮颜色',
-                description: `当前: ${configService.getHighlightStyle('dialogue').color || '默认'}`,
-                detail: '对话文本的高亮颜色',
-                getValue: () => configService.getHighlightStyle('dialogue').color || '#ce9178'
+                description: configService.getHighlightStyle('dialogue').color || '#ce9178',
+                detail: '对话文字的高亮颜色',
             },
             {
                 id: 'characterColor',
                 label: '$(account) 人物高亮颜色',
-                description: `当前: ${configService.getHighlightStyle('character').color || '默认'}`,
+                description: configService.getHighlightStyle('character').color || '#4ec9b0',
                 detail: '人物名称的高亮颜色',
-                getValue: () => configService.getHighlightStyle('character').color || '#4ec9b0'
             },
             {
                 id: 'eyeCareMode',
-                label: configService.isEyeCareModeEnabled()
-                    ? '$(eye-closed) 禁用护眼模式'
-                    : '$(eye) 启用护眼模式',
-                description: configService.isEyeCareModeEnabled() ? '当前已启用' : '当前已禁用',
-                detail: '使用豆沙绿背景保护眼睛（仅当前项目）',
-                getValue: () => configService.isEyeCareModeEnabled() ? '已启用' : '已禁用'
+                label: '$(eye) 护眼模式',
+                description: statusLabel(configService.isEyeCareModeEnabled()),
+                detail: '豆沙绿背景，减少视觉疲劳（仅当前项目）',
             },
-            {
-                id: 'chapterNumbering',
-                label: '$(list-ordered) 章节编号模式',
-                description: `当前: ${{ global: '全局连续', volume: '按卷重置', mixed: '混合' }[configService.getVolumesConfig().chapterNumbering] ?? '按卷重置'}`,
-                detail: '分卷模式下章节序号的计算方式',
-                getValue: () => configService.getVolumesConfig().chapterNumbering
-            },
+
+            // ── 分卷设置（仅分卷模式下显示）────────────────────────
+            ...(volumesEnabled ? [
+                sep('分卷设置') as vscode.QuickPickItem,
+                {
+                    id: 'chapterNumbering',
+                    label: '$(list-ordered) 章节编号模式',
+                    description: NUMBERING_LABELS[numberingMode] ?? numberingMode,
+                    detail: '分卷下章节序号的计算方式',
+                } as SettingItem,
+            ] : []),
+
+            // ── 专注写作 ──────────────────────────────────────────
+            sep('专注写作'),
             {
                 id: 'focusMode',
                 label: '$(symbol-keyword) 专注模式',
-                description: '打字机模式 + 打字音效',
-                detail: '提供沉浸式写作体验',
-                getValue: () => ''
-            }
+                description: '打字机滚动 + 打字音效',
+                detail: '沉浸式写作体验设置',
+            },
         ];
 
-        // 显示配置项选择器
         const selected = await vscode.window.showQuickPick(items, {
             placeHolder: '选择要修改的配置项',
             matchOnDescription: true,
-            matchOnDetail: true
+            matchOnDetail: true,
         });
 
-        if (!selected) {
+        const item = selected as SettingItem | undefined;
+        if (!item?.id) {
             return;
         }
 
-        // 根据选择的项目调用对应的配置函数
-        switch (selected.id) {
-            case 'targetWords':
-                await configureTargetWords();
-                break;
-            case 'quoteStyle':
-                await configureQuoteStyle();
-                break;
-            case 'autoEmptyLine':
-                await toggleAutoEmptyLineDirect();
-                break;
-            case 'paragraphIndent':
-                await toggleParagraphIndentDirect();
-                break;
-            case 'dialogueColor':
-                await configureColor('dialogue', '对话高亮颜色');
-                break;
-            case 'characterColor':
-                await configureColor('character', '人物高亮颜色');
-                break;
-            case 'eyeCareMode':
-                await toggleEyeCareModeDirect();
-                break;
-            case 'chapterNumbering':
-                await configureChapterNumbering();
-                break;
-            case 'focusMode':
-                await vscode.commands.executeCommand('noveler.focusModeSettings');
-                break;
+        switch (item.id) {
+            case 'targetWords':      await configureTargetWords(); break;
+            case 'quoteStyle':       await configureQuoteStyle(); break;
+            case 'autoEmptyLine':    await toggleBoolSetting('autoEmptyLine'); break;
+            case 'paragraphIndent':  await toggleBoolSetting('paragraphIndent'); break;
+            case 'dialogueColor':    await configureColor('dialogue', '对话高亮颜色'); break;
+            case 'characterColor':   await configureColor('character', '人物高亮颜色'); break;
+            case 'eyeCareMode':      await toggleEyeCareMode(); break;
+            case 'chapterNumbering': await configureChapterNumbering(); break;
+            case 'focusMode':        await vscode.commands.executeCommand('noveler.focusModeSettings'); break;
         }
 
     } catch (error) {
@@ -142,9 +132,8 @@ export async function quickSettings(): Promise<void> {
     }
 }
 
-/**
- * 配置目标字数
- */
+// ── 各配置项处理函数 ──────────────────────────────────────────────────────────
+
 async function configureTargetWords(): Promise<void> {
     const configService = ConfigService.getInstance();
     const current = configService.getTargetWords();
@@ -154,134 +143,122 @@ async function configureTargetWords(): Promise<void> {
         value: current.toString(),
         validateInput: (value) => {
             const num = parseInt(value);
-            if (isNaN(num) || num <= 0) {
-                return '请输入有效的正整数';
-            }
-            if (num > 50000) {
-                return '字数不能超过 50000';
-            }
+            if (isNaN(num) || num <= 0) { return '请输入有效的正整数'; }
+            if (num > 50000) { return '字数不能超过 50000'; }
             return null;
         }
     });
 
-    if (input === undefined) {
-        return;
-    }
+    if (input === undefined) { return; }
 
     const targetWords = parseInt(input);
     await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
-        }
+        if (!draft.noveler) { draft.noveler = {}; }
         draft.noveler.targetWords = { default: targetWords };
     });
 
     vscode.window.showInformationMessage(`已设置目标字数为 ${targetWords} 字`);
 }
 
-/**
- * 配置引号样式
- */
 async function configureQuoteStyle(): Promise<void> {
     const configService = ConfigService.getInstance();
+    const current = configService.getChineseQuoteStyle();
 
     const styles = [
         { label: '「」', description: '直角引号（日式）', value: '「」' },
         { label: '""', description: '弯引号', value: '""' },
-        { label: '""', description: '直引号', value: '""' }
-    ];
+        { label: '""', description: '直引号', value: '""' },
+    ].map(s => ({ ...s, picked: s.value === current }));
 
     const selected = await vscode.window.showQuickPick(styles, {
-        placeHolder: '选择引号样式'
+        placeHolder: '选择引号样式',
     });
 
-    if (!selected) {
-        return;
-    }
+    if (!selected || selected.value === current) { return; }
 
     await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
-        }
-        if (!draft.noveler.format) {
-            draft.noveler.format = {};
-        }
-        draft.noveler.format.chineseQuoteStyle = selected.value;
+        if (!draft.noveler) { draft.noveler = {}; }
+        if (!draft.noveler.format) { draft.noveler.format = {}; }
+        (draft.noveler.format as Record<string, unknown>).chineseQuoteStyle = selected.value;
     });
 
     vscode.window.showInformationMessage(`已设置引号样式为 ${selected.label}`);
 }
 
-/**
- * 直接切换自动空行
- */
-async function toggleAutoEmptyLineDirect(): Promise<void> {
+async function toggleBoolSetting(key: 'autoEmptyLine' | 'paragraphIndent'): Promise<void> {
     const configService = ConfigService.getInstance();
-    const currentEnabled = configService.shouldAutoEmptyLine();
-    const newEnabled = !currentEnabled;
+    const labelMap = { autoEmptyLine: '自动空行', paragraphIndent: '段落首行缩进' } as const;
+    const currentEnabled = key === 'autoEmptyLine'
+        ? configService.shouldAutoEmptyLine()
+        : configService.shouldParagraphIndent();
 
-    await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
-        }
-        draft.noveler.autoEmptyLine = { value: newEnabled };
+    const options = [
+        { label: '$(check) 启用', value: true,  picked: currentEnabled },
+        { label: '$(circle-slash) 禁用', value: false, picked: !currentEnabled },
+    ];
+
+    const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: `设置${labelMap[key]}`,
     });
 
+    if (!selected || selected.value === currentEnabled) { return; }
+
+    await configService.updateConfig((draft) => {
+        if (!draft.noveler) { draft.noveler = {}; }
+        if (key === 'autoEmptyLine') {
+            draft.noveler.autoEmptyLine = { value: selected.value };
+        } else {
+            draft.noveler.paragraphIndent = { value: selected.value };
+        }
+    });
+
+    vscode.window.showInformationMessage(`已${selected.value ? '启用' : '禁用'}${labelMap[key]}`);
+}
+
+async function toggleEyeCareMode(): Promise<void> {
+    const configService = ConfigService.getInstance();
+    const currentEnabled = configService.isEyeCareModeEnabled();
+
+    const options = [
+        { label: '$(check) 启用', value: true,  picked: currentEnabled },
+        { label: '$(circle-slash) 禁用', value: false, picked: !currentEnabled },
+    ];
+
+    const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: '设置护眼模式',
+    });
+
+    if (!selected || selected.value === currentEnabled) { return; }
+
+    await configService.toggleEyeCareMode(selected.value);
     vscode.window.showInformationMessage(
-        `已${newEnabled ? '启用' : '禁用'}自动空行`
+        `已${selected.value ? '启用' : '禁用'}护眼模式（仅当前项目生效）`
     );
 }
 
-/**
- * 直接切换段落缩进
- */
-async function toggleParagraphIndentDirect(): Promise<void> {
-    const configService = ConfigService.getInstance();
-    const currentEnabled = configService.shouldParagraphIndent();
-    const newEnabled = !currentEnabled;
-
-    await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
-        }
-        draft.noveler.paragraphIndent = { value: newEnabled };
-    });
-
-    vscode.window.showInformationMessage(
-        `已${newEnabled ? '启用' : '禁用'}段落缩进`
-    );
-}
-
-/**
- * 配置高亮颜色
- */
 async function configureColor(type: 'dialogue' | 'character', label: string): Promise<void> {
     const configService = ConfigService.getInstance();
     const currentColor = configService.getHighlightStyle(type).color ||
         (type === 'dialogue' ? '#ce9178' : '#4ec9b0');
 
-    // 预设颜色
     const presetColors = [
-        { label: '$(symbol-color) 橙色', description: '#ce9178', value: '#ce9178' },
-        { label: '$(symbol-color) 青色', description: '#4ec9b0', value: '#4ec9b0' },
-        { label: '$(symbol-color) 黄色', description: '#dcdcaa', value: '#dcdcaa' },
-        { label: '$(symbol-color) 蓝色', description: '#569cd6', value: '#569cd6' },
-        { label: '$(symbol-color) 绿色', description: '#6a9955', value: '#6a9955' },
-        { label: '$(symbol-color) 粉色', description: '#c586c0', value: '#c586c0' },
-        { label: '$(edit) 自定义...', description: '输入自定义颜色代码', value: 'custom' }
-    ];
+        { label: '$(symbol-color) 橙色',  description: '#ce9178', value: '#ce9178' },
+        { label: '$(symbol-color) 青色',  description: '#4ec9b0', value: '#4ec9b0' },
+        { label: '$(symbol-color) 黄色',  description: '#dcdcaa', value: '#dcdcaa' },
+        { label: '$(symbol-color) 蓝色',  description: '#569cd6', value: '#569cd6' },
+        { label: '$(symbol-color) 绿色',  description: '#6a9955', value: '#6a9955' },
+        { label: '$(symbol-color) 粉色',  description: '#c586c0', value: '#c586c0' },
+        { label: '$(edit) 自定义...', description: '输入自定义颜色代码', value: 'custom' },
+    ].map(c => ({ ...c, picked: c.value === currentColor }));
 
     const selected = await vscode.window.showQuickPick(presetColors, {
-        placeHolder: `选择${label}`
+        placeHolder: `选择${label}（当前：${currentColor}）`,
     });
 
-    if (!selected) {
-        return;
-    }
+    if (!selected) { return; }
 
     let color = selected.value;
 
-    // 如果选择自定义，弹出输入框
     if (color === 'custom') {
         const input = await vscode.window.showInputBox({
             prompt: '输入颜色代码（如 #ff0000）',
@@ -294,90 +271,63 @@ async function configureColor(type: 'dialogue' | 'character', label: string): Pr
             }
         });
 
-        if (!input) {
-            return;
-        }
+        if (!input) { return; }
         color = input;
     }
 
+    if (color === currentColor) { return; }
+
     await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
+        if (!draft.noveler) { draft.noveler = {}; }
+        if (!draft.noveler.highlight) { draft.noveler.highlight = {}; }
+        if (!(draft.noveler.highlight as Record<string, unknown>)[type]) {
+            (draft.noveler.highlight as Record<string, unknown>)[type] = {};
         }
-        if (!draft.noveler.highlight) {
-            draft.noveler.highlight = {};
-        }
-        if (!draft.noveler.highlight[type]) {
-            draft.noveler.highlight[type] = {};
-        }
-        draft.noveler.highlight[type]!.color = color;
+        ((draft.noveler.highlight as Record<string, Record<string, string>>)[type]).color = color;
     });
 
     vscode.window.showInformationMessage(`已设置${label}为 ${color}`);
 }
 
-/**
- * 直接切换护眼模式
- */
-async function toggleEyeCareModeDirect(): Promise<void> {
-    const configService = ConfigService.getInstance();
-    const currentEnabled = configService.isEyeCareModeEnabled();
-
-    // 直接切换状态
-    const newEnabled = await configService.toggleEyeCareMode(!currentEnabled);
-
-    vscode.window.showInformationMessage(
-        `已${newEnabled ? '启用' : '禁用'}护眼模式（仅当前项目生效）`
-    );
-}
-
-/**
- * 配置章节编号模式
- */
 async function configureChapterNumbering(): Promise<void> {
     const configService = ConfigService.getInstance();
     const current = configService.getVolumesConfig().chapterNumbering;
 
-    const modeLabels: Record<string, string> = { global: '全局连续', volume: '按卷重置', mixed: '混合' };
-
     const options = [
         {
-            label: '按卷重置',
+            label: '$(list-ordered) 按卷重置',
             description: '每卷从第1章开始（推荐）',
             detail: '卷一第1章、卷二第1章各自独立计数，适合大多数长篇小说',
-            value: 'volume'
+            value: 'volume',
         },
         {
-            label: '全局连续',
-            description: '所有卷章节序号连续递增',
-            detail: '跨卷不重置，全书唯一编号，适合章节顺序固定不变的项目',
-            value: 'global'
+            label: '$(arrow-right) 全局连续',
+            description: '全书章节序号连续递增',
+            detail: '跨卷不重置，全书唯一编号；注意：往非末尾卷插入章节时序号可能出现空洞',
+            value: 'global',
         },
         {
-            label: '混合',
-            description: '正文卷全局连续，其他卷独立计数',
-            detail: '番外、前传、后传从第1章开始，正文卷保持全局序号',
-            value: 'mixed'
-        }
+            label: '$(git-branch) 混合（正文全局 + 番外独立）',
+            description: '正文卷连续，番外/前传/后传各自从第1章开始',
+            detail: '主线剧情保持全局序号，番外篇、前传、后传单独计数，互不影响',
+            value: 'mixed',
+        },
     ].map(o => ({ ...o, picked: o.value === current }));
 
     const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: `当前模式：${modeLabels[current] ?? current}，选择新模式`
+        placeHolder: `当前：${NUMBERING_LABELS[current] ?? current}  ·  选择新模式`,
+        matchOnDetail: true,
     });
 
-    if (!selected || selected.value === current) {
-        return;
-    }
+    if (!selected || selected.value === current) { return; }
 
     await configService.updateConfig((draft) => {
-        if (!draft.noveler) {
-            draft.noveler = {};
-        }
+        if (!draft.noveler) { draft.noveler = {}; }
         if (!draft.noveler.volumes) {
             draft.noveler.volumes = { enabled: false, folderStructure: 'flat', numberFormat: 'arabic', chapterNumbering: 'volume' };
         }
         draft.noveler.volumes.chapterNumbering = selected.value as 'global' | 'volume' | 'mixed';
     });
 
-    vscode.window.showInformationMessage(`已将章节编号模式设置为「${selected.label}」`);
+    vscode.window.showInformationMessage(`已将章节编号模式设置为「${selected.label.replace(/^\$\([^)]+\)\s*/, '')}」`);
 }
