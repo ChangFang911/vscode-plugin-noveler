@@ -105,7 +105,7 @@ export class OverviewNodesProvider {
 
     private createModeIndicatorItem(): NovelerTreeItem {
         const volumesEnabled = this.configService.isVolumesEnabled();
-        const modeLabel = volumesEnabled ? '📚 分卷模式' : '📄 简单模式';
+        const modeLabel = volumesEnabled ? '分卷模式' : '简单模式';
         const modeTooltip = volumesEnabled
             ? '当前使用分卷模式\n章节按卷组织\n\n点击切换到简单模式'
             : '当前使用简单模式\n所有章节在同一目录\n\n点击切换到分卷模式';

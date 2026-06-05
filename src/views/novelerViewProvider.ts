@@ -53,12 +53,17 @@ export class NovelerTreeItem extends vscode.TreeItem {
         public readonly contextValue?: string,
         public readonly description?: string,
         public readonly tooltip?: string,
-        public readonly metadata?: VolumeInfo,  // 用于存储卷信息
+        public readonly metadata?: VolumeInfo,
     ) {
         super(label, collapsibleState);
         this.contextValue = contextValue;
         this.description = description;
         this.tooltip = tooltip;
+    }
+
+    withIcon(icon: vscode.ThemeIcon): this {
+        this.iconPath = icon;
+        return this;
     }
 }
 
@@ -194,7 +199,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
             // 未初始化，显示初始化引导
             return [
                 new NovelerTreeItem(
-                    '🚀 初始化小说项目',
+                    '初始化小说项目',
                     NodeType.InitProject,
                     vscode.TreeItemCollapsibleState.None,
                     {
@@ -204,7 +209,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                     'initProject',
                     undefined,
                     '点击此处在当前工作区初始化小说项目结构'
-                )
+                ).withIcon(new vscode.ThemeIcon('add'))
             ];
         }
 
@@ -214,59 +219,59 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
 
         return [
             new NovelerTreeItem(
-                '📊 项目概览',
+                '项目概览',
                 NodeType.Overview,
                 vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
                 'overview',
                 undefined,
                 '查看项目统计信息'
-            ),
+            ).withIcon(new vscode.ThemeIcon('pulse')),
             new NovelerTreeItem(
-                '📂 章节列表',
+                '章节列表',
                 NodeType.Chapters,
                 vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
                 canCreateVolumes ? 'chapterGroupWithVolumes' : 'chapterGroup',
                 canCreateVolumes ? '点击 ➕ 创建章节或卷' : '点击 ➕ 创建章节',
                 '浏览和管理章节'
-            ),
+            ).withIcon(new vscode.ThemeIcon('book')),
             new NovelerTreeItem(
-                '👤 人物管理',
+                '人物管理',
                 NodeType.Characters,
                 vscode.TreeItemCollapsibleState.Expanded,
                 undefined,
                 'characterGroup',
                 '点击 ➕ 创建人物',
                 '管理小说人物'
-            ),
+            ).withIcon(new vscode.ThemeIcon('person')),
             new NovelerTreeItem(
-                '📝 大纲草稿',
+                '大纲草稿',
                 NodeType.Outlines,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
                 'outlineGroup',
                 undefined,
                 '大纲和草稿文件'
-            ),
+            ).withIcon(new vscode.ThemeIcon('note')),
             new NovelerTreeItem(
-                '📚 参考资料',
+                '参考资料',
                 NodeType.References,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
                 'referenceGroup',
                 undefined,
                 '灵感和参考素材'
-            ),
+            ).withIcon(new vscode.ThemeIcon('references')),
             new NovelerTreeItem(
-                '🔧 工具与设置',
+                '工具与设置',
                 NodeType.OtherActions,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
                 'otherActions',
                 undefined,
                 '更多功能和设置'
-            ),
+            ).withIcon(new vscode.ThemeIcon('tools')),
         ];
     }
 }

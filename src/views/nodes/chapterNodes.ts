@@ -44,27 +44,27 @@ export class ChapterNodesProvider {
         if (volumes.length === 0) {
             return [
                 new NovelerTreeItem(
-                    '💡 还没有卷，请在 chapters/ 下创建卷文件夹',
+                    '还没有卷，请在 chapters/ 下创建卷文件夹',
                     NodeType.EmptyHint,
                     vscode.TreeItemCollapsibleState.None,
                     undefined,
                     'emptyHint',
                     undefined,
                     '创建卷文件夹示例：chapters/第一卷-崛起/'
-                ),
+                ).withIcon(new vscode.ThemeIcon('info')),
             ];
         }
 
         const items: NovelerTreeItem[] = [];
 
         for (const volume of volumes) {
-            const statusIcon = this.getVolumeStatusIcon(volume.status);
+            const volumeIcon = this.getVolumeStatusIcon(volume.status);
             const volumeLabel = this.getVolumeLabel(volume);
             const description = `${volume.stats.chapterCount} 章 · ${volume.stats.totalWords.toLocaleString()} 字`;
             const tooltip = this.getVolumeTooltip(volume);
 
             const item = new NovelerTreeItem(
-                `${statusIcon} ${volumeLabel}`,
+                volumeLabel,
                 NodeType.Volume,
                 vscode.TreeItemCollapsibleState.Collapsed,
                 undefined,
@@ -72,7 +72,7 @@ export class ChapterNodesProvider {
                 description,
                 tooltip,
                 volume
-            );
+            ).withIcon(volumeIcon);
 
             items.push(item);
         }
@@ -107,7 +107,7 @@ export class ChapterNodesProvider {
         try {
             await vscode.workspace.fs.stat(outlinePath);
             const outlineItem = new NovelerTreeItem(
-                '📝 卷大纲',
+                '卷大纲',
                 NodeType.OutlineItem,
                 vscode.TreeItemCollapsibleState.None,
                 {
@@ -118,7 +118,7 @@ export class ChapterNodesProvider {
                 'volumeOutline',
                 undefined,
                 `点击编辑「${volume.title}」的大纲`
-            );
+            ).withIcon(new vscode.ThemeIcon('list-tree'));
             outlineItem.resourceUri = outlinePath;
             items.push(outlineItem);
         } catch {
@@ -192,14 +192,14 @@ export class ChapterNodesProvider {
         if (items.length === 0) {
             return [
                 new NovelerTreeItem(
-                    '💡 该卷还没有章节',
+                    '该卷还没有章节',
                     NodeType.EmptyHint,
                     vscode.TreeItemCollapsibleState.None,
                     undefined,
                     'emptyHint',
                     undefined,
                     '在该卷文件夹中创建 Markdown 文件'
-                ),
+                ).withIcon(new vscode.ThemeIcon('info')),
             ];
         }
 
@@ -224,14 +224,14 @@ export class ChapterNodesProvider {
             if (mdFiles.length === 0) {
                 return [
                     new NovelerTreeItem(
-                        '💡 还没有章节，点击右侧 ➕ 创建',
+                        '还没有章节，点击右侧 ➕ 创建',
                         NodeType.EmptyHint,
                         vscode.TreeItemCollapsibleState.None,
                         undefined,
                         'emptyHint',
                         undefined,
                         '点击章节列表标题右侧的 ➕ 按钮创建你的第一个章节'
-                    ),
+                    ).withIcon(new vscode.ThemeIcon('info')),
                 ];
             }
 
@@ -369,15 +369,15 @@ export class ChapterNodesProvider {
         }
     }
 
-    private getVolumeStatusIcon(status: string): string {
+    private getVolumeStatusIcon(status: string): vscode.ThemeIcon {
         switch (status) {
             case 'planning':
-                return '📝';
+                return new vscode.ThemeIcon('circle-outline');
             case 'completed':
-                return '✅';
+                return new vscode.ThemeIcon('pass');
             case 'writing':
             default:
-                return '✍️';
+                return new vscode.ThemeIcon('edit');
         }
     }
 

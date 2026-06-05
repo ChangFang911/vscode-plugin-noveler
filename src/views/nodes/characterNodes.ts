@@ -26,14 +26,14 @@ export class CharacterNodesProvider {
             if (mdFiles.length === 0) {
                 return [
                     new NovelerTreeItem(
-                        '💡 还没有人物，点击右侧 ➕ 创建',
+                        '还没有人物，点击右侧 ➕ 创建',
                         NodeType.EmptyHint,
                         vscode.TreeItemCollapsibleState.None,
                         undefined,
                         'emptyHint',
                         undefined,
                         '点击人物管理标题右侧的 ➕ 按钮创建你的第一个人物'
-                    ),
+                    ).withIcon(new vscode.ThemeIcon('info')),
                 ];
             }
 

@@ -38,14 +38,14 @@ export class OutlineNodesProvider {
             if (mdFiles.length === 0) {
                 return [
                     new NovelerTreeItem(
-                        `💡 还没有${itemTypeName}文件`,
+                        `还没有${itemTypeName}文件`,
                         NodeType.EmptyHint,
                         vscode.TreeItemCollapsibleState.None,
                         undefined,
                         'emptyHint',
                         undefined,
                         `可以在 ${folderName}/ 目录创建 Markdown 文件`
-                    ),
+                    ).withIcon(new vscode.ThemeIcon('info')),
                 ];
             }
 

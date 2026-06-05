@@ -66,7 +66,7 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
 
                 // 目标进度 Code Lens（如果设置了目标字数）
                 if (targetWords > 0) {
-                    const progressIcon = progress >= 100 ? '✅' : progress >= 50 ? '��' : '📋';
+                    const progressIcon = progress >= 100 ? '✅' : progress >= 50 ? '📝' : '📋';
                     codeLenses.push(new vscode.CodeLens(range, {
                         title: `${progressIcon} ${progress}% (目标: ${targetWords.toLocaleString()})`,
                         tooltip: `当前进度: ${totalWords.toLocaleString()} / ${targetWords.toLocaleString()} 字`,
