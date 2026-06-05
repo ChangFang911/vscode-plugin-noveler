@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as jsoncParser from 'jsonc-parser';
 import { VolumeInfo, VolumeStatus, VolumeType } from '../types/volume';
 import { Logger } from '../utils/logger';
@@ -11,6 +10,7 @@ import { generateVolumeFolderName, getVolumeStatusName, getVolumeTypeName } from
 import { CHAPTER_NUMBER_PADDING, DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
 import { writeAndOpenChapter } from './createChapter';
 import { loadTemplates } from '../utils/templateLoader';
+import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
 
 /**
  * 重命名卷
@@ -368,9 +368,12 @@ async function setVolumeTypeInternal(volume: VolumeInfo): Promise<void> {
  */
 async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
     const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
+    const volumeJsonUri = vscode.Uri.file(volumeJsonPath);
 
     // 如果 volume.json 不存在，先创建
-    if (!fs.existsSync(volumeJsonPath)) {
+    try {
+        await vscode.workspace.fs.stat(volumeJsonUri);
+    } catch {
         const metadata = {
             "volume": volume.volume,
             "volumeType": volume.volumeType,
@@ -384,7 +387,7 @@ async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
             "theme": "",
             "mainConflict": ""
         };
-        fs.writeFileSync(volumeJsonPath, JSON.stringify(metadata, null, 2), 'utf-8');
+        await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(JSON.stringify(metadata, null, 2), 'utf-8'));
         Logger.info(`创建 volume.json: ${volumeJsonPath}`);
     }
 
@@ -458,16 +461,23 @@ export async function openVolumeOutline(item: NovelerTreeItem): Promise<void> {
     }
 
     const outlinePath = path.join(volume.folderPath, 'outline.md');
+    const outlineUri = vscode.Uri.file(outlinePath);
 
     // 检查大纲文件是否存在
-    if (!fs.existsSync(outlinePath)) {
+    let outlineExists = true;
+    try {
+        await vscode.workspace.fs.stat(outlineUri);
+    } catch {
+        outlineExists = false;
+    }
+
+    if (!outlineExists) {
         const create = await vscode.window.showInformationMessage(
             `卷「${volume.title}」还没有大纲文件，是否创建？`,
             '创建', '取消'
         );
 
         if (create === '创建') {
-            // 创建大纲文件
             const outlineContent = `# ${volume.title} - 大纲
 
 ## 卷概述
@@ -504,7 +514,7 @@ export async function openVolumeOutline(item: NovelerTreeItem): Promise<void> {
 3. 事件3
 `;
             try {
-                fs.writeFileSync(outlinePath, outlineContent, 'utf-8');
+                await vscode.workspace.fs.writeFile(outlineUri, Buffer.from(outlineContent, 'utf-8'));
                 Logger.info(`创建卷大纲: ${outlinePath}`);
             } catch (error) {
                 Logger.error('创建卷大纲失败', error);
@@ -709,33 +719,14 @@ export async function copyChapterToVolume(item: NovelerTreeItem): Promise<void> 
  * 更新章节 frontmatter 中的 volume 和 volumeType 字段
  */
 function updateChapterVolumeFrontMatter(content: string, targetVolume: VolumeInfo): string {
-    // 使用正则表达式替换 frontmatter 中的 volume 和 volumeType
-    let updatedContent = content;
-
-    // 匹配 frontmatter 区域
-    const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-    if (frontmatterMatch) {
-        let frontmatterContent = frontmatterMatch[1];
-
-        // 更新或添加 volume 字段
-        if (/^volume:\s*.+$/m.test(frontmatterContent)) {
-            frontmatterContent = frontmatterContent.replace(/^volume:\s*.+$/m, `volume: ${targetVolume.volume}`);
-        } else {
-            frontmatterContent += `\nvolume: ${targetVolume.volume}`;
-        }
-
-        // 更新或添加 volumeType 字段
-        if (/^volumeType:\s*.+$/m.test(frontmatterContent)) {
-            frontmatterContent = frontmatterContent.replace(/^volumeType:\s*.+$/m, `volumeType: ${targetVolume.volumeType}`);
-        } else {
-            frontmatterContent += `\nvolumeType: ${targetVolume.volumeType}`;
-        }
-
-        // 替换整个 frontmatter
-        updatedContent = content.replace(/^---\s*\n[\s\S]*?\n---/, `---\n${frontmatterContent}\n---`);
+    const parsed = parseFrontMatter(content);
+    if (parsed.isEmpty) {
+        return content;
     }
-
-    return updatedContent;
+    const data = parsed.data as Record<string, unknown>;
+    data.volume = targetVolume.volume;
+    data.volumeType = targetVolume.volumeType;
+    return stringifyFrontMatter(parsed.content, data);
 }
 
 /**

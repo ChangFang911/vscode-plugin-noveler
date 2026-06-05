@@ -110,8 +110,9 @@ export async function activate(context: vscode.ExtensionContext) {
             wordCountService,
             configService,
             focusModeService,
-            sensitiveWordService: null as unknown as SensitiveWordService, // 稍后初始化
+            sensitiveWordService: null as unknown as SensitiveWordService,
             sensitiveWordDiagnostic: null as unknown as SensitiveWordDiagnosticProvider,
+            getSensitiveWordDiagnostic: () => sensitiveWordDiagnostic,
             novelerViewProvider,
             statsWebviewProvider,
             welcomeWebviewProvider,
@@ -369,11 +370,13 @@ function registerFileSystemWatchers(
     const sensitiveWordsWatcher = vscode.workspace.createFileSystemWatcher(sensitiveWordsPattern);
 
     const reloadSensitiveWords = async () => {
+        if (!sensitiveWordService) {
+            return;
+        }
         try {
             await sensitiveWordService.reload();
             Logger.info('[Noveler] 敏感词库已自动重新加载');
-
-            if (vscode.window.activeTextEditor) {
+            if (vscode.window.activeTextEditor && sensitiveWordDiagnostic) {
                 sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
             }
         } catch (error) {

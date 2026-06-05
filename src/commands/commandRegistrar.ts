@@ -65,6 +65,8 @@ export interface CommandRegistrarDeps {
     previewWebviewProvider: PreviewWebviewProvider;
     highlightProvider: NovelHighlightProvider;
     updateHighlights: (editor: vscode.TextEditor | undefined) => void;
+    /** 运行时获取敏感词诊断提供器（服务延迟初始化，注册时可能为 null） */
+    getSensitiveWordDiagnostic: () => SensitiveWordDiagnosticProvider | undefined;
 }
 
 /**
@@ -267,7 +269,7 @@ function registerVolumeCommands(deps: CommandRegistrarDeps): void {
  * 注册敏感词相关命令
  */
 function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
-    const { context, sensitiveWordDiagnostic } = deps;
+    const { context, getSensitiveWordDiagnostic } = deps;
 
     // 打开敏感词配置
     context.subscriptions.push(
@@ -314,12 +316,12 @@ function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
     // 忽略敏感词（会话级别）
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.ignoreSensitiveWord', (documentUri: string, word: string) => {
-            if (sensitiveWordDiagnostic && documentUri && word) {
-                sensitiveWordDiagnostic.ignoreWordInDocument(documentUri, word);
-                // 刷新当前文档的诊断
+            const diagnostic = getSensitiveWordDiagnostic();
+            if (diagnostic && documentUri && word) {
+                diagnostic.ignoreWordInDocument(documentUri, word);
                 const editor = vscode.window.activeTextEditor;
                 if (editor && editor.document.uri.toString() === documentUri) {
-                    sensitiveWordDiagnostic.updateDiagnostics(editor.document);
+                    diagnostic.updateDiagnostics(editor.document);
                 }
             }
         })
