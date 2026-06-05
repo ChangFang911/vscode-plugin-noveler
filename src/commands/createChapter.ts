@@ -230,8 +230,6 @@ export async function createChapter(chapterName: string): Promise<void> {
     }
 
     // 生成章节信息
-    // title 字段只包含章节名称，不包含章节号（侧边栏会自动添加章节号）
-    const chapterTitle = sanitizedName;
     const fullChapterTitle = `第${convertToChineseNumber(nextChapterNumber)}章 ${sanitizedName}`;
 
     // 根据卷的编号格式生成文件名

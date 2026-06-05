@@ -190,7 +190,8 @@ export async function activate(context: vscode.ExtensionContext) {
             return await sensitiveWordServicePromise;
         };
 
-        // === 初始化敏感词服务已改为延迟加载 ===
+        // 触发后台初始化（不阻塞启动）
+        void initializeSensitiveWordService();
 
         // 🚀 姓名生成服务已在并行加载中处理，此处移除重复初始化
 

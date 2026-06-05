@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as cp from 'child_process';
+import * as fs from 'fs';
 import { ConfigService } from './configService';
 import { Logger } from '../utils/logger';
 
@@ -82,7 +83,6 @@ export class FocusModeService implements vscode.Disposable {
     private cacheSoundFiles(): void {
         if (!this.extensionContext) return;
 
-        const fs = require('fs');
         const soundTypes: TypingSoundType[] = ['mechanical', 'typewriter', 'bubble', 'pop', 'click', 'click2', 'click3'];
 
         for (const soundType of soundTypes) {
@@ -104,7 +104,6 @@ export class FocusModeService implements vscode.Disposable {
      * 缓存自定义音效文件
      */
     private cacheCustomSounds(): void {
-        const fs = require('fs');
 
         // 清除旧的自定义音效缓存
         this.soundFileCache.delete('custom');
@@ -533,7 +532,6 @@ export class FocusModeService implements vscode.Disposable {
      * 试听指定路径的音效文件
      */
     private previewSoundFile(soundPath: string): void {
-        const fs = require('fs');
         if (!fs.existsSync(soundPath)) return;
         this.playSoundFile(soundPath);
     }
