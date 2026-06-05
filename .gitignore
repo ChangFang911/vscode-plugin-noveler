@@ -1,6 +1,7 @@
 node_modules
 out
 *.vsix
+releases/
 .vscode-test/
 .DS_Store
 examples
