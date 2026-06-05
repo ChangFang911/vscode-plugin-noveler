@@ -290,7 +290,7 @@ export class PreviewWebviewProvider {
      */
     private formatBody(body: string): string {
         // 分割段落
-        const paragraphs = body.split(/\n\s*\n/);
+        const paragraphs = body.split(/\n/);
 
         // 处理每个段落
         const formattedParagraphs = paragraphs
