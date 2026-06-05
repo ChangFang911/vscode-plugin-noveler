@@ -104,16 +104,13 @@ export class ProjectStatsService {
         const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
 
         try {
-            const files = await vscode.workspace.fs.readDirectory(chaptersPath);
-            const mdFiles = files.filter(([name, type]) =>
-                type === vscode.FileType.File && name.endsWith('.md')
-            );
+            // 递归扫描所有 .md 文件（支持扁平结构和分卷嵌套结构）
+            const mdFilePaths = await this.scanForMdFiles(chaptersPath);
 
-            stats.chapterCount = mdFiles.length;
+            stats.chapterCount = mdFilePaths.length;
 
             // 读取每个章节文件统计字数和状态
-            for (const [filename] of mdFiles) {
-                const filePath = vscode.Uri.joinPath(chaptersPath, filename);
+            for (const filePath of mdFilePaths) {
                 try {
                     const content = await vscode.workspace.fs.readFile(filePath);
                     const text = Buffer.from(content).toString('utf8');
@@ -128,12 +125,43 @@ export class ProjectStatsService {
                         stats.completedChapters++;
                     }
                 } catch (error) {
-                    handleError(`读取章节文件失败 ${filename}`, error, ErrorSeverity.Silent);
+                    handleError(`读取章节文件失败 ${filePath.fsPath}`, error, ErrorSeverity.Silent);
                 }
             }
         } catch (error) {
             // chapters 目录不存在，忽略
         }
+    }
+
+    /**
+     * 递归扫描目录中的所有 .md 文件（支持扁平结构和嵌套结构）
+     * 排除 outline.md 等非章节文件
+     */
+    private async scanForMdFiles(dirPath: vscode.Uri): Promise<vscode.Uri[]> {
+        const mdFiles: vscode.Uri[] = [];
+
+        try {
+            const entries = await vscode.workspace.fs.readDirectory(dirPath);
+
+            for (const [name, type] of entries) {
+                if (type === vscode.FileType.Directory) {
+                    // 递归扫描子目录（支持分卷结构）
+                    const subDirPath = vscode.Uri.joinPath(dirPath, name);
+                    const subFiles = await this.scanForMdFiles(subDirPath);
+                    mdFiles.push(...subFiles);
+                } else if (type === vscode.FileType.File && name.endsWith('.md')) {
+                    // 排除 outline.md 等非章节文件
+                    if (name === 'outline.md' || name === 'README.md') {
+                        continue;
+                    }
+                    mdFiles.push(vscode.Uri.joinPath(dirPath, name));
+                }
+            }
+        } catch (error) {
+            // 目录不存在或无法读取，忽略
+        }
+
+        return mdFiles;
     }
 
     /**
@@ -146,12 +174,9 @@ export class ProjectStatsService {
         const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
         try {
-            const files = await vscode.workspace.fs.readDirectory(charactersPath);
-            const mdFiles = files.filter(([name, type]) =>
-                type === vscode.FileType.File && name.endsWith('.md')
-            );
-
-            stats.characterCount = mdFiles.length;
+            // 递归扫描所有 .md 文件
+            const mdFilePaths = await this.scanForMdFiles(charactersPath);
+            stats.characterCount = mdFilePaths.length;
         } catch (error) {
             // characters 目录不存在，忽略
         }

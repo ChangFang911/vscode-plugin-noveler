@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import { ProjectStatsService, ProjectStats } from '../services/projectStatsService';
+import { Logger } from '../utils/logger';
 
 export class StatsWebviewProvider {
     private static currentPanel: vscode.WebviewPanel | undefined;
@@ -59,6 +60,9 @@ export class StatsWebviewProvider {
                         case 'refresh':
                             await this.updateContent();
                             break;
+                        case 'close':
+                            StatsWebviewProvider.currentPanel?.dispose();
+                            break;
                     }
                 },
                 undefined,
@@ -68,28 +72,40 @@ export class StatsWebviewProvider {
     }
 
     /**
+     * 刷新面板（如果可见）
+     */
+    public refreshIfVisible(): Promise<void> {
+        if (StatsWebviewProvider.currentPanel) {
+            return this.updateContent();
+        }
+        return Promise.resolve();
+    }
+
+    /**
      * 更新面板内容
      */
-    private async updateContent() {
+    private async updateContent(): Promise<void> {
         if (!StatsWebviewProvider.currentPanel) {
             return;
         }
 
-        const stats = await this.statsService.getStats();
-        if (stats) {
+        try {
+            const stats = await this.statsService.getStats();
             StatsWebviewProvider.currentPanel.webview.html = this.getHtmlContent(stats);
+        } catch (error) {
+            Logger.error('[StatsWebviewProvider] 更新内容失败', error);
         }
     }
 
     /**
      * 生成 HTML 内容
      */
-    private getHtmlContent(stats: ProjectStats): string {
-        const completionRate = stats.completionRate || 0;
-        const totalWords = stats.totalWords || 0;
-        const chapterCount = stats.chapterCount || 0;
-        const completedChapters = stats.completedChapters || 0;
-        const characterCount = stats.characterCount || 0;
+    private getHtmlContent(stats: ProjectStats | null): string {
+        const completionRate = stats?.completionRate || 0;
+        const totalWords = stats?.totalWords || 0;
+        const chapterCount = stats?.chapterCount || 0;
+        const completedChapters = stats?.completedChapters || 0;
+        const characterCount = stats?.characterCount || 0;
 
         // 计算平均章节字数
         const avgWordsPerChapter = chapterCount > 0 ? Math.round(totalWords / chapterCount) : 0;
@@ -271,7 +287,7 @@ export class StatsWebviewProvider {
 
     <div class="action-buttons">
         <button onclick="refresh()">🔄 刷新数据</button>
-        <button onclick="close()">❌ 关闭</button>
+        // <button onclick="close()">❌ 关闭</button>
     </div>
 
     <script>
@@ -282,7 +298,7 @@ export class StatsWebviewProvider {
         }
 
         function close() {
-            window.close();
+            vscode.postMessage({ command: 'close' });
         }
     </script>
 </body>

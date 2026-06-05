@@ -314,7 +314,7 @@ export async function updateReadme(silent = false): Promise<void> {
         // 检查 README 是否存在
         await vscode.workspace.fs.stat(readmeUri);
     } catch {
-        vscode.window.showErrorMessage('Noveler: 未找到 README.md 文件，请先初始化项目');
+        // README 不存在，跳过更新（用户可以通过初始化项目创建）
         return;
     }
 

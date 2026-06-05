@@ -11,9 +11,88 @@ import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES } from '../constants';
+import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES, SIDEBAR_REFRESH_DELAY } from '../constants';
 import { Logger } from '../utils/logger';
 import { VolumeInfo } from '../types/volume';
+
+/**
+ * 公共：写入章节文件并在编辑器中打开
+ * createChapter 和 createChapterInVolume 均通过此函数完成实际文件操作
+ */
+export async function writeAndOpenChapter(params: {
+    folderUri: vscode.Uri;
+    fileName: string;
+    chapterTitle: string;       // 用于标题行（含章节号）
+    chapterNumber: number;
+    volumeInfo?: { volume: number; volumeType: string; folderName?: string };
+    targetWords: number;
+    template?: { frontMatter?: { wordCount: number; status: string; characters: unknown[]; locations: unknown[]; tags: unknown[] }; content?: string };
+}): Promise<void> {
+    const { folderUri, fileName, chapterTitle, chapterNumber, volumeInfo, targetWords, template } = params;
+    const fileUri = vscode.Uri.joinPath(folderUri, fileName);
+
+    // 检查文件是否已存在
+    try {
+        await vscode.workspace.fs.stat(fileUri);
+        vscode.window.showWarningMessage(`Noveler: 文件已存在: ${fileName}`);
+        return;
+    } catch {
+        // 文件不存在，继续创建
+    }
+
+    const now = formatDateTime(new Date());
+    const fm = template?.frontMatter;
+    const content = template?.content || "\n";
+
+    const frontMatterLines: string[] = [
+        `title: ${params.chapterTitle.replace(/^第\S+章\s*/, '')}`,  // title 只存章节名，不含序号
+        `chapter: ${chapterNumber}`
+    ];
+    if (volumeInfo) {
+        frontMatterLines.push(`volume: ${volumeInfo.volume}`);
+        frontMatterLines.push(`volumeType: ${volumeInfo.volumeType}`);
+    }
+    frontMatterLines.push(
+        `status: ${fm?.status ?? 'draft'}`,
+        `created: ${now}`,
+        `modified: ${now}`,
+        `wordCount: ${fm?.wordCount ?? 0}`,
+        `targetWords: ${targetWords}`,
+        `characters: ${JSON.stringify(fm?.characters ?? [])}`,
+        `locations: ${JSON.stringify(fm?.locations ?? [])}`,
+        `tags: ${JSON.stringify(fm?.tags ?? [])}`
+    );
+
+    const fileContent = `---\n${frontMatterLines.join('\n')}\n---\n\n# ${chapterTitle}\n${content}`;
+
+    try {
+        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(fileContent, 'utf8'));
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        const editor = await vscode.window.showTextDocument(doc, {
+            viewColumn: vscode.ViewColumn.Active,
+            preserveFocus: false
+        });
+
+        const locationInfo = volumeInfo?.folderName ? ` (${volumeInfo.folderName})` : '';
+        handleSuccess(`新章节已创建: ${params.chapterTitle.replace(/^第\S+章\s*/, '')}${locationInfo}`);
+
+        setTimeout(() => {
+            vscode.commands.executeCommand('noveler.refresh').then(
+                () => {
+                    if (editor !== vscode.window.activeTextEditor) {
+                        vscode.window.showTextDocument(editor.document, {
+                            viewColumn: editor.viewColumn,
+                            preserveFocus: false
+                        });
+                    }
+                },
+                (error: unknown) => { Logger.error('刷新侧边栏失败', error); }
+            );
+        }, SIDEBAR_REFRESH_DELAY);
+    } catch (error) {
+        handleError('创建章节失败', error);
+    }
+}
 
 /**
  * 创建新章节
@@ -47,9 +126,12 @@ export async function createChapter(chapterName: string): Promise<void> {
     const configService = ConfigService.getInstance();
     await configService.waitForConfig(); // 等待配置加载完成
 
+    // 关键：重新加载配置，确保使用最新的用户设置
+    await configService.reloadConfig();
+
     // 获取分卷服务
     const volumeService = VolumeService.getInstance();
-    await volumeService.scanVolumes();
+    await volumeService.scanVolumes(true); // 强制刷新，防止缓存导致章节号重复
 
     const volumesConfig = configService.getVolumesConfig();
 
@@ -148,7 +230,6 @@ export async function createChapter(chapterName: string): Promise<void> {
     }
 
     // 生成章节信息
-    const now = formatDateTime(new Date());
     // title 字段只包含章节名称，不包含章节号（侧边栏会自动添加章节号）
     const chapterTitle = sanitizedName;
     const fullChapterTitle = `第${convertToChineseNumber(nextChapterNumber)}章 ${sanitizedName}`;
@@ -180,65 +261,21 @@ export async function createChapter(chapterName: string): Promise<void> {
     const templates = await loadTemplates();
     const chapterTemplate = templates?.chapter;
 
-    // 从配置文件读取目标字数
+    // 🔑 关键：在使用 targetWords 前再次刷新，确保分卷模式下也能获取最新配置
+    await configService.reloadConfig();
     const targetWords = configService.getTargetWords();
 
-    const frontMatter = chapterTemplate?.frontMatter || {
-        wordCount: 0,
-        targetWords: targetWords,
-        characters: [],
-        locations: [],
-        tags: [],
-        status: "draft"
-    };
-
-    // 确保使用配置中的 targetWords（即使模板中有值也覆盖）
-    frontMatter.targetWords = targetWords;
-
-    const content = chapterTemplate?.content || "\n";
-
-    const template = `---
-title: ${chapterTitle}
-chapter: ${nextChapterNumber}
-wordCount: ${frontMatter.wordCount}
-targetWords: ${frontMatter.targetWords}
-characters: ${JSON.stringify(frontMatter.characters)}
-locations: ${JSON.stringify(frontMatter.locations)}
-tags: ${JSON.stringify(frontMatter.tags)}
-created: '${now}'
-modified: '${now}'
-status: ${frontMatter.status}
----
-
-# ${fullChapterTitle}
-${content}`;
-
-    const fileUri = vscode.Uri.joinPath(targetFolderUri, fileName);
-
-    // 检查文件是否已存在
-    try {
-        await vscode.workspace.fs.stat(fileUri);
-        vscode.window.showWarningMessage(`Noveler: 文件已存在: ${fileName}`);
-        return;
-    } catch {
-        // 文件不存在，继续创建
-    }
-
-    try {
-        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(template, 'utf8'));
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        await vscode.window.showTextDocument(doc);
-
-        // 成功提示
-        let successMessage = `新章节已创建: ${chapterTitle}`;
-        if (targetVolume) {
-            successMessage += ` (${targetVolume.folderName})`;
-        }
-        handleSuccess(successMessage);
-
-        // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
-        await vscode.commands.executeCommand('noveler.refresh');
-    } catch (error) {
-        handleError('创建章节失败', error);
-    }
+    await writeAndOpenChapter({
+        folderUri: targetFolderUri,
+        fileName,
+        chapterTitle: fullChapterTitle,
+        chapterNumber: nextChapterNumber,
+        volumeInfo: targetVolume ? {
+            volume: targetVolume.volume,
+            volumeType: targetVolume.volumeType,
+            folderName: targetVolume.folderName
+        } : undefined,
+        targetWords,
+        template: chapterTemplate
+    });
 }

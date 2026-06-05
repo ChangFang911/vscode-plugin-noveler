@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
-import { CONFIG_FILE_NAME } from '../constants';
+import { CONFIG_FILE_NAME, DEFAULT_TARGET_WORDS } from '../constants';
 import * as jsoncParser from 'jsonc-parser';
 import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
@@ -174,6 +174,58 @@ export class ConfigService {
         }
     }
 
+    /**
+     * 重新加载配置文件
+     * 用于外部触发配置重新加载（如配置文件被修改时）
+     */
+    public async reloadConfig(): Promise<void> {
+        // 等待任何正在进行的加载完成，再强制重新加载
+        if (this.configLoadPromise) {
+            try {
+                await this.configLoadPromise;
+            } catch {
+                // 忽略之前加载的错误
+            }
+        }
+        // 强制加载：绕过 isLoading 锁，直接读取文件
+        await this.forceLoadConfig();
+    }
+
+    private async forceLoadConfig(): Promise<void> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
+
+        try {
+            const fileData = await vscode.workspace.fs.readFile(configUri);
+            const configText = Buffer.from(fileData).toString('utf8');
+
+            let fullConfig;
+            try {
+                fullConfig = jsoncParser.parse(configText);
+            } catch (parseError) {
+                handleError('novel.jsonc 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
+                return;
+            }
+
+            if (fullConfig?.noveler) {
+                const errors = validateConfig(fullConfig.noveler);
+                const errorMessages = errors.filter((e: { severity: string }) => e.severity === 'error');
+                if (errorMessages.length > 0) {
+                    this.config = fixConfig(fullConfig.noveler);
+                } else {
+                    this.config = fullConfig.noveler;
+                }
+                Logger.info(`[ConfigService] 强制重载完成，targetWords.default = ${this.config.targetWords?.default}`);
+            }
+        } catch {
+            Logger.debug('reloadConfig: novel.jsonc 不存在或读取失败');
+        }
+    }
+
     private async loadConfig() {
         // 防止并发加载
         if (this.isLoading) {
@@ -230,6 +282,9 @@ export class ConfigService {
                         this.config = fullConfig.noveler;
                     }
 
+                    // 日志：记录加载的配置
+                    Logger.info(`[ConfigService] 配置已加载，targetWords.default = ${this.config.targetWords?.default}`);
+
                     // 触发配置变更事件
                     this._onDidChangeConfig.fire(this.config);
                     // 配置加载完成，触发重新加载高亮
@@ -251,7 +306,7 @@ export class ConfigService {
     private setDefaultConfig() {
         this.config = {
             targetWords: {
-                default: 2500
+                default: DEFAULT_TARGET_WORDS
             },
             highlight: {
                 dialogue: {
@@ -397,7 +452,7 @@ export class ConfigService {
      * @returns 默认目标字数，默认为 2500
      */
     public getTargetWords(): number {
-        return this.config.targetWords?.default || 2500;
+        return this.config.targetWords?.default || DEFAULT_TARGET_WORDS;
     }
 
     /**
@@ -625,7 +680,8 @@ export class ConfigService {
             const encoder = new TextEncoder();
             await vscode.workspace.fs.writeFile(configUri, encoder.encode(newText));
 
-            // 重新加载配置
+            // 重置加载锁，确保 loadConfig 不被跳过
+            this.isLoading = false;
             await this.loadConfig();
             Logger.info('配置已更新');
         }

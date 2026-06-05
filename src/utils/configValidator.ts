@@ -3,6 +3,7 @@
  */
 
 import { NovelConfig } from '../services/configService';
+import { DEFAULT_TARGET_WORDS } from '../constants';
 
 export interface ValidationError {
     field: string;
@@ -135,7 +136,7 @@ export function fixConfig(config: NovelConfig): NovelConfig {
     // 修复 targetWords
     if (fixed.targetWords?.default !== undefined) {
         if (typeof fixed.targetWords.default !== 'number' || fixed.targetWords.default <= 0) {
-            fixed.targetWords.default = 2500; // 恢复默认值
+            fixed.targetWords.default = DEFAULT_TARGET_WORDS;
         }
     }
 

@@ -14,6 +14,7 @@ import { NovelerViewProvider } from '../views/novelerViewProvider';
 import { StatsWebviewProvider } from '../views/statsWebviewProvider';
 import { WelcomeWebviewProvider } from '../views/welcomeWebviewProvider';
 import { PreviewWebviewProvider } from '../views/previewWebviewProvider';
+import { VolumeService } from '../services/volumeService';
 import { handleReadmeAutoUpdate } from '../utils/readmeAutoUpdate';
 import { initProject } from './initProject';
 import { createChapter } from './createChapter';
@@ -88,6 +89,7 @@ function registerCoreCommands(deps: CommandRegistrarDeps): void {
     // 刷新命令
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.refresh', async () => {
+            VolumeService.getInstance().invalidateCache();
             novelerViewProvider.refresh();
             await handleReadmeAutoUpdate();
         })

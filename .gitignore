@@ -4,6 +4,7 @@ out
 .vscode-test/
 .DS_Store
 examples
+demo
 
 # 测试覆盖率
 coverage/

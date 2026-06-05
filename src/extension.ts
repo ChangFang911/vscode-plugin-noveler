@@ -39,6 +39,7 @@ let sensitiveWordDiagnostic: SensitiveWordDiagnosticProvider;
 let wordCountDebouncer: Debouncer;
 let highlightDebouncer: Debouncer;
 let readmeUpdateDebouncer: Debouncer;
+let isApplyingAutoLineBreak = false;
 
 export async function activate(context: vscode.ExtensionContext) {
     // 初始化日志系统（最先执行，确保后续能记录日志）
@@ -121,12 +122,29 @@ export async function activate(context: vscode.ExtensionContext) {
         Logger.info('[Noveler] 命令已注册');
 
         // 注册事件监听器
-        registerEventListeners(context, novelerViewProvider);
+        registerEventListeners(context, novelerViewProvider, statsWebviewProvider);
 
         // === 以下是可以延迟加载的服务 ===
 
-        // 等待配置加载完��
-        await configService.waitForConfig();
+        // 🚀 并行加载配置和其他初始化
+        // 配置加载和姓名生成服务不相互依赖，可以并行执行
+        const configPromise = configService.waitForConfig();
+
+        const nameGenPromise = Promise.resolve().then(() => {
+            try {
+                NameGeneratorService.initialize(context);
+                Logger.info('[Noveler] 随机起名功能已启用');
+            } catch (nameGenError) {
+                Logger.error('[Noveler] 姓名生成服务初始化失败', nameGenError);
+                throw nameGenError;
+            }
+        });
+
+        const results = await Promise.allSettled([configPromise, nameGenPromise]);
+
+        if (results[0].status === 'rejected') {
+            Logger.error('[Noveler] 配置加载失败', results[0].reason);
+        }
 
         // 执行配置迁移（如果需要）
         try {
@@ -135,34 +153,46 @@ export async function activate(context: vscode.ExtensionContext) {
             Logger.error('[Noveler] 配置迁移失败，但不影响基本功能', migrationError);
         }
 
-        // 初始化敏感词检测服务
-        try {
-            sensitiveWordService = await SensitiveWordService.initialize(context);
-            sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
-            sensitiveWordDiagnostic.register(context);
+        // 延迟加载敏感词服务（不阻塞初始化）
+        // 用户首次需要敏感词检测时才初始化
+        let sensitiveWordServicePromise: Promise<SensitiveWordService | null> | null = null;
 
-            // 注册敏感词快速修复提供器
-            context.subscriptions.push(
-                vscode.languages.registerCodeActionsProvider(
-                    'markdown',
-                    new SensitiveWordCodeActionProvider(),
-                    {
-                        providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
+        const initializeSensitiveWordService = async () => {
+            if (sensitiveWordService) {
+                return sensitiveWordService;
+            }
+            if (!sensitiveWordServicePromise) {
+                sensitiveWordServicePromise = (async () => {
+                    try {
+                        const service = await SensitiveWordService.initialize(context);
+                        sensitiveWordService = service;
+                        sensitiveWordDiagnostic = new SensitiveWordDiagnosticProvider(sensitiveWordService);
+                        sensitiveWordDiagnostic.register(context);
+
+                        // 注册敏感词快速修复提供器
+                        context.subscriptions.push(
+                            vscode.languages.registerCodeActionsProvider(
+                                'markdown',
+                                new SensitiveWordCodeActionProvider(),
+                                {
+                                    providedCodeActionKinds: SensitiveWordCodeActionProvider.providedCodeActionKinds
+                                }
+                            )
+                        );
+                        Logger.info('[Noveler] 敏感词检测功能已启用（延迟加载）');
+                        return service;
+                    } catch (error) {
+                        Logger.error('[Noveler] 敏感词服务初始化失败，但不影响基本功能', error);
+                        return null;
                     }
-                )
-            );
-            Logger.info('[Noveler] 敏感词检测功能已启用');
-        } catch (sensitiveWordError) {
-            Logger.error('[Noveler] 敏感词服务初始化失败，但不影响基本功能', sensitiveWordError);
-        }
+                })();
+            }
+            return await sensitiveWordServicePromise;
+        };
 
-        // 初始化姓名生成服务
-        try {
-            NameGeneratorService.initialize(context);
-            Logger.info('[Noveler] 随机起名功能已启用');
-        } catch (nameGenError) {
-            Logger.error('[Noveler] 姓名生成服务初始化失败', nameGenError);
-        }
+        // === 初始化敏感词服务已改为延迟加载 ===
+
+        // 🚀 姓名生成服务已在并行加载中处理，此处移除重复初始化
 
         // 初始化 Code Lens 提供者
         codeLensProvider = new ChapterCodeLensProvider(wordCountService);
@@ -200,8 +230,10 @@ export async function activate(context: vscode.ExtensionContext) {
         updateWordCountImmediate(vscode.window.activeTextEditor);
         updateHighlightsImmediate(vscode.window.activeTextEditor);
 
-        // 同步护眼模式状态（确保主题与配置一致）
-        await syncEyeCareModeTheme(context);
+        // 异步同步护眼模式状态（不阻塞初始化完成）
+        syncEyeCareModeTheme(context).catch((error) => {
+            Logger.error('[Noveler] 护眼模式主题同步失败', error);
+        });
 
         // 检查是否需要显示欢迎页面（首次安装）
         if (welcomeWebviewProvider.shouldShowWelcome()) {
@@ -228,7 +260,8 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 function registerEventListeners(
     context: vscode.ExtensionContext,
-    novelerViewProvider: NovelerViewProvider
+    novelerViewProvider: NovelerViewProvider,
+    statsWebviewProvider: StatsWebviewProvider
 ): void {
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
@@ -277,13 +310,20 @@ function registerEventListeners(
                     readmeUpdateDebouncer.debounce(async () => {
                         await handleReadmeAutoUpdate();
                     });
+
+                    // 🔑 新增：保存章节文件时，如果统计面板打开，立即刷新字数统计
+                    if (filePath.includes('/chapters/')) {
+                        statsWebviewProvider.refreshIfVisible().catch((error: unknown) => {
+                            Logger.debug(`保存时刷新统计面板失败: ${error}`);
+                        });
+                    }
                 }
             }
         })
     );
 
     // 注册文件系统监听器
-    registerFileSystemWatchers(context, novelerViewProvider);
+    registerFileSystemWatchers(context, novelerViewProvider, statsWebviewProvider);
 }
 
 /**
@@ -291,18 +331,29 @@ function registerEventListeners(
  */
 function registerFileSystemWatchers(
     context: vscode.ExtensionContext,
-    novelerViewProvider: NovelerViewProvider
+    novelerViewProvider: NovelerViewProvider,
+    statsWebviewProvider: StatsWebviewProvider
 ): void {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         return;
     }
 
-    // 监听章节文件变化
-    const chaptersPattern = new vscode.RelativePattern(workspaceFolder, `${CHAPTERS_FOLDER}/*.md`);
+    // 监听所有章节文件变化（**/*.md 同时覆盖扁平结构和嵌套分卷结构）
+    const chaptersPattern = new vscode.RelativePattern(workspaceFolder, `${CHAPTERS_FOLDER}/**/*.md`);
     const chaptersWatcher = vscode.workspace.createFileSystemWatcher(chaptersPattern);
-    chaptersWatcher.onDidCreate(() => novelerViewProvider.refresh());
-    chaptersWatcher.onDidDelete(() => novelerViewProvider.refresh());
+    chaptersWatcher.onDidCreate(() => {
+        novelerViewProvider.refresh();
+        statsWebviewProvider.refreshIfVisible().catch((err: unknown) => {
+            Logger.debug(`统计面板刷新失败: ${err}`);
+        });
+    });
+    chaptersWatcher.onDidDelete(() => {
+        novelerViewProvider.refresh();
+        statsWebviewProvider.refreshIfVisible().catch((err: unknown) => {
+            Logger.debug(`统计面板刷新失败: ${err}`);
+        });
+    });
     chaptersWatcher.onDidChange(() => novelerViewProvider.refresh());
     context.subscriptions.push(chaptersWatcher);
 
@@ -317,9 +368,18 @@ function registerFileSystemWatchers(
     // 监听配置文件变化
     const configPattern = new vscode.RelativePattern(workspaceFolder, CONFIG_FILE_NAME);
     const configWatcher = vscode.workspace.createFileSystemWatcher(configPattern);
-    configWatcher.onDidCreate(() => novelerViewProvider.refresh());
-    configWatcher.onDidDelete(() => novelerViewProvider.refresh());
-    configWatcher.onDidChange(() => novelerViewProvider.refresh());
+    configWatcher.onDidCreate(async () => {
+        await configService.reloadConfig();
+        novelerViewProvider.refresh();
+    });
+    configWatcher.onDidDelete(async () => {
+        await configService.reloadConfig();
+        novelerViewProvider.refresh();
+    });
+    configWatcher.onDidChange(async () => {
+        await configService.reloadConfig();
+        novelerViewProvider.refresh();
+    });
     context.subscriptions.push(configWatcher);
 
     // 监听敏感词配置文件变化
@@ -474,6 +534,11 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
 }
 
 function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
+    // 跳过插件自身 editor.edit 触发的变更，防止循环插入
+    if (isApplyingAutoLineBreak) {
+        return;
+    }
+
     const editor = vscode.window.activeTextEditor;
     if (!editor || event.document !== editor.document) {
         return;
@@ -499,6 +564,13 @@ function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
         return;
     }
 
+    // 跳过文件末尾添加换行的情况（VS Code 保存时可能自动添加尾部空行）
+    const newLineIndex = change.range.start.line;
+    const totalLines = event.document.lineCount;
+    if (newLineIndex >= totalLines - 1) {
+        return;
+    }
+
     const line = event.document.lineAt(change.range.start.line);
     const previousLineText = line.text.trim();
 
@@ -521,28 +593,33 @@ function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
         return;
     }
 
-    editor.edit((editBuilder) => {
-        let textToInsert = '';
+    let textToInsert = '';
 
-        if (autoEmptyLineEnabled && !isPreviousLineEmpty) {
-            textToInsert += '\n';
-            Logger.info(`[换行处理] 添加空行`);
-        }
+    if (autoEmptyLineEnabled && !isPreviousLineEmpty) {
+        textToInsert += '\n';
+        Logger.info(`[换行处理] 添加空行`);
+    }
 
-        if (paragraphIndentEnabled) {
-            textToInsert += PARAGRAPH_INDENT;
-            Logger.info(`[换行处理] 添加缩进`);
-        }
+    if (paragraphIndentEnabled) {
+        textToInsert += PARAGRAPH_INDENT;
+        Logger.info(`[换行处理] 添加缩进`);
+    }
 
-        if (textToInsert) {
-            const insertPos = new vscode.Position(change.range.start.line + 1, 0);
+    if (textToInsert) {
+        const insertPos = new vscode.Position(change.range.start.line + 1, 0);
+        Logger.info(`[换行处理] 在第 ${change.range.start.line + 1} 行插入: "${textToInsert.replace(/\n/g, '\\n')}"`);
+        isApplyingAutoLineBreak = true;
+        editor.edit((editBuilder) => {
             editBuilder.insert(insertPos, textToInsert);
-            Logger.info(`[换行处理] 在第 ${change.range.start.line + 1} 行插入: "${textToInsert.replace(/\n/g, '\\n')}"`);
-        }
-    }, {
-        undoStopBefore: false,
-        undoStopAfter: false
-    });
+        }, {
+            undoStopBefore: false,
+            undoStopAfter: false
+        }).then(() => {
+            isApplyingAutoLineBreak = false;
+        }, () => {
+            isApplyingAutoLineBreak = false;
+        });
+    }
 }
 
 export function deactivate() {

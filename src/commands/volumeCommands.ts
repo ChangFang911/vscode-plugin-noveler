@@ -5,9 +5,12 @@ import * as jsoncParser from 'jsonc-parser';
 import { VolumeInfo, VolumeStatus, VolumeType } from '../types/volume';
 import { Logger } from '../utils/logger';
 import { VolumeService } from '../services/volumeService';
+import { ConfigService } from '../services/configService';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
 import { generateVolumeFolderName, getVolumeStatusName, getVolumeTypeName } from '../utils/volumeHelper';
-import { formatDateTime } from '../utils/dateFormatter';
+import { CHAPTER_NUMBER_PADDING, DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
+import { writeAndOpenChapter } from './createChapter';
+import { loadTemplates } from '../utils/templateLoader';
 
 /**
  * 重命名卷
@@ -241,7 +244,7 @@ async function setVolumeStatusInternal(volume: VolumeInfo): Promise<void> {
                 "title": volume.title,
                 "subtitle": "",
                 "status": selected.status,
-                "targetWords": 500000,
+                "targetWords": DEFAULT_VOLUME_TARGET_WORDS,
                 "description": "",
                 "startDate": "",
                 "endDate": "",
@@ -374,7 +377,7 @@ async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
             "title": volume.title,
             "subtitle": "",
             "status": volume.status,
-            "targetWords": 100000,
+            "targetWords": DEFAULT_VOLUME_TARGET_WORDS,
             "description": "",
             "startDate": "",
             "endDate": "",
@@ -410,51 +413,38 @@ export async function createChapterInVolume(item: NovelerTreeItem): Promise<void
         return;
     }
 
-    // 获取 VolumeService 实例并扫描卷信息
+    // 获取配置服务，读取最新配置
+    const configService = ConfigService.getInstance();
+    await configService.reloadConfig();
+    const targetWords = configService.getTargetWords();
+
+    // 获取 VolumeService 实例并强制刷新卷信息
     const volumeService = VolumeService.getInstance();
-    await volumeService.scanVolumes();
+    await volumeService.scanVolumes(true);
 
     // 使用 VolumeService 计算正确的章节号（根据配置的编号模式）
     const chapterNumber = await volumeService.calculateNextChapterNumber(volume);
 
-    // 生成文件名
-    const fileName = `第${String(chapterNumber).padStart(3, '0')}章-${chapterTitle}.md`;
-    const filePath = path.join(volume.folderPath, fileName);
+    // 生成文件名（使用统一的 padding 常量）
+    const fileName = `第${String(chapterNumber).padStart(CHAPTER_NUMBER_PADDING, '0')}章-${chapterTitle}.md`;
 
-    // 检查文件是否已存在
-    if (fs.existsSync(filePath)) {
-        vscode.window.showErrorMessage(`章节已存在: ${fileName}`);
-        return;
-    }
+    // 加载模板（与 createChapter 保持一致）
+    const templates = await loadTemplates();
 
-    // 创建章节内容
-    const now = formatDateTime(new Date());
-    const frontMatter = `---
-title: ${chapterTitle}
-chapter: ${chapterNumber}
-volume: ${volume.volume}
-volumeType: ${volume.volumeType}
-status: draft
-created: ${now}
-modified: ${now}
-wordCount: 0
-targetWords: 2500
----
-
-# ${chapterTitle}
-
-`;
-
-    try {
-        fs.writeFileSync(filePath, frontMatter, 'utf-8');
-        Logger.info(`创建章节: ${filePath}`);
-
-        // 刷新侧边栏
-        await vscode.commands.executeCommand('noveler.refresh');
-    } catch (error) {
-        Logger.error('创建章节失败', error);
-        vscode.window.showErrorMessage(`创建章节失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    // 通过公共函数创建并打开章节文件
+    await writeAndOpenChapter({
+        folderUri: vscode.Uri.file(volume.folderPath),
+        fileName,
+        chapterTitle: `第${chapterNumber}章 ${chapterTitle}`,
+        chapterNumber,
+        volumeInfo: {
+            volume: volume.volume,
+            volumeType: volume.volumeType,
+            folderName: volume.folderName
+        },
+        targetWords,
+        template: templates?.chapter
+    });
 }
 
 /**

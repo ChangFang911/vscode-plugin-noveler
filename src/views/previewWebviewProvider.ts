@@ -437,7 +437,6 @@ export class PreviewWebviewProvider {
                 transform: scale(0.65);
             }
         }
-        }
 
         /* 手机外壳 */
         .phone-shell {

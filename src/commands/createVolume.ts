@@ -7,6 +7,7 @@ import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
 import { generateVolumeFolderName } from '../utils/volumeHelper';
 import { formatDateTime } from '../utils/dateFormatter';
+import { DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
 
 /**
  * 创建新卷
@@ -238,7 +239,7 @@ async function createVolumeMetadata(volumeFolderPath: string, info: {
         "title": info.volumeTitle,
         "subtitle": "",
         "status": "planning",
-        "targetWords": 500000,
+        "targetWords": DEFAULT_VOLUME_TARGET_WORDS,
         "description": info.volumeDescription || "",
         "startDate": "",
         "endDate": "",
