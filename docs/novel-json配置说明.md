@@ -569,6 +569,9 @@
 - **v0.5.0**：新增 volumes（分卷管理）、paragraphIndent
 - **v0.6.0**：新增 readmeAutoUpdate
 - **v0.6.8**：新增快速设置命令（QuickPick 界面）
+- **v0.7.1**：新增 eyeCareMode（护眼模式，低饱和度暖灰绿主题）
+- **v0.8.0**：新增手机阅读预览（仿真 iPhone 外观，4 种阅读主题）
+- **v0.8.4**：新增 focusMode.typingSound（打字音效，8 种内置音效 + 自定义）
 
 ---
 
