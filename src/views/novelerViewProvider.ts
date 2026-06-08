@@ -1,71 +1,22 @@
 import * as vscode from 'vscode';
 import { ProjectStatsService } from '../services/projectStatsService';
 import { CONFIG_FILE_NAME } from '../constants';
-import { VolumeInfo } from '../types/volume';
 import { VolumeService } from '../services/volumeService';
 import { ConfigService } from '../services/configService';
+import { NodeType, NovelerTreeItem } from './treeItem';
 import {
     OverviewNodesProvider,
     ActionNodesProvider,
     ChapterNodesProvider,
     CharacterNodesProvider,
-    OutlineNodesProvider
+    OutlineNodesProvider,
+    DoubtMarkNodesProvider,
 } from './nodes';
+import { DoubtMarkService } from '../services/doubtMarkService';
+import { DoubtMarkTreeItem } from './nodes/doubtMarkNodes';
 
-/**
- * TreeView 节点类型
- */
-export enum NodeType {
-    Overview = 'overview',        // 项目概览
-    Actions = 'actions',          // 快捷操作
-    OtherActions = 'otherActions', // 其他操作
-    Tools = 'tools',               // 写作工具（子分组）
-    Settings = 'settings',         // 项目设置（子分组）
-    Chapters = 'chapters',        // 章节列表
-    Characters = 'characters',    // 人物管理
-    Outlines = 'outlines',        // 大纲列表
-    References = 'references',    // 参考资料
-
-    // 子节点类型
-    OverviewItem = 'overviewItem',
-    ActionItem = 'actionItem',
-    OtherActionItem = 'otherActionItem',
-    Volume = 'volume',            // 卷节点
-    ChapterItem = 'chapterItem',
-    CharacterItem = 'characterItem',
-    OutlineItem = 'outlineItem',
-    ReferenceItem = 'referenceItem',
-
-    // 特殊节点
-    InitProject = 'initProject',  // 初始化项目
-    EmptyHint = 'emptyHint',      // 空状态提示
-}
-
-/**
- * TreeView 节点
- */
-export class NovelerTreeItem extends vscode.TreeItem {
-    constructor(
-        public readonly label: string,
-        public readonly nodeType: NodeType,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly command?: vscode.Command,
-        public readonly contextValue?: string,
-        public readonly description?: string,
-        public readonly tooltip?: string,
-        public readonly metadata?: VolumeInfo,
-    ) {
-        super(label, collapsibleState);
-        this.contextValue = contextValue;
-        this.description = description;
-        this.tooltip = tooltip;
-    }
-
-    withIcon(icon: vscode.ThemeIcon): this {
-        this.iconPath = icon;
-        return this;
-    }
-}
+// 하위 호환을 위해 재내보내기 (기존 node 파일들이 이 경로로 임포트함)
+export { NodeType, NovelerTreeItem };
 
 /**
  * Noveler 侧边栏视图提供器
@@ -91,6 +42,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     private chapterNodes: ChapterNodesProvider;
     private characterNodes: CharacterNodesProvider;
     private outlineNodes: OutlineNodesProvider;
+    doubtMarkNodes: DoubtMarkNodesProvider;  // public 供 commandRegistrar 访问 filter 状态
 
     constructor() {
         this.statsService = new ProjectStatsService();
@@ -103,6 +55,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
         this.chapterNodes = new ChapterNodesProvider(this.volumeService, this.configService);
         this.characterNodes = new CharacterNodesProvider();
         this.outlineNodes = new OutlineNodesProvider();
+        this.doubtMarkNodes = new DoubtMarkNodesProvider(DoubtMarkService.getInstance());
     }
 
     /**
@@ -159,6 +112,10 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                     return this.actionNodes.getToolItems();
                 case NodeType.Settings:
                     return this.actionNodes.getSettingsItems();
+                case NodeType.DoubtMark:
+                    return this.doubtMarkNodes.getFileGroupNodes();
+                case NodeType.DoubtMarkFile:
+                    return this.doubtMarkNodes.getMarkItemNodes(element as DoubtMarkTreeItem);
                 case NodeType.Chapters:
                     return await this.chapterNodes.getChapterItems();
                 case NodeType.Volume:
@@ -272,6 +229,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
                 undefined,
                 '更多功能和设置'
             ).withIcon(new vscode.ThemeIcon('tools')),
+            this.doubtMarkNodes.getRootNode(),
         ];
     }
 }

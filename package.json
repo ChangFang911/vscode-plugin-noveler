@@ -188,34 +188,68 @@
         "command": "noveler.focusModeSettings",
         "title": "Noveler: 专注模式设置",
         "icon": "$(eye)"
+      },
+      {
+        "command": "noveler.addDoubtMark",
+        "title": "Noveler: 添加写作待办",
+        "description": "在当前行插入写作待办标记，收集写作过程中需要稍后处理的问题（快捷键：Ctrl+Shift+/）",
+        "icon": "$(question)"
+      },
+      {
+        "command": "noveler.resolveDoubtMark",
+        "title": "Noveler: 标记为已完成"
+      },
+      {
+        "command": "noveler.reopenDoubtMark",
+        "title": "Noveler: 重新打开待办"
+      },
+      {
+        "command": "noveler.deleteDoubtMark",
+        "title": "Noveler: 删除写作待办"
+      },
+      {
+        "command": "noveler.jumpToDoubtMark",
+        "title": "Noveler: 跳转到待办处"
+      },
+      {
+        "command": "noveler.setDoubtMarkFilterAll",
+        "title": "Noveler: 显示全部待办"
+      },
+      {
+        "command": "noveler.setDoubtMarkFilterUnresolved",
+        "title": "Noveler: 仅显示待处理待办"
+      },
+      {
+        "command": "noveler.resolveAllDoubtMarks",
+        "title": "Noveler: 全部待办标为已完成"
+      },
+      {
+        "command": "noveler.deleteResolvedDoubtMarks",
+        "title": "Noveler: 删除所有已完成待办"
       }
     ],
     "menus": {
+      "commandPalette": [
+        { "command": "noveler.resolveDoubtMark",  "when": "false" },
+        { "command": "noveler.reopenDoubtMark",   "when": "false" },
+        { "command": "noveler.deleteDoubtMark",   "when": "false" },
+        { "command": "noveler.jumpToDoubtMark",   "when": "false" }
+      ],
       "editor/context": [
-        {
-          "command": "noveler.formatDocument",
-          "when": "editorLangId == markdown",
-          "group": "noveler@1"
-        },
-        {
-          "command": "noveler.showPreview",
-          "when": "editorLangId == markdown",
-          "group": "noveler@2"
-        },
-        {
-          "command": "noveler.toggleFocusMode",
-          "when": "editorLangId == markdown",
-          "group": "noveler@3"
-        },
         {
           "command": "noveler.addToCustomWords",
           "when": "editorLangId == markdown && editorHasSelection",
-          "group": "noveler@4"
+          "group": "noveler@1"
         },
         {
           "command": "noveler.addSelectedToWhitelist",
           "when": "editorLangId == markdown && editorHasSelection",
-          "group": "noveler@5"
+          "group": "noveler@2"
+        },
+        {
+          "command": "noveler.addDoubtMark",
+          "when": "editorLangId == markdown",
+          "group": "noveler@3"
         }
       ],
       "view/item/context": [
@@ -298,9 +332,56 @@
           "command": "noveler.copyChapterToVolume",
           "when": "view == novelerView && viewItem == chapter",
           "group": "4_move@2"
+        },
+        {
+          "command": "noveler.setDoubtMarkFilterAll",
+          "when": "view == novelerView && viewItem == doubtMarkRoot",
+          "group": "1_filter@1"
+        },
+        {
+          "command": "noveler.setDoubtMarkFilterUnresolved",
+          "when": "view == novelerView && viewItem == doubtMarkRoot",
+          "group": "1_filter@2"
+        },
+        {
+          "command": "noveler.resolveAllDoubtMarks",
+          "when": "view == novelerView && viewItem == doubtMarkRoot",
+          "group": "2_batch@1"
+        },
+        {
+          "command": "noveler.deleteResolvedDoubtMarks",
+          "when": "view == novelerView && viewItem == doubtMarkRoot",
+          "group": "2_batch@2"
+        },
+        {
+          "command": "noveler.resolveDoubtMark",
+          "when": "view == novelerView && viewItem == doubtMarkItem",
+          "group": "1_action@1"
+        },
+        {
+          "command": "noveler.deleteDoubtMark",
+          "when": "view == novelerView && viewItem == doubtMarkItem",
+          "group": "2_delete@1"
+        },
+        {
+          "command": "noveler.reopenDoubtMark",
+          "when": "view == novelerView && viewItem == doubtMarkItemResolved",
+          "group": "1_action@1"
+        },
+        {
+          "command": "noveler.deleteDoubtMark",
+          "when": "view == novelerView && viewItem == doubtMarkItemResolved",
+          "group": "2_delete@1"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "noveler.addDoubtMark",
+        "key": "ctrl+shift+/",
+        "when": "editorTextFocus && editorLangId == markdown"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

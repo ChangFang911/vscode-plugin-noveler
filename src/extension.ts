@@ -25,6 +25,9 @@ import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
 import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, CONFIG_FILE_NAME } from './constants';
 import { Logger, LogLevel } from './utils/logger';
+import { DoubtMarkService } from './services/doubtMarkService';
+import { DoubtMarkDecorationProvider } from './providers/doubtMarkDecorationProvider';
+import { DoubtMarkCodeLensProvider } from './providers/doubtMarkCodeLensProvider';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
@@ -179,6 +182,28 @@ export async function activate(context: vscode.ExtensionContext) {
                 { language: 'markdown', pattern: '**/chapters/**' },
                 codeLensProvider
             )
+        );
+
+        // 初始化疑问标记服务、装饰器、CodeLens
+        const doubtMarkService = DoubtMarkService.getInstance();
+        await doubtMarkService.initialize();
+        context.subscriptions.push(doubtMarkService);
+
+        const doubtMarkDecoration = new DoubtMarkDecorationProvider();
+        doubtMarkDecoration.register(context);
+
+        const doubtMarkCodeLens = new DoubtMarkCodeLensProvider();
+        context.subscriptions.push(
+            vscode.languages.registerCodeLensProvider({ language: 'markdown' }, doubtMarkCodeLens)
+        );
+
+        // 服务变更时刷新 TreeView 和 CodeLens
+        context.subscriptions.push(
+            doubtMarkService.onChange(() => {
+                novelerViewProvider.refresh();
+                doubtMarkCodeLens.refresh();
+                doubtMarkDecoration.updateDecorations(vscode.window.activeTextEditor);
+            })
         );
 
         // 订阅配置变更事件

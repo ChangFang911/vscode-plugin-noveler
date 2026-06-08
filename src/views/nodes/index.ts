@@ -8,3 +8,4 @@ export * from './actionNodes';
 export * from './chapterNodes';
 export * from './characterNodes';
 export * from './outlineNodes';
+export * from './doubtMarkNodes';

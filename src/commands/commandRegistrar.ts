@@ -48,6 +48,7 @@ import { jumpToReadmeSection } from './jumpToReadme';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { Logger } from '../utils/logger';
 import { NovelHighlightProvider } from '../providers/highlightProvider';
+import { registerDoubtMarkCommands } from './doubtMarkCommands';
 
 /**
  * 命令注册器依赖项
@@ -78,6 +79,11 @@ export function registerAllCommands(deps: CommandRegistrarDeps): void {
     registerSensitiveWordCommands(deps);
     registerMigrationCommands(deps);
     registerUtilityCommands(deps);
+    registerDoubtMarkCommands(
+        deps.context,
+        deps.novelerViewProvider.doubtMarkNodes,
+        () => deps.novelerViewProvider.refresh()
+    );
 }
 
 /**
