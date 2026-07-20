@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
 import { extractFrontMatter } from '../../utils/frontMatterHelper';
+import { ConfigService } from '../../services/configService';
 import { DRAFTS_FOLDER, REFERENCES_FOLDER } from '../../constants';
 import { Logger } from '../../utils/logger';
 

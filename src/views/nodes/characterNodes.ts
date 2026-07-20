@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { NovelerTreeItem, NodeType } from '../novelerViewProvider';
 import { extractFrontMatter } from '../../utils/frontMatterHelper';
+import { ConfigService } from '../../services/configService';
 import { CHARACTERS_FOLDER } from '../../constants';
 import { Logger } from '../../utils/logger';
 
@@ -17,7 +18,7 @@ export class CharacterNodesProvider {
             return [];
         }
 
-        const folderPath = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+        const folderPath = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getCharactersFolder());
 
         try {
             const files = await vscode.workspace.fs.readDirectory(folderPath);

@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
-import { CONFIG_FILE_NAME, DEFAULT_TARGET_WORDS } from '../constants';
+import { CONFIG_FILE_NAME, DEFAULT_TARGET_WORDS, CHAPTERS_FOLDER, CHARACTERS_FOLDER, DRAFTS_FOLDER, REFERENCES_FOLDER } from '../constants';
 import * as jsoncParser from 'jsonc-parser';
 import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
 import { SensitiveWordConfig } from '../types/sensitiveWord';
 import { VolumesConfig } from '../types/volume';
+import { DirectoriesConfig } from '../types/directories';
 import type { FocusModeConfig, TypingSoundType, TypewriterPosition } from './focusModeService';
 
 /**
@@ -79,6 +80,8 @@ export interface NovelConfig {
     sensitiveWords?: SensitiveWordConfig;
     /** 分卷功能配置 */
     volumes?: VolumesConfig;
+    /** 目录配置 */
+    directories?: DirectoriesConfig;
     /** 护眼模式配置 */
     eyeCareMode?: {
         /** 是否启用 */
@@ -476,6 +479,60 @@ export class ConfigService {
     public isVolumesEnabled(): boolean {
         const volumes = this.config.volumes;
         return volumes?.enabled === true && volumes?.folderStructure === 'nested';
+    }
+
+
+    /**
+     * 获取目录配置
+     * @returns 目录配置对象
+     */
+    public getDirectoriesConfig(): DirectoriesConfig {
+        return this.config.directories || {};
+    }
+
+    /**
+     * 获取章节目录名
+     * @returns 章节目录名，默认为 "chapters"
+     */
+    public getChaptersFolder(): string {
+        return this.config.directories?.chapters || CHAPTERS_FOLDER;
+    }
+
+    /**
+     * 获取人物目录名
+     * @returns 人物目录名，默认为 "characters"
+     */
+    public getCharactersFolder(): string {
+        return this.config.directories?.characters || CHARACTERS_FOLDER;
+    }
+
+    /**
+     * 获取草稿目录名
+     * @returns 草稿目录名，默认为 "drafts"
+     */
+    public getDraftsFolder(): string {
+        return this.config.directories?.drafts || DRAFTS_FOLDER;
+    }
+
+    /**
+     * 获取参考资料目录名
+     * @returns 参考资料目录名，默认为 "references"
+     */
+    public getReferencesFolder(): string {
+        return this.config.directories?.references || REFERENCES_FOLDER;
+    }
+
+    /**
+     * 获取项目目录列表（用于初始化项目等场景）
+     * @returns 目录名数组
+     */
+    public getProjectDirectories(): string[] {
+        return [
+            this.getChaptersFolder(),
+            this.getCharactersFolder(),
+            this.getDraftsFolder(),
+            this.getReferencesFolder()
+        ];
     }
 
     /**

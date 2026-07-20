@@ -3,7 +3,7 @@ import { parseFrontMatter } from './frontMatterParser';
 import { handleError, handleSuccess, ErrorSeverity } from './errorHandler';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
+import { STATUS_EMOJI_MAP } from '../constants';
 import { Logger } from './logger';
 import { getStatusDisplayName } from './statusHelper';
 
@@ -57,7 +57,7 @@ export async function scanChapters(): Promise<ProjectStats> {
     const configService = ConfigService.getInstance();
     const volumesEnabled = configService.isVolumesEnabled();
 
-    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+    const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getChaptersFolder());
     const chapters: ChapterInfo[] = [];
     let totalWords = 0;
     let completedChapters = 0;
@@ -80,7 +80,7 @@ export async function scanChapters(): Promise<ProjectStats> {
                     try {
                         const fileUri = vscode.Uri.joinPath(
                             workspaceFolder.uri,
-                            CHAPTERS_FOLDER,
+                            ConfigService.getInstance().getChaptersFolder(),
                             volume.folderName,
                             chapterFile
                         );
@@ -236,7 +236,7 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
         return [];
     }
 
-    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getCharactersFolder());
     const characters: CharacterInfo[] = [];
 
     try {

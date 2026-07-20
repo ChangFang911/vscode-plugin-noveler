@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, COMPLETED_STATUS } from '../constants';
+import { ConfigService } from "./configService";
+import { COMPLETED_STATUS } from '../constants';
 import { WordCountService } from './wordCountService';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { parseFrontMatter } from '../utils/frontMatterParser';
@@ -101,7 +102,7 @@ export class ProjectStatsService {
         workspaceFolder: vscode.WorkspaceFolder,
         stats: ProjectStats
     ): Promise<void> {
-        const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+        const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getChaptersFolder());
 
         try {
             // 递归扫描所有 .md 文件（支持扁平结构和分卷嵌套结构）
@@ -171,7 +172,7 @@ export class ProjectStatsService {
         workspaceFolder: vscode.WorkspaceFolder,
         stats: ProjectStats
     ): Promise<void> {
-        const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+        const charactersPath = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getCharactersFolder());
 
         try {
             // 递归扫描所有 .md 文件

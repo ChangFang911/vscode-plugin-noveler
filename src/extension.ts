@@ -23,7 +23,7 @@ import { PARAGRAPH_INDENT, VOLUME_TYPE_NAMES } from './constants';
 import { MigrationService } from './services/migrationService';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, CONFIG_FILE_NAME } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CONFIG_FILE_NAME } from './constants';
 import { Logger, LogLevel } from './utils/logger';
 import { DoubtMarkService } from './services/doubtMarkService';
 import { DoubtMarkDecorationProvider } from './providers/doubtMarkDecorationProvider';
@@ -343,7 +343,7 @@ function registerFileSystemWatchers(
     }
 
     // 监听所有章节文件变化（**/*.md 同时覆盖扁平结构和嵌套分卷结构）
-    const chaptersPattern = new vscode.RelativePattern(workspaceFolder, `${CHAPTERS_FOLDER}/**/*.md`);
+    const chaptersPattern = new vscode.RelativePattern(workspaceFolder, `${ConfigService.getInstance().getChaptersFolder()}/**/*.md`);
     const chaptersWatcher = vscode.workspace.createFileSystemWatcher(chaptersPattern);
     chaptersWatcher.onDidCreate(() => {
         novelerViewProvider.refresh();
@@ -555,7 +555,7 @@ function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
 
     const filePath = event.document.uri.fsPath;
     const normalizedPath = filePath.replace(/\\/g, '/');
-    if (!normalizedPath.includes(`/${CHAPTERS_FOLDER}/`)) {
+    if (!normalizedPath.includes(`/${ConfigService.getInstance().getChaptersFolder()}/`)) {
         return;
     }
 

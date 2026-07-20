@@ -92,7 +92,7 @@ export class NovelHighlightProvider {
             return;
         }
 
-        const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+        const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getCharactersFolder());
 
         try {
             // 检查目录是否存在
@@ -144,7 +144,7 @@ export class NovelHighlightProvider {
             return;
         }
 
-        const pattern = new vscode.RelativePattern(workspaceFolder, `${CHARACTERS_FOLDER}/*.md`);
+        const pattern = new vscode.RelativePattern(workspaceFolder, `${ConfigService.getInstance().getCharactersFolder()}/*.md`);
         this.characterFolderWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
         // 文件创建、修改、删除时重新加载人物名称并刷新高亮

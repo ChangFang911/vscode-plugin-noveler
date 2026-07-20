@@ -8,7 +8,7 @@ import { VolumeService } from '../../services/volumeService';
 import { ConfigService } from '../../services/configService';
 import { WordCountService } from '../../services/wordCountService';
 import { extractChapterFrontMatter, getContentWithoutFrontMatter } from '../../utils/frontMatterHelper';
-import { CHAPTERS_FOLDER, VOLUME_TYPE_NAMES, VOLUME_STATUS_NAMES } from '../../constants';
+import { VOLUME_TYPE_NAMES, VOLUME_STATUS_NAMES } from '../../constants';
 import { VolumeInfo } from '../../types/volume';
 import { convertToChineseNumber } from '../../utils/chineseNumber';
 import { convertToRomanNumber } from '../../utils/volumeHelper';
@@ -215,7 +215,7 @@ export class ChapterNodesProvider {
             return [];
         }
 
-        const folderPath = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+        const folderPath = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getChaptersFolder());
 
         try {
             const files = await vscode.workspace.fs.readDirectory(folderPath);
