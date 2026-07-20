@@ -11,7 +11,7 @@ import { validateChapterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES, SIDEBAR_REFRESH_DELAY } from '../constants';
+import { CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES, SIDEBAR_REFRESH_DELAY } from '../constants';
 import { Logger } from '../utils/logger';
 import { VolumeInfo } from '../types/volume';
 
@@ -160,7 +160,7 @@ export async function createChapter(chapterName: string): Promise<void> {
             }
 
             // 打开 chapters 目录
-            const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+            const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getChaptersFolder());
             try {
                 await vscode.workspace.fs.stat(chaptersFolderUri);
             } catch {
@@ -209,7 +209,7 @@ export async function createChapter(chapterName: string): Promise<void> {
         // 扁平模式：直接在 chapters/ 目录下创建
         Logger.info('使用扁平结构创建章节');
 
-        targetFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
+        targetFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getChaptersFolder());
 
         // 确保 chapters 目录存在
         try {

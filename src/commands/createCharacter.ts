@@ -7,6 +7,7 @@ import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { validateCharacterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
+import { ConfigService } from '../services/configService';
 import { CHARACTERS_FOLDER } from '../constants';
 
 /**
@@ -37,7 +38,7 @@ export async function createCharacter(characterName: string): Promise<void> {
         }
     }
 
-    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
+    const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ConfigService.getInstance().getCharactersFolder());
 
     // 确保 characters 目录存在
     try {

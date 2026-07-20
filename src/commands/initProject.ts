@@ -5,8 +5,9 @@
 import * as vscode from 'vscode';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
+import { ConfigService } from "../services/configService";
 import { handleError, handleSuccess } from '../utils/errorHandler';
-import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
+import { CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
 import { Logger } from '../utils/logger';
 
 /**
@@ -102,7 +103,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
     try {
         // 创建目录结构
-        for (const dir of PROJECT_DIRECTORIES) {
+        for (const dir of ConfigService.getInstance().getProjectDirectories()) {
             const dirUri = vscode.Uri.joinPath(workspaceFolder.uri, dir);
             try {
                 await vscode.workspace.fs.stat(dirUri);

@@ -132,6 +132,20 @@
       "chapterNumbering": "volume"
     },
 
+    // ==================== 目录配置 ====================
+    // 自定义小说项目的目录名称
+    // 如果不设置，将使用默认值
+    "directories": {
+      // 章节目录名，默认为 "chapters"
+      // "chapters": "chapters",
+      // 人物目录名，默认为 "characters"
+      // "characters": "characters",
+      // 草稿目录名，默认为 "drafts"
+      // "drafts": "drafts",
+      // 参考资料目录名，默认为 "references"
+      // "references": "references"
+    },
+
     // ==================== 护眼模式 ====================
     // 使用护眼主题保护视力，仅在当前项目生效
     "eyeCareMode": {
