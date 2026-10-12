@@ -7,6 +7,31 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 人物档案标题上方增加格式化按钮，所有 Markdown 编辑器增加右上角与右键格式化入口；操作绑定点击的文档。
+- 侧边栏增加“使用指南”和“重新加载敏感词库”，方便通过鼠标访问。
+
+### 修复
+
+- 章节快捷操作跳过 Front Matter 和 HTML 注释，显示在正文标题上方，避免将 YAML 注释误判为章节标题。
+- 格式化完整保留 Front Matter、行内和多行注释，避免破坏写作待办标记；待办位置同步未保存的文档变化。
+- 章节和人物重命名禁止覆盖已有文件，保留章节编号、未保存正文及 YAML 注释；状态更新和章节移动、复制使用最新文档内容。
+- VS Code 设置按 JSONC 合并，保留注释和已有配置，解析失败时停止写入。
+- 分卷迁移和回滚先检查冲突并创建临时备份，失败时恢复已完成的操作；成功校验后清理备份，恢复不完整时保留备份并提示位置。
+- 回到扁平结构仅移动章节，保留原卷大纲、元数据和附属文件；再次分卷可复用原目录，采用本次选择的章节分组。
+
+### 文档
+
+- 同步 README、配置说明、FAQ、文件格式和初始化模板，纠正自动保存位置、编号枚举、命令入口及 README 更新范围。
+- 校正敏感词库统计：共 846 条记录，按级别为 235 / 332 / 279。
+- 澄清兼容字段的当前限制：完成待办自动删除未生效，手机预览可能显示注释；历史版本条目不代表当前全部行为。
+
+### 测试
+
+- 增加真实实现的格式化、文件操作、JSONC 合并和迁移故障恢复测试。
+- 增加 `npm run test:unit`，扩展宿主测试使用独立临时工作区，并支持通过 `NOVELER_TEST_VSCODE_EXECUTABLE` 指定本机 VS Code。
+
 ## [0.8.8] - 2026-06-08
 
 ### 新增
@@ -211,7 +236,7 @@
   - 文件隐藏（`.DS_Store`, `.noveler`）
 - **实现**：[src/commands/initProject.ts](src/commands/initProject.ts#L264-L346)
 - **文档**：
-  - [docs/VSCode配置说明.md](docs/VSCode配置说明.md) - 详细使用指南
+  - [VS Code 项目配置说明](docs/novel-json配置说明.md#vs-code-项目设置) - 详细使用指南
   - [templates/vscode-settings.json](templates/vscode-settings.json) - 配置模板
 
 ### 问题修复
@@ -258,9 +283,9 @@
   - 添加 0.6.0 和 0.6.1 升级逻辑到 MigrationService
   - 添加版本更新日志到 MigrationService.showChangelog()
 - **修复文件**：
-  - [src/constants.ts](src/constants.ts:160) - `CURRENT_CONFIG_VERSION = '0.6.1'`
-  - [templates/default-config.jsonc](templates/default-config.jsonc:4) - `"version": "0.6.1"`
-  - [src/services/migrationService.ts](src/services/migrationService.ts:130-142) - 添加 0.6.0/0.6.1 升级逻辑
+  - [src/constants.ts](src/constants.ts) - `CURRENT_CONFIG_VERSION = '0.6.1'`
+  - [templates/default-config.jsonc](templates/default-config.jsonc) - `"version": "0.6.1"`
+  - [src/services/migrationService.ts](src/services/migrationService.ts) - 添加 0.6.0/0.6.1 升级逻辑
 
 #### 🔄 卷操作刷新缺失
 - **问题**：`copyChapterToVolume` 和 `setVolumeType` 操作后侧边栏不刷新

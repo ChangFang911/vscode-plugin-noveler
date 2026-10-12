@@ -1,128 +1,66 @@
 # novel.jsonc 配置说明
 
-`novel.jsonc` 是小说项目的配置文件，包含小说信息和 Noveler 插件的配置。
+本文按插件 0.8.8 和当前工作区实现校对。插件版本与配置版本分别管理，当前配置版本是 0.6.4。
+项目配置必须使用根目录的 `novel.jsonc`，支持注释和尾逗号；主配置不会回退读取 `novel.json`。
+可通过 `Noveler: 打开配置文件` 或侧边栏「项目设置」打开。
 
-> 💡 推荐使用 `.jsonc` 格式，支持注释。也可以使用 `.json` 格式（不支持注释）。
-
----
-
-## 📋 目录
-
-- [完整配置示例](#完整配置示例)
-- [基本信息](#基本信息)
-- [插件配置](#插件配置)
-  - [语法高亮 (highlight)](#highlight---语法高亮配置)
-  - [格式化 (format)](#format---格式化配置)
-  - [字数统计 (wordCount)](#wordcount---字数统计配置)
-  - [敏感词检测 (sensitiveWords)](#sensitivewords---敏感词检测配置)
-  - [分卷管理 (volumes)](#volumes---分卷管理配置)
-  - [写作辅助](#写作辅助配置)
-  - [编辑器 (editor)](#editor---编辑器配置)
-  - [全局人物 (characters)](#characters---全局人物名称配置)
-- [自定义颜色方案](#自定义颜色方案示例)
-- [使用说明](#使用说明)
-- [常见问题](#常见问题)
-
----
-
-## 完整配置示例
+## 常用配置示例
 
 ```jsonc
 {
   "name": "我的小说",
-  "author": "作者名",
-  "description": "小说简介",
-  "genre": "武侠",
-  "tags": ["成长", "江湖"],
-  "created": "2025-11-18T10:00:00",
-  "modified": "2025-11-18T10:00:00",
-
   "noveler": {
-    // 语法高亮配置
+    "targetWords": {
+      "default": 2500
+    },
+    "sensitiveWords": {
+      "enabled": true,
+      "builtInLibrary": {
+        "enabled": true,
+        "levels": {
+          "high": true,
+          "medium": true,
+          "low": false
+        }
+      }
+    },
+    "autoEmptyLine": {
+      "value": true
+    },
+    "paragraphIndent": {
+      "value": true
+    },
+    "autoUpdateReadmeOnCreate": {
+      "value": "always"
+    },
+    "volumes": {
+      "enabled": true,
+      "folderStructure": "flat",
+      "chapterNumbering": "volume",
+      "numberFormat": "arabic"
+    },
+    "characters": {
+      "list": []
+    },
     "highlight": {
       "dialogue": {
-        "color": "#ce9178",
-        "backgroundColor": "rgba(206, 145, 120, 0.15)",
-        "fontStyle": "normal"
-      },
-      "thought": {
-        "color": "#608b4e",
-        "backgroundColor": "rgba(96, 139, 78, 0.15)",
-        "fontStyle": "italic"
+        "color": "#ce9178"
       },
       "character": {
         "color": "#4ec9b0",
-        "backgroundColor": "rgba(78, 201, 176, 0.15)",
-        "fontWeight": "bold"
-      },
-      "ellipsis": {
-        "color": "#569cd6",
-        "backgroundColor": "rgba(86, 156, 214, 0.15)",
         "fontWeight": "bold"
       }
     },
-
-    // 格式化配置
     "format": {
       "chineseQuoteStyle": "「」",
-      "autoFormat": true,
       "convertQuotes": true
-    },
-
-    // 字数统计配置
-    "wordCount": {
-      "showInStatusBar": true,
-      "includePunctuation": true
-    },
-
-    // 敏感词检测配置 (v0.3.4+)
-    "sensitiveWords": {
-      "enabled": true,
-      "levels": {
-        "high": true,      // 高危词库
-        "medium": true,    // 中危词库
-        "low": false       // 低危词库
-      },
-      "checkOnType": true,
-      "checkOnSave": true,
-      "customWords": {
-        "enabled": true,
-        "blacklistPath": ".noveler/sensitive-words/blacklist.json",
-        "whitelistPath": ".noveler/sensitive-words/whitelist.json"
-      },
-      "display": {
-        "severity": "Warning",
-        "showInProblems": true,
-        "showWordCount": true
-      }
-    },
-
-    // 分卷管理配置 (v0.5.0+)
-    "volumes": {
-      "enabled": false,
-      "chapterNumbering": "sequential",  // sequential | reset | hybrid
-      "folderStructure": "nested"        // flat | nested
-    },
-
-    // 写作辅助配置
-    "autoEmptyLine": true,        // 自动空行
-    "paragraphIndent": true,      // 段落缩进
-
-    // README 自动更新配置
-    "readmeAutoUpdate": "ask",    // always | ask | never
-
-    // 编辑器配置
-    "editor": {
-      "markdownFontSize": 16
-    },
-
-    // 全局人物名称
-    "characters": ["张无忌", "周芷若", "赵敏"]
+    }
   }
 }
 ```
 
----
+上例为扁平结构。已有章节要改为分卷，请运行 `Noveler: 迁移到分卷结构`，让向导同时处理文件和配置。
+完整默认字段见 [默认模板](../templates/default-config.jsonc)；部分兼容字段当前未接入，见下文限制。
 
 ## 基本信息
 
@@ -138,291 +76,71 @@
 
 ---
 
-## 插件配置
+## 配置字段
 
-所有 Noveler 插件的配置都在 `noveler` 对象下。
+下表路径均位于 `noveler` 内。
 
-### highlight - 语法高亮配置
+| 路径 | 类型或可选值 | 说明 |
+|---|---|---|
+| `targetWords.default` | 正数，默认 2500 | 新章节默认目标字数，已有章节可设置自身 `targetWords` |
+| `highlight.dialogue` | 样式对象 | 对话高亮 |
+| `highlight.character` | 样式对象 | 人物高亮 |
+| `characters.list` | 字符串数组 | 补充人物名称；也会读取 `characters/` 文件中的名称 |
+| `format.convertQuotes` | 布尔值 | 是否转换引号 |
+| `format.chineseQuoteStyle` | `「」` 或两个直双引号 | 引号输出样式，双引号值在 JSON 中写作 `"\"\""` |
+| `wordCount.showInStatusBar` | 布尔值，默认 true | 状态栏统计显示 |
+| `autoEmptyLine.value` | 布尔值，默认 true | 段落空行 |
+| `paragraphIndent.value` | 布尔值，默认 true | 段首两个全角空格 |
+| `autoUpdateReadmeOnCreate.value` | `always` / `ask` / `never` | README 更新策略，默认 always；never 时刷新命令也跳过更新 |
+| `volumes.enabled` | 布尔值 | 与 nested 结构同时满足才启用分卷 |
+| `volumes.folderStructure` | `flat` / `nested` | 扁平 / 分卷目录 |
+| `volumes.numberFormat` | `arabic` / `chinese` / `roman` | 卷号显示格式 |
+| `volumes.chapterNumbering` | `global` / `volume` / `mixed` | 章节编号策略 |
+| `eyeCareMode.enabled` | 布尔值 | 护眼模式，建议使用快速设置切换以保存原主题 |
+| `eyeCareMode.previousTheme` | 字符串 | 切换前主题名 |
+| `focusMode.typingSound` | 音效名称 | none、mechanical、typewriter、bubble、pop、click、click2、click3、custom |
+| `focusMode.typingSoundVolume` | 0–100 | 音效音量 |
+| `focusMode.customSoundPaths` | 字符串数组 | 自定义音效文件路径 |
+| `focusMode.activeCustomSound` | 字符串 | 当前选中的自定义音效 |
 
-每种高亮类型支持以下属性：
+### 高亮样式
 
 | 属性 | 类型 | 说明 | 示例 |
-|------|------|------|------|
-| color | string | 文字颜色 | "#ce9178" |
-| backgroundColor | string | 背景颜色 | "rgba(206, 145, 120, 0.15)" |
-| fontStyle | string | 字体样式 | "normal", "italic" |
-| fontWeight | string | 字体粗细 | "normal", "bold" |
+|---|---|---|---|
+| color | string | 文字颜色 | #ce9178 |
+| backgroundColor | string | 背景颜色 | rgba(206, 145, 120, 0.15) |
+| fontStyle | string | 字体样式 | normal / italic |
+| fontWeight | string | 字体粗细 | normal / bold |
 
-**高亮类型：**
-
-- `dialogue`: 对话内容（各种引号包裹的文字）
-- `thought`: 心理描写（括号包裹的文字）
-- `character`: 人物名称
-- `ellipsis`: 省略号
-
-**颜色格式：**
-
-- 十六进制：`"#ce9178"`
-- RGB/RGBA：`"rgb(206, 145, 120)"` 或 `"rgba(206, 145, 120, 0.15)"`
-- 颜色名：`"red"`, `"blue"` 等
-
----
-
-### format - 格式化配置
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| chineseQuoteStyle | string | 中文引号样式 | "「」" |
-| autoFormat | boolean | 保存时自动格式化 | true |
-| convertQuotes | boolean | 是否转换引号 | true |
-
-**引号样式选项：**
-- `"「」"` - 中文直角引号
-- `"\"\""` - 中文弯引号
-- `"''"` - 中文单引号
-
-**convertQuotes 说明：**
-- `true`（默认）：格式化时会统一引号为 `chineseQuoteStyle` 配置的样式
-- `false`：格式化时不转换引号，保持原样
-
----
-
-### wordCount - 字数统计配置
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| showInStatusBar | boolean | 在状态栏显示字数 | true |
-| includePunctuation | boolean | 字数包含标点符号 | true |
-
-**字数统计说明（v0.3.2+）：**
-- **总计** = 正文 + 标点（不含空格）
-- **正文** = 中文汉字 + 英文字母和数字（不含标点、不含空格）
-- **标点** = 中文标点（含 `""`、`…`、`—` 等）+ 英文标点
-- **自动排除**：
-  - Front Matter（YAML 元数据）
-  - Markdown 标题（`#` 开头的行）
-  - HTML 注释（`<!-- ... -->`）
-  - 所有空格（全角和半角）
-- **状态栏显示**：`总计 xxx | 正文 xxx | 标点 xxx`
-- **选中文本统计**：选中任何文本（包括标题）时显示选中部分的字数
-- **侧边栏 hover**：鼠标悬停章节名称即可查看详细字数统计
-
----
-
-### sensitiveWords - 敏感词检测配置
-
-> ⚠️ v0.3.4+ 新增功能
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| enabled | boolean | 是否启用敏感词检测 | true |
-| levels.high | boolean | 启用高危词库 | true |
-| levels.medium | boolean | 启用中危词库 | true |
-| levels.low | boolean | 启用低危词库 | false |
-| checkOnType | boolean | 输入时检测 | true |
-| checkOnSave | boolean | 保存时检测 | true |
-
-**词库级别说明：**
-- **high（高危）**：政治、严重暴力、严重违法 - 推荐启用
-- **medium（中危）**：色情、一般违法、宗教敏感 - 推荐启用
-- **low（低危）**：广告、争议词汇、不文明用语 - 可选启用
-
-**自定义词库配置：**
+颜色校验支持十六进制、rgb 和 rgba。人物名称可从 `characters/` 和 `characters.list` 合并读取，
+未建立人物档案时也可先在列表中添加姓名。
 
 ```jsonc
-"customWords": {
-  "enabled": true,
-  "blacklistPath": ".noveler/sensitive-words/blacklist.json",  // 自定义黑名单路径
-  "whitelistPath": ".noveler/sensitive-words/whitelist.json"   // 自定义白名单路径
-}
-```
-
-**显示配置：**
-
-```jsonc
-"display": {
-  "severity": "Warning",        // Error | Warning | Information | Hint
-  "showInProblems": true,       // 在问题面板显示
-  "showWordCount": true         // 状态栏显示敏感词数量
-}
-```
-
-**示例配置：**
-
-```jsonc
-// 只启用高危词库
-"sensitiveWords": {
-  "enabled": true,
-  "levels": {
-    "high": true,
-    "medium": false,
-    "low": false
+{
+  "noveler": {
+    "characters": { "list": ["张无忌", "周芷若", "赵敏", "谢逊"] }
   }
 }
-
-// 完全禁用敏感词检测
-"sensitiveWords": {
-  "enabled": false
-}
 ```
-
----
-
-### volumes - 分卷管理配置
-
-> ⚠️ v0.5.0+ 新增功能
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| enabled | boolean | 是否启用分卷功能 | false |
-| chapterNumbering | string | 章节编号模式 | "sequential" |
-| folderStructure | string | 文件夹结构 | "nested" |
-
-**章节编号模式（chapterNumbering）：**
-
-- **sequential（全局连续）**：所有章节连续编号
-  - 示例：第 1 章、第 2 章、第 3 章...
-
-- **reset（按卷重置）**：每卷重新编号
-  - 示例：第一卷-第 1 章、第一卷-第 2 章、第二卷-第 1 章...
-
-- **hybrid（混合模式）**：卷内连续，全局也连续
-  - 示例：第 1 章 [卷1-1]、第 2 章 [卷1-2]、第 3 章 [卷2-1]...
-
-**文件夹结构（folderStructure）：**
-
-- **nested（嵌套结构）**：每卷一个文件夹
-  ```
-  chapters/
-  ├── 第一卷-崛起/
-  │   ├── 第1章.md
-  │   └── 第2章.md
-  └── 第二卷-修炼/
-      ├── 第1章.md
-      └── 第2章.md
-  ```
-
-- **flat（扁平结构）**：所有章节在同一目录
-  ```
-  chapters/
-  ├── 第1章.md
-  ├── 第2章.md
-  └── 第3章.md
-  ```
-
-**示例配置：**
-
-```jsonc
-// 启用分卷，按卷重置编号
-"volumes": {
-  "enabled": true,
-  "chapterNumbering": "reset",
-  "folderStructure": "nested"
-}
-
-// 扁平结构（不使用分卷）
-"volumes": {
-  "enabled": false
-}
-```
-
----
-
-### 写作辅助配置
-
-#### autoEmptyLine - 自动空行
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| autoEmptyLine | boolean | 按回车时自动插入空行 | true |
-
-**说明：**
-- 仅在 `chapters/` 目录下的 Markdown 文件中生效
-- 帮助保持段落间距，提升阅读体验
-- 避免手动添加空行的繁琐操作
-
----
-
-#### paragraphIndent - 段落缩进
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| paragraphIndent | boolean | 自动添加段落缩进 | true |
-
-**说明：**
-- 自动添加两个全角空格作为段落缩进
-- 符合中文写作习惯
-- 与自动空行功能可同时使用
-
----
-
-#### readmeAutoUpdate - README 自动更新
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| readmeAutoUpdate | string | README 自动更新策略 | "ask" |
-
-**可选值：**
-- **always**：创建章节/人物后自动更新 README
-- **ask**：创建后询问是否更新（推荐）
-- **never**：不自动更新，需手动触发
-
----
-
-### editor - 编辑器配置
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| markdownFontSize | number | Markdown 文件字号 | 无（使用编辑器默认） |
-
-**说明：**
-- 设置后，打开 Markdown 文件时会自动应用该字号
-- 切换到其他类型文件时自动恢复原始字号
-- 推荐值：16-18，适合长时间阅读和写作
-- 留空则使用 VSCode 编辑器的默认字号
-
----
-
-### characters - 全局人物名称配置
-
-| 字段 | 类型 | 说明 | 默认值 |
-|------|------|------|--------|
-| characters | string[] | 需要高亮的人物名称列表 | [] |
-
-**说明：**
-- 配置的人物名称会在所有章节中自动高亮
-- 与 `characters/` 目录中的人物文件配置互补
-- 两个来源的人物名称会自动合并去重
-- 适合快速添加人物名称，无需创建完整的人物文件
-
-**示例：**
-```jsonc
-"characters": ["张无忌", "周芷若", "赵敏", "谢逊"]
-```
-
----
+没有 `highlight.thought`、`highlight.ellipsis` 配置。
 
 ## 自定义颜色方案示例
 
 ### 深色主题方案
 
 ```jsonc
-"highlight": {
-  "dialogue": {
-    "color": "#d19a66",
-    "backgroundColor": "rgba(209, 154, 102, 0.1)"
-  },
-  "thought": {
-    "color": "#98c379",
-    "backgroundColor": "rgba(152, 195, 121, 0.1)"
-  },
-  "character": {
-    "color": "#61afef",
-    "backgroundColor": "rgba(97, 175, 239, 0.1)"
-  },
-  "ellipsis": {
-    "color": "#c678dd",
-    "backgroundColor": "rgba(198, 120, 221, 0.1)"
+{
+  "noveler": {
+    "highlight": {
+      "dialogue": {
+        "color": "#d19a66",
+        "backgroundColor": "rgba(209, 154, 102, 0.1)"
+      },
+      "character": {
+        "color": "#61afef",
+        "backgroundColor": "rgba(97, 175, 239, 0.1)"
+      }
+    }
   }
 }
 ```
@@ -430,22 +148,18 @@
 ### 浅色主题方案
 
 ```jsonc
-"highlight": {
-  "dialogue": {
-    "color": "#d73a49",
-    "backgroundColor": "rgba(215, 58, 73, 0.08)"
-  },
-  "thought": {
-    "color": "#22863a",
-    "backgroundColor": "rgba(34, 134, 58, 0.08)"
-  },
-  "character": {
-    "color": "#005cc5",
-    "backgroundColor": "rgba(0, 92, 197, 0.08)"
-  },
-  "ellipsis": {
-    "color": "#6f42c1",
-    "backgroundColor": "rgba(111, 66, 193, 0.08)"
+{
+  "noveler": {
+    "highlight": {
+      "dialogue": {
+        "color": "#d73a49",
+        "backgroundColor": "rgba(215, 58, 73, 0.08)"
+      },
+      "character": {
+        "color": "#005cc5",
+        "backgroundColor": "rgba(0, 92, 197, 0.08)"
+      }
+    }
   }
 }
 ```
@@ -453,126 +167,165 @@
 ### 高对比度方案
 
 ```jsonc
-"highlight": {
-  "dialogue": {
-    "color": "#ff6b6b",
-    "backgroundColor": "rgba(255, 107, 107, 0.2)",
-    "fontStyle": "normal"
-  },
-  "thought": {
-    "color": "#51cf66",
-    "backgroundColor": "rgba(81, 207, 102, 0.2)",
-    "fontStyle": "italic"
-  },
-  "character": {
-    "color": "#339af0",
-    "backgroundColor": "rgba(51, 154, 240, 0.2)",
-    "fontWeight": "bold"
-  },
-  "ellipsis": {
-    "color": "#cc5de8",
-    "backgroundColor": "rgba(204, 93, 232, 0.2)",
-    "fontWeight": "bold"
+{
+  "noveler": {
+    "highlight": {
+      "dialogue": {
+        "color": "#ff6b6b",
+        "backgroundColor": "rgba(255, 107, 107, 0.2)",
+        "fontStyle": "normal"
+      },
+      "character": {
+        "color": "#339af0",
+        "backgroundColor": "rgba(51, 154, 240, 0.2)",
+        "fontWeight": "bold"
+      }
+    }
   }
 }
 ```
 
 ---
 
-## 使用说明
+## 分卷编号与迁移
 
-### 1. 配置文件格式
+- `global`：所有卷使用全局编号。
+- `volume`：每卷独立编号。
+- `mixed`：正文卷全局编号，前传、后传和番外独立编号。
 
-- **推荐使用 `novel.jsonc`**：支持注释，更易维护
-- 也可使用 `novel.json`：标准 JSON 格式，不支持注释
-- 插件优先读取 `.jsonc`，如果不存在则读取 `.json`
+切换编号模式不会重排已有章节，也不会生成“卷号-章号”复合编号。
+目录位置决定章节归属；再次迁移按本次分组处理，旧 Front Matter 的 `volume` 不决定迁移目标。
+回到扁平结构时保留原卷资料，后续可以复用卷目录，已有资料不会被覆盖。
+成功迁移会清理临时备份，失败恢复不完整时保留备份并提示路径。
 
-### 2. 修改配置后生效
+### 目录结构示例
 
-- 修改 `novel.jsonc` 后保存
-- 配置会自动重新加载
-- 如果没有自动生效，运行命令 `Noveler: 重载高亮配置`
+分卷目录（nested）：
 
-### 3. 配置优先级
+```text
+chapters/
+├── 第01卷-崛起/
+│   ├── volume.json
+│   ├── outline.md
+│   └── 第01章-启程.md
+└── 第02卷-修炼/
+    └── 第01章-入门.md
+```
 
-- `novel.jsonc` 中的配置优先于 VSCode 的 settings.json
-- 如果 `novel.jsonc` 中没有配置某项，会使用默认值
+扁平目录（flat）：
 
-### 4. 配置验证
+```text
+chapters/
+├── 第01章-启程.md
+└── 第02章-入门.md
+```
 
-- 配置文件必须是合法的 JSON/JSONC 格式
-- 颜色值必须是有效的 CSS 颜色格式
-- 如果配置错误，会使用默认值并在控制台显示警告
+回滚后可能仍存在原卷目录，它们用于保留卷资料；扁平模式的章节在 chapters 根目录。
 
-### 5. 配置迁移
+## 字数与写作辅助
 
-- 插件会自动检测并迁移旧版本配置
-- 迁移过程不会丢失任何自定义配置
-- 详见：[配置迁移说明](CONFIG_MIGRATION.md)
+- 总计 = 正文 + 标点，正文为中文汉字、英文字母和数字，不含空格。
+- 全文统计排除 Front Matter、整行 Markdown 标题和 HTML 注释；选中统计保留标题。
+- 状态栏显示总计、正文和标点，章节悬停也可以查看统计。
+- `autoEmptyLine.value` 控制章节编辑时的自动空行，`paragraphIndent.value` 控制两个全角空格缩进，两项可同时开启。
+- `format.convertQuotes` 为 false 时保持原引号；为 true 时按 `chineseQuoteStyle` 转换。
 
----
+## 敏感词配置
 
-## 常见问题
+```jsonc
+{
+  "noveler": {
+    "sensitiveWords": {
+      "enabled": true,
+      "builtInLibrary": {
+        "enabled": true,
+        "levels": { "high": true, "medium": true, "low": false }
+      },
+      "customLibrary": {
+        "enabled": true,
+        "path": ".noveler/sensitive-words/custom-words.jsonc"
+      },
+      "whitelist": {
+        "enabled": true,
+        "path": ".noveler/sensitive-words/whitelist.jsonc"
+      },
+      "checkOnType": true,
+      "checkOnSave": true,
+      "display": {
+        "severity": "Warning",
+        "showInProblems": true,
+        "showWordCount": true
+      }
+    }
+  }
+}
+```
 
-### Q: 修改配置后没有立即生效？
-**A**: 尝试以下方法：
-1. 运行命令 `Noveler: 重载高亮配置`
-2. 重新打开文件
-3. 刷新侧边栏
-4. 重启 VS Code（极少数情况）
+`severity` 支持 `Error`、`Warning`、`Information`。自定义词库和白名单使用 `words` 数组，
+它们的文件路径支持 `.jsonc` 与 `.json` 回退；这一规则不适用于主配置文件。
+详见 [敏感词库说明](../templates/sensitive-words/README.md)。
 
-### Q: 如何恢复默认配置？
-**A**: 两种方式：
-1. 删除 `noveler` 配置节
-2. 使用命令 `Noveler: 打开配置文件` 并选择"创建"重新生成
+## VS Code 项目设置
 
-### Q: 可以只配置部分选项吗？
-**A**: 可以。未配置的选项会使用默认值。
+自动保存、保存时格式化和编辑器字号在 `.vscode/settings.json` 中设置：
 
-### Q: 颜色不够明显怎么办？
-**A**: 调整 `backgroundColor` 的透明度（rgba 中的最后一个值），或使用高对比度方案。
+```jsonc
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 2000,
+  "[markdown]": {
+    "editor.defaultFormatter": "chang.chinese-novel-writer",
+    "editor.formatOnSave": true
+  },
+  "editor.fontSize": 20
+}
+```
 
-### Q: novel.json 和 novel.jsonc 有什么区别？
-**A**:
-- `novel.jsonc`：支持注释（`//` 和 `/* */`），推荐使用
-- `novel.json`：标准 JSON，不支持注释
+初始化安全合并缺失项，保留已有设置、注释和尾逗号；已有 `files.autoSave: "off"` 不会被强制开启。
+需要关闭自动保存时将 `files.autoSave` 改为 `off`，恢复时改回 `afterDelay`。
 
-### Q: 配置文件可以共享吗？
-**A**: 可以。提交到 Git 仓库，团队成员克隆后即可使用统一配置。
+## 当前限制与兼容字段
 
-### Q: 如何备份配置？
-**A**: 直接复制 `novel.jsonc` 文件即可。
+- `noveler.autoSave` 和 `noveler.editor.markdownFontSize` 不生效，请使用 VS Code 设置。
+- `format.autoFormat` 当前未接入保存事件；使用 `editor.formatOnSave` 和 Markdown 默认格式化器。
+- `wordCount.includePunctuation` 当前未接入计算，总计始终为正文加标点。
+- `focusMode.typewriter`、`typewriterPosition` 是旧兼容字段，不提供打字机滚动功能。
+- `doubtMark.deleteOnResolve` 当前未正确接入，完成待办只改变标记，删除请使用明确的删除命令。
 
-### Q: 敏感词检测影响性能吗？
-**A**: 不会。使用了防抖技术和高效算法（Trie 树），只在必要时检测。
+修改后保存配置，大多数功能会重新加载。如果显示未更新，可切换文件或重新加载窗口。
+遇到格式错误先修复 JSONC，不要通过覆盖整个配置来解决。
 
-### Q: 分卷功能如何迁移？
-**A**: 使用命令 `Noveler: 迁移到分卷结构`，插件会引导你完成迁移，支持随时回滚。
+## 使用与常见问题
 
----
+### 可以只配置部分选项吗？
 
-## 📚 相关文档
+可以，未配置项使用代码中的默认值。注意默认模板与完全缺省的配置并非每项都相同，
+例如默认模板 volumes.enabled 为 true，但 folderStructure 为 flat，仍是扁平模式。
 
-- [文件格式说明](文件格式说明.md) - Front Matter 字段详解
-- [FAQ](FAQ.md) - 常见问题解答
-- [配置迁移说明](CONFIG_MIGRATION.md) - 配置自动迁移系统
-- [CHANGELOG](../CHANGELOG.md) - 更新日志
+### 如何恢复默认配置？
 
----
+先备份 novel.jsonc，再对照 [默认模板](../templates/default-config.jsonc) 恢复需要的字段。
+不要删除小说基本信息；旧的无效字段不会因为保留而变成有效配置。
 
-## 📋 配置版本历史
+### 颜色不够明显怎么办？
 
-- **v0.1.0**：基础配置（highlight, format, wordCount）
-- **v0.2.0**：新增 autoEmptyLine, characters
-- **v0.3.0**：新增 editor.markdownFontSize
-- **v0.3.4**：新增 sensitiveWords（敏感词检测）
-- **v0.5.0**：新增 volumes（分卷管理）、paragraphIndent
-- **v0.6.0**：新增 readmeAutoUpdate
-- **v0.6.8**：新增快速设置命令（QuickPick 界面）
-- **v0.7.1**：新增 eyeCareMode（护眼模式，低饱和度暖灰绿主题）
-- **v0.8.0**：新增手机阅读预览（仿真 iPhone 外观，4 种阅读主题）
-- **v0.8.4**：新增 focusMode.typingSound（打字音效，8 种内置音效 + 自定义）
+调整 backgroundColor 的 rgba 透明度，或使用上面的高对比度方案。保存后切换编辑器检查效果。
 
----
+### 配置可以共享或备份吗？
 
-**提示**：推荐使用 `novel.jsonc` 格式，可以添加注释方便理解配置用途。
+可以复制 novel.jsonc，或纳入 Git；VS Code 编辑设置另外保存在 .vscode/settings.json。
+两个文件控制不同的功能，不能用“novel.jsonc 一律优先”描述它们的关系。
+
+### 配置验证与升级
+
+配置必须为有效 JSONC；验证会检查目标字数、颜色、引号样式和 README 更新策略等字段，
+并不代表所有未知字段都会被识别。遇到警告应按字段定位修正。
+配置版本由插件维护，旧版本升级的实现和示例见 [配置升级机制](CONFIG_MIGRATION.md)。
+功能发布时间请查 [CHANGELOG](../CHANGELOG.md)，不要将插件版本与配置版本混用。
+
+## 相关文档
+
+- [README](../README.md)
+- [文件格式说明](文件格式说明.md)
+- [FAQ](FAQ.md)
+- [配置升级机制](CONFIG_MIGRATION.md)

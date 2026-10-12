@@ -179,7 +179,10 @@ export async function activate(context: vscode.ExtensionContext) {
         codeLensProvider = new ChapterCodeLensProvider(wordCountService);
         context.subscriptions.push(
             vscode.languages.registerCodeLensProvider(
-                { language: 'markdown', pattern: '**/chapters/**' },
+                [
+                    { language: 'markdown', pattern: '**/chapters/**' },
+                    { language: 'markdown', pattern: '**/characters/**' }
+                ],
                 codeLensProvider
             )
         );

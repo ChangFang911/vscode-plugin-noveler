@@ -32,9 +32,9 @@
     "format": {
       // 是否自动转换引号为中文引号
       "convertQuotes": true,
-      // 保存时是否自动格式化
+      // 保留兼容字段；保存格式化由 .vscode/settings.json 的 editor.formatOnSave 控制
       "autoFormat": true,
-      // 中文引号样式：""（直角引号）或 ""（弯引号）
+      // 中文引号样式：「」或两个直双引号
       "chineseQuoteStyle": "\"\""
     },
 
@@ -43,7 +43,7 @@
     "wordCount": {
       // 是否在状态栏显示字数
       "showInStatusBar": true,
-      // 字数统计是否包含标点符号
+      // 保留兼容字段；当前总计固定包含标点
       "includePunctuation": true
     },
 

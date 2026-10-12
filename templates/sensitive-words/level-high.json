@@ -1,7 +1,7 @@
 {
   "level": "high",
   "description": "高危敏感词：政治、严重暴力、严重违法（强烈建议启用）",
-  "totalWords": 250,
+  "totalWords": 235,
   "words": [
     "共产党",
     "国民党",

@@ -43,13 +43,16 @@ export function findMarksInText(text: string): MarkPosition[] {
 export class DoubtMarkService {
     private static instance: DoubtMarkService | undefined;
 
-    private marks = new Map<string, DoubtMark[]>();  // key: uri.toString()
+    private marks: Map<string, DoubtMark[]>;  // key: uri.toString()
     private watcher: vscode.FileSystemWatcher | undefined;
+    private documentListener: vscode.Disposable | undefined;
     private listeners: Array<() => void> = [];
     private scanTimers = new Map<string, NodeJS.Timeout>();
     private initialized = false;
 
-    private constructor() {}
+    private constructor() {
+        this.marks = new Map();
+    }
 
     static getInstance(): DoubtMarkService {
         if (!DoubtMarkService.instance) {
@@ -71,7 +74,7 @@ export class DoubtMarkService {
         try {
             const uris = await vscode.workspace.findFiles(
                 '**/*.md',
-                '{**/node_modules/**,**/out/**,.git/**}'
+                '{**/node_modules/**,**/out/**,**/.git/**,**/.noveler/backups/**}'
             );
             await Promise.all(uris.map(u => this.scanFile(u)));
         } catch (error) {
@@ -80,9 +83,11 @@ export class DoubtMarkService {
     }
 
     private async scanFile(uri: vscode.Uri): Promise<void> {
+        if (uri.path.includes('/.noveler/backups/')) { return; }
         try {
             const bytes = await vscode.workspace.fs.readFile(uri);
-            const text = Buffer.from(bytes).toString('utf8');
+            const document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === uri.toString());
+            const text = document?.getText() ?? Buffer.from(bytes).toString('utf8');
             const fileMarks = this.extractMarksFromText(text, uri);
             if (fileMarks.length > 0) {
                 this.marks.set(uri.toString(), fileMarks);
@@ -109,6 +114,20 @@ export class DoubtMarkService {
 
     private setupWatcher(): void {
         this.watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+        this.documentListener = vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document.languageId !== 'markdown' || event.document.uri.path.includes('/.noveler/backups/')) { return; }
+            const marks = this.extractMarksFromText(event.document.getText(), event.document.uri);
+            const previous = this.marks.get(event.document.uri.toString()) ?? [];
+            if (previous.length === marks.length && previous.every((mark, index) =>
+                mark.lineNumber === marks[index].lineNumber && mark.content === marks[index].content && mark.resolved === marks[index].resolved
+            )) { return; }
+            if (marks.length) {
+                this.marks.set(event.document.uri.toString(), marks);
+            } else {
+                this.marks.delete(event.document.uri.toString());
+            }
+            this.fireChange();
+        });
 
         this.watcher.onDidChange(uri => this.debounceFileScan(uri));
         this.watcher.onDidCreate(async uri => {
@@ -271,6 +290,7 @@ export class DoubtMarkService {
 
     dispose(): void {
         this.watcher?.dispose();
+        this.documentListener?.dispose();
         for (const t of this.scanTimers.values()) { clearTimeout(t); }
         this.scanTimers.clear();
         this.listeners = [];

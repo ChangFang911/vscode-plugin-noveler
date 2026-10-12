@@ -1,33 +1,32 @@
 # 打字音效文件
 
-此目录存放打字音效的 MP3 文件。
+此目录包含 7 种内置音效，默认关闭。通过 `Noveler: 专注模式设置` 选择音效、音量或自定义文件。
 
-## 所需文件
+| 文件 | 音效 |
+|---|---|
+| mechanical.wav | 机械键盘 |
+| typewriter.wav | 打字机 |
+| bubble.wav | 气泡 |
+| pop.mp3 | 弹出 |
+| click.wav | 点击 |
+| click2.wav | 点击变体 2 |
+| click3.wav | 点击变体 3 |
 
-| 文件名 | 描述 |
-|--------|------|
-| `mechanical.mp3` | 机械键盘音效（青轴风格） |
-| `typewriter.mp3` | 老式打字机音效 |
-| `bubble.mp3` | 气泡音效 |
-| `pop.mp3` | 弹出音效 |
-| `click.mp3` | 点击音效 |
+加载时优先查找 WAV，再查找 MP3。实际播放依赖系统播放器：macOS 使用 afplay，
+Windows 使用 PowerShell Media.SoundPlayer，Linux 使用 aplay。不同平台支持的格式可能不同，
+自定义音效优先使用短促的 WAV 文件，并在目标系统试听。
 
-## 音效要求
+添加资源时检查许可证、控制文件大小，并同步此列表。保存文件时不触发打字音效。
 
-- 格式：MP3
-- 时长：50-200ms（短促）
-- 采样率：44100Hz
-- 文件大小：< 50KB
+## 音效资源要求
 
-## 获取��效
+建议使用 50–200ms 的短音效，采样率 44100Hz，单文件尽量小于 50KB。
+这些是资源制作建议，实际播放还需检查系统格式兼容性。
+
+## 获取音效
 
 可以从以下来源获取免费音效：
 
 1. [Freesound](https://freesound.org/) - 搜索 "keyboard click", "typewriter", "bubble pop"
 2. [Mixkit](https://mixkit.co/free-sound-effects/) - 免费音效库
 3. [Zapsplat](https://www.zapsplat.com/) - 免费音效（需注册）
-
-## 注意事项
-
-- 确保音效文件的许可证允许在开源项目中使用
-- 音效文件会打包到扩展中，请控制文件大小

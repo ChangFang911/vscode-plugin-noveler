@@ -5,6 +5,10 @@
 
 import * as assert from 'assert';
 import * as sinon from 'sinon';
+import * as vscode from 'vscode';
+import { ChapterCodeLensProvider } from '../../providers/codeLensProvider';
+import { WordCountService } from '../../services/wordCountService';
+import { MockTextDocument, MockUri } from '../mocks/vscode';
 import { getStatusDisplayName } from '../../utils/statusHelper';
 
 suite('CodeLensProvider Test Suite', () => {
@@ -16,6 +20,58 @@ suite('CodeLensProvider Test Suite', () => {
 
     teardown(() => {
         sandbox.restore();
+    });
+
+    suite('Actual provider title placement', () => {
+        const cases: Array<{ name: string; text: string; line: number | null }> = [
+            { name: 'skips YAML comments before the chapter title', text: '---\n# 元数据备注\ntitle: 开篇\nstatus: draft\ntargetWords: 2500\n---\n# 第1章 开篇\n正文', line: 6 },
+            { name: 'skips heading-like lines in YAML block values', text: '---\ndescription: |\n  # 元数据内的标题\n---\n\n# 正文标题', line: 5 },
+            { name: 'skips headings inside HTML comments', text: '<!--\n# 注释标题\n-->\n# 正文标题\n正文', line: 3 },
+            { name: 'keeps CRLF line positions after frontmatter and comments', text: '---\r\n# 备注\r\ntitle: 开篇\r\n---\r\n<!--\r\n# 隐藏标题\r\n-->\r\n# 正文标题', line: 7 },
+            { name: 'keeps the first real title with an inline comment', text: '# 开篇 <!-- 备注 -->\n# 第二个标题', line: 0 },
+            { name: 'ignores a heading consisting only of a comment', text: '# <!-- 不是章节标题 -->\n# 正文标题', line: 1 },
+            { name: 'does not place actions in an unclosed comment', text: '<!--\n# 隐藏标题', line: null },
+            { name: 'does not place actions in unclosed frontmatter', text: '---\n# 元数据备注\ntitle: 开篇', line: null },
+            { name: 'keeps ordinary title placement without frontmatter', text: '# 开篇\n正文', line: 0 },
+            { name: 'accepts empty frontmatter', text: '---\n---\n# 开篇', line: 2 },
+            { name: 'skips frontmatter with a byte order mark', text: '\uFEFF---\n# 备注\ntitle: 开篇\n---\n# 正文标题', line: 4 }
+        ];
+        for (const item of cases) {
+            test(item.name, () => {
+                const document = new MockTextDocument(MockUri.file('/novel/chapters/第01章.md'), item.text, 'markdown');
+                const provider = new ChapterCodeLensProvider(new WordCountService());
+                const lenses = provider.provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+                if (item.line === null) {
+                    assert.strictEqual(lenses.length, 0);
+                    return;
+                }
+                assert.ok(lenses.length >= 3);
+                assert.ok(lenses.every(lens => lens.range.start.line === item.line));
+                assert.ok(lenses.some(lens => lens.command?.command === 'noveler.formatDocument'));
+                const format = lenses.find(lens => lens.command?.command === 'noveler.formatDocument');
+                assert.strictEqual(format?.command?.arguments?.[0], document.uri);
+                const status = lenses.find(lens => lens.command?.command === 'noveler.updateChapterStatus');
+                assert.strictEqual(status?.command?.arguments?.[0], document.uri);
+            });
+        }
+    });
+
+    suite('Character document actions', () => {
+        test('shows only formatting above the real character title', () => {
+            const document = new MockTextDocument(MockUri.file('/novel/characters/林舟.md'), '---\n# 人物备注\nname: 林舟\n---\n<!--\n# 隐藏标题\n-->\n# 林舟\n## 人物设定', 'markdown');
+            const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+            assert.strictEqual(lenses.length, 1);
+            assert.strictEqual(lenses[0].range.start.line, 7);
+            assert.strictEqual(lenses[0].command?.command, 'noveler.formatDocument');
+            assert.strictEqual(lenses[0].command?.arguments?.[0], document.uri);
+        });
+        test('does not add chapter actions to references or non-Markdown documents', () => {
+            for (const [file, language] of [['/novel/references/资料.md', 'markdown'], ['/novel/characters/人物.txt', 'plaintext']]) {
+                const document = new MockTextDocument(MockUri.file(file), '# 标题', language);
+                const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+                assert.strictEqual(lenses.length, 0);
+            }
+        });
     });
 
     suite('Chapter Title Detection', () => {

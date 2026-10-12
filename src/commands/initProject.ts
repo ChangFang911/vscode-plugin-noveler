@@ -8,6 +8,8 @@ import { formatDateTime } from '../utils/dateFormatter';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
 import { Logger } from '../utils/logger';
+import { mergeRecommendedSettings } from '../utils/settingsHelper';
+import { applyDocumentChange, fileExists } from '../utils/documentOperations';
 
 /**
  * 初始化小说项目
@@ -272,16 +274,14 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
         const settingsUri = vscode.Uri.joinPath(vscodeDir, 'settings.json');
         let createSettings = false;
 
-        try {
-            await vscode.workspace.fs.stat(settingsUri);
+        if (await fileExists(settingsUri)) {
             // settings.json 已存在，询问是否覆盖
             const overwriteSettings = await vscode.window.showInformationMessage(
                 '检测到 .vscode/settings.json 已存在，是否要合并 Noveler 推荐配置？',
                 '合并', '跳过'
             );
             createSettings = (overwriteSettings === '合并');
-        } catch {
-            // settings.json 不存在，直接创建
+        } else {
             createSettings = true;
         }
 
@@ -312,36 +312,20 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
                 }
             };
 
-            // 尝试读取现有配置并合并
-            let finalSettings = novelerSettings;
-            try {
-                const existingData = await vscode.workspace.fs.readFile(settingsUri);
-                const existingSettings = JSON.parse(Buffer.from(existingData).toString('utf8'));
-
-                // 深度合并配置（现有配置优先，Noveler 配置作为默认值）
-                finalSettings = {
-                    ...novelerSettings,
-                    ...existingSettings,
-                    // 特殊处理嵌套对象（files.exclude 和 search.exclude）
-                    "files.exclude": {
-                        ...novelerSettings["files.exclude"],
-                        ...(existingSettings["files.exclude"] || {})
-                    },
-                    "search.exclude": {
-                        ...novelerSettings["search.exclude"],
-                        ...(existingSettings["search.exclude"] || {})
-                    }
-                };
-                Logger.info('合并现有 VSCode 配置与 Noveler 推荐配置');
-            } catch {
-                // 文件不存在或解析失败，使用 Noveler 默认配置
-                Logger.info('创建新的 VSCode 配置文件');
+            if (await fileExists(settingsUri)) {
+                await applyDocumentChange(settingsUri, text => mergeRecommendedSettings(text, novelerSettings));
+            } else {
+                const edit = new vscode.WorkspaceEdit();
+                edit.createFile(settingsUri, { overwrite: false });
+                edit.insert(settingsUri, new vscode.Position(0, 0), JSON.stringify(novelerSettings, null, 2));
+                if (!await vscode.workspace.applyEdit(edit)) {
+                    throw new Error('无法创建 settings.json，未覆盖已有文件');
+                }
             }
-
-            await vscode.workspace.fs.writeFile(
-                settingsUri,
-                Buffer.from(JSON.stringify(finalSettings, null, 2), 'utf8')
-            );
+            const settingsDocument = await vscode.workspace.openTextDocument(settingsUri);
+            if (!await settingsDocument.save() || settingsDocument.isDirty) {
+                throw new Error('settings.json 未保存，请检查编辑器中的配置');
+            }
             Logger.info('项目级 VSCode 配置已保存: .vscode/settings.json');
         }
 

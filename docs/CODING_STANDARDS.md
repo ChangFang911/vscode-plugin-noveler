@@ -22,8 +22,8 @@
 ### ✅ 正确做法
 
 ```typescript
-// 使用 ES6 默认导入（适用于有默认导出的库）
-import matter from 'gray-matter';
+// YAML 使用命名导出
+import { parseDocument } from 'yaml';
 
 // 使用 ES6 命名空间导入（适用于模块导出多个成员）
 import * as vscode from 'vscode';
@@ -40,7 +40,7 @@ import { CONFIG_FILE_NAME, CHAPTERS_FOLDER } from '../constants';
 const jsoncParser = require('jsonc-parser');
 
 // ❌ TypeScript 特有的 require 语法（不推荐）
-import matter = require('gray-matter');
+import yaml = require('yaml');
 ```
 
 ### 🔍 自查方法
@@ -496,24 +496,27 @@ npx jscpd src/
 
 ## 测试规范
 
-### ✅ 正确做法（待实现）
+### 测试命令
+
+使用 `npm run test:unit` 运行 Node 单元测试，`npm test` 运行真实 VS Code 扩展宿主测试。
+测试位于 `src/test/suite/`，使用 Mocha 和 Node assert，故障注入使用 Sinon。
+
+### 示例
 
 ```typescript
-// tests/wordCountService.test.ts
-import { WordCountService } from '../src/services/wordCountService';
+import * as assert from 'assert';
+import { WordCountService } from '../../services/wordCountService';
 
-describe('WordCountService', () => {
-    it('should count Chinese characters correctly', () => {
-        const service = new WordCountService();
-        const text = '这是一个测试';
-        const count = WordCountService.getSimpleWordCount(text);
-        expect(count).toBe(6);
+suite('WordCountService', () => {
+    test('counts Chinese characters', () => {
+        assert.strictEqual(WordCountService.getSimpleWordCount('这是一个测试'), 6);
     });
 
-    it('should exclude headers when specified', () => {
-        const text = '# 标题\n正文内容';
-        const count = WordCountService.getSimpleWordCount(text, true);
-        expect(count).toBe(4); // 不包含"# 标题"
+    test('excludes complete heading lines', () => {
+        assert.strictEqual(
+            WordCountService.getSimpleWordCount('# 标题\n正文内容'),
+            4
+        );
     });
 });
 ```

@@ -29,21 +29,41 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
     ): vscode.CodeLens[] | Thenable<vscode.CodeLens[]> {
         const codeLenses: vscode.CodeLens[] = [];
 
-        // 只在 chapters 目录下的 Markdown 文件中显示
-        if (document.languageId !== 'markdown' || !document.uri.fsPath.includes('/chapters/')) {
+        const documentPath = document.uri.fsPath.replace(/\\/g, '/');
+        const isChapter = documentPath.includes('/chapters/');
+        const isCharacter = documentPath.includes('/characters/');
+        if (document.languageId !== 'markdown' || (!isChapter && !isCharacter)) {
             return codeLenses;
         }
 
         const text = document.getText();
-        const lines = text.split('\n');
+        const frontMatter = text.match(/^\uFEFF?---[^\S\r\n]*\r?\n(?:[\s\S]*?\r?\n)?---[^\S\r\n]*(?:\r?\n|$)/);
+        if (!frontMatter && /^\uFEFF?---[^\S\r\n]*(?:\r?\n|$)/.test(text)) {
+            return codeLenses;
+        }
+        const frontMatterEnd = frontMatter?.[0].length || 0;
+        const mask = (value: string) => value.replace(/[^\r\n]/g, ' ');
+        const visibleText = mask(text.slice(0, frontMatterEnd))
+            + text.slice(frontMatterEnd).replace(/<!--[\s\S]*?(?:-->|$)/g, mask);
+        const lines = visibleText.split(/\r?\n/);
 
         // 查找章节标题（# 开头的行）
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const match = line.match(/^#\s+(.+)$/);
 
-            if (match) {
+            if (match && match[1].trim()) {
                 const range = new vscode.Range(i, 0, i, line.length);
+
+                if (isCharacter) {
+                    codeLenses.push(new vscode.CodeLens(range, {
+                        title: '格式化',
+                        tooltip: '格式化当前人物档案',
+                        command: 'noveler.formatDocument',
+                        arguments: [document.uri]
+                    }));
+                    break;
+                }
 
                 // 获取字数统计
                 const contentWithoutFM = getContentWithoutFrontMatter(document);
@@ -86,7 +106,8 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
                 codeLenses.push(new vscode.CodeLens(range, {
                     title: '🎨 格式化',
                     tooltip: '修正标点和格式',
-                    command: 'noveler.formatDocument'
+                    command: 'noveler.formatDocument',
+                    arguments: [document.uri]
                 }));
 
                 // 只处理第一个标题

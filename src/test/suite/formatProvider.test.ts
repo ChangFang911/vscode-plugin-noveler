@@ -6,152 +6,36 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 
-/**
- * 模拟 formatLine 逻辑（从 ChineseNovelFormatProvider 提取）
- */
-function formatLine(line: string, quoteStyle: string, shouldConvertQuotes: boolean): string {
-    if (!line.trim()) {
-        return line;
-    }
+import * as vscode from 'vscode';
+import { ChineseNovelFormatProvider } from '../../providers/formatProvider';
+import { ConfigService } from '../../services/configService';
+import { MockTextDocument } from '../mocks/vscode';
+import { findMarksInText } from '../../services/doubtMarkService';
 
-    let formatted = line;
+const config = {
+    getChineseQuoteStyle: () => '「」',
+    shouldConvertQuotes: () => true,
+    shouldAutoEmptyLine: () => true,
+    shouldParagraphIndent: () => false
+};
 
-    // 1. 统一引号样式（如果启用了转换）
-    if (shouldConvertQuotes) {
-        if (quoteStyle === '「」') {
-            // 将英文引号转为中文引号
-            formatted = formatted.replace(/"([^"]*)"/g, '「$1」');
-        } else {
-            // 将中文引号转为英文引号
-            formatted = formatted.replace(/「([^」]*)」/g, '"$1"');
-        }
-    }
-
-    // 2. 统一省略号（在标点规范化之前执行，避免 ... 被拆分）
-    formatted = formatted.replace(/\.{3,}/g, '…');
-
-    // 3. 统一破折号
-    formatted = formatted.replace(/--+/g, '——');
-
-    // 4. 标点符号规范化
-    // 中文后面跟英文标点
-    formatted = formatted.replace(/([\u4e00-\u9fa5]),/g, '$1，');
-    formatted = formatted.replace(/([\u4e00-\u9fa5])\./g, '$1。');
-    formatted = formatted.replace(/([\u4e00-\u9fa5])!/g, '$1！');
-    formatted = formatted.replace(/([\u4e00-\u9fa5])\?/g, '$1？');
-    // 英文标点后面跟中文
-    formatted = formatted.replace(/,(?=[\u4e00-\u9fa5])/g, '，');
-    formatted = formatted.replace(/\.(?=[\u4e00-\u9fa5])/g, '。');
-    formatted = formatted.replace(/!(?=[\u4e00-\u9fa5])/g, '！');
-    formatted = formatted.replace(/\?(?=[\u4e00-\u9fa5])/g, '？');
-
-    // 5. 删除多余空格（中文之间的空格，需要循环处理连续空格）
-    let prev = '';
-    while (prev !== formatted) {
-        prev = formatted;
-        formatted = formatted.replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g, '$1$2');
-    }
-
-    return formatted;
+function formatLine(line: string, quoteStyle: string, convert: boolean): string {
+    config.getChineseQuoteStyle = () => quoteStyle;
+    config.shouldConvertQuotes = () => convert;
+    return new ChineseNovelFormatProvider()['formatLine'](line, quoteStyle);
 }
 
-/**
- * 模拟段落间空行处理逻辑
- */
-function formatParagraphSpacing(
-    text: string,
-    shouldAutoEmptyLine: boolean,
-    shouldParagraphIndent: boolean,
-    PARAGRAPH_INDENT = '　　'
-): string {
-    const lines = text.split('\n');
-    const result: string[] = [];
+function formatParagraphSpacing(text: string, emptyLine: boolean, indent: boolean, _indentText = '　　'): string {
+    config.shouldAutoEmptyLine = () => emptyLine;
+    config.shouldParagraphIndent = () => indent;
+    config.shouldConvertQuotes = () => false;
+    return formatDocument(text);
+}
 
-    let inFrontMatter = false;
-    let frontMatterCount = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-        const currentLine = lines[i];
-        const prevLine = result.length > 0 ? result[result.length - 1] : null;
-        const nextLine = i < lines.length - 1 ? lines[i + 1] : null;
-
-        // 跟踪 Front Matter 区域
-        if (currentLine.trim() === '---') {
-            frontMatterCount++;
-            if (frontMatterCount === 1) {
-                inFrontMatter = true;
-            } else if (frontMatterCount === 2) {
-                inFrontMatter = false;
-            }
-            result.push(currentLine);
-            continue;
-        }
-
-        // Front Matter 内部不处理
-        if (inFrontMatter) {
-            result.push(currentLine);
-            continue;
-        }
-
-        const isCurrentEmpty = currentLine.trim() === '';
-        const isPrevEmpty = prevLine === null || prevLine.trim() === '';
-        const isNextEmpty = nextLine === null || nextLine.trim() === '';
-
-        // 判断是否是特殊行（标题、HTML注释）
-        const isCurrentSpecial = currentLine.trim().startsWith('#') || currentLine.trim().startsWith('<!--');
-        const isPrevSpecial = prevLine !== null && (prevLine.trim().startsWith('#') || prevLine.trim().startsWith('<!--'));
-        const isNextSpecial = nextLine !== null && (nextLine.trim().startsWith('#') || nextLine.trim().startsWith('<!--'));
-
-        if (shouldAutoEmptyLine) {
-            if (isCurrentEmpty) {
-                if (!isPrevEmpty && !isNextEmpty && !isPrevSpecial && !isNextSpecial) {
-                    result.push(currentLine);
-                }
-            } else {
-                let lineToAdd = currentLine;
-
-                if (shouldParagraphIndent && !isCurrentSpecial) {
-                    const isParagraphStart = isPrevEmpty || isPrevSpecial || prevLine === null ||
-                        (prevLine !== null && prevLine.trim() === '---' && frontMatterCount === 2);
-
-                    if (isParagraphStart) {
-                        // eslint-disable-next-line no-irregular-whitespace
-                        const trimmed = lineToAdd.replace(/^[\s　]+/, '');
-                        lineToAdd = PARAGRAPH_INDENT + trimmed;
-                    }
-                }
-
-                result.push(lineToAdd);
-
-                if (!isCurrentSpecial && !isNextEmpty && !isNextSpecial && nextLine !== null) {
-                    result.push('');
-                }
-            }
-        } else {
-            if (isCurrentEmpty) {
-                if ((prevLine !== null && prevLine.trim() === '---' && frontMatterCount === 2) || isPrevSpecial) {
-                    result.push(currentLine);
-                }
-            } else {
-                let lineToAdd = currentLine;
-
-                if (shouldParagraphIndent && !isCurrentSpecial) {
-                    const isParagraphStart = isPrevEmpty || isPrevSpecial || prevLine === null ||
-                        (prevLine !== null && prevLine.trim() === '---' && frontMatterCount === 2);
-
-                    if (isParagraphStart) {
-                        // eslint-disable-next-line no-irregular-whitespace
-                        const trimmed = lineToAdd.replace(/^[\s　]+/, '');
-                        lineToAdd = PARAGRAPH_INDENT + trimmed;
-                    }
-                }
-
-                result.push(lineToAdd);
-            }
-        }
-    }
-
-    return result.join('\n');
+function formatDocument(text: string): string {
+    const document = MockTextDocument.create(text) as unknown as vscode.TextDocument;
+    const edits = new ChineseNovelFormatProvider().provideDocumentFormattingEdits(document, {} as vscode.FormattingOptions, {} as vscode.CancellationToken);
+    return edits[0]?.newText ?? text;
 }
 
 suite('FormatProvider Test Suite', () => {
@@ -159,6 +43,11 @@ suite('FormatProvider Test Suite', () => {
 
     setup(() => {
         sandbox = sinon.createSandbox();
+        config.getChineseQuoteStyle = () => '「」';
+        config.shouldConvertQuotes = () => true;
+        config.shouldAutoEmptyLine = () => true;
+        config.shouldParagraphIndent = () => false;
+        sandbox.stub(ConfigService, 'getInstance').returns(config as unknown as ConfigService);
     });
 
     teardown(() => {
@@ -420,5 +309,60 @@ suite('FormatProvider Test Suite', () => {
             assert.ok(result.includes('，'));
             assert.ok(result.includes('。'));
         });
+    });
+});
+
+suite('Formatting Content Safety', () => {
+    let sandbox: sinon.SinonSandbox;
+    setup(() => {
+        sandbox = sinon.createSandbox();
+        config.getChineseQuoteStyle = () => '「」';
+        config.shouldConvertQuotes = () => true;
+        config.shouldAutoEmptyLine = () => true;
+        config.shouldParagraphIndent = () => true;
+        sandbox.stub(ConfigService, 'getInstance').returns(config as unknown as ConfigService);
+    });
+    teardown(() => sandbox.restore());
+
+    test('inline todo remains identifiable and actionable after formatting', () => {
+        const result = formatDocument('正文,等等... <!--? 检查 "伏笔" -- -->');
+        assert.ok(result.includes('正文，等等…'));
+        assert.ok(result.includes('<!--? 检查 "伏笔" -- -->'));
+        assert.deepStrictEqual(findMarksInText(result).map(mark => mark.content), ['检查 "伏笔" --']);
+    });
+    test('preserves multiple inline pending and resolved markers', () => {
+        const text = '正文 <!--? 一 --> 后文 <!--✓ 二 -->';
+        const result = formatDocument(text);
+        assert.ok(result.includes('<!--? 一 -->'));
+        assert.ok(result.includes('<!--✓ 二 -->'));
+    });
+    test('preserves multiline comments including blank lines and indentation', () => {
+        const comment = '<!--\n  "注释" -- ...\n\n  内容\n-->';
+        assert.ok(formatDocument(`正文,\n${comment}\n后文.`).includes(comment));
+    });
+    test('preserves an unclosed comment through the end of the document', () => {
+        const comment = '<!--\n  "注释" -- ...\n\n 后文.';
+        assert.ok(formatDocument(`正文,\n${comment}`).endsWith(comment));
+    });
+    test('preserves frontmatter exactly with CRLF', () => {
+        const frontMatter = '---\r\n# 元数据备注\r\ntitle: "测试 -- ..."\r\n\r\n---\r\n';
+        const result = formatDocument(frontMatter + '正文, <!--? 注释 -->\r\n下一段.');
+        assert.ok(result.startsWith(frontMatter));
+        assert.ok(!result.replace(/\r\n/g, '').includes('\n'));
+    });
+    test('an unclosed frontmatter is left unchanged', () => {
+        const text = '---\ntitle: "测试"\n正文,...';
+        assert.strictEqual(formatDocument(text), text);
+    });
+    test('a body separator does not hide subsequent paragraphs', () => {
+        assert.ok(formatDocument('正文,\n---\n下一段,').includes('下一段，'));
+    });
+    test('formatting is idempotent with comments and indentation', () => {
+        const once = formatDocument('# 标题\n正文, <!--? 检查 -->\n第二段...\n<!--\n多行 --\n-->' );
+        assert.strictEqual(formatDocument(once), once);
+    });
+    test('placeholder-like user text is not replaced', () => {
+        const text = '\uE000NOVELER0\uE001 <!--? 待办 -->';
+        assert.ok(formatDocument(text).includes('\uE000NOVELER0\uE001'));
     });
 });

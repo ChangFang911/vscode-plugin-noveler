@@ -3,10 +3,11 @@
  */
 
 import * as vscode from 'vscode';
-import { parseFrontMatter, stringifyFrontMatter } from './frontMatterParser';
+import { parseFrontMatter } from './frontMatterParser';
 import { formatDateTime } from './dateFormatter';
 import { ChapterFrontMatter, CharacterFrontMatter, GenericFrontMatter } from '../types/frontMatter';
 import { Logger } from './logger';
+import { patchFrontMatter } from './documentOperations';
 
 /**
  * 更新文档的 Front Matter
@@ -31,22 +32,21 @@ export function updateFrontMatter(
         }
 
         // 更新字段
-        let hasChanges = false;
+        const fields: Record<string, unknown> = {};
         const data = parsed.data as Record<string, unknown>;
 
         if (data.wordCount !== undefined) {
-            data.wordCount = wordCount;
-            hasChanges = true;
+            if (data.wordCount !== wordCount) { fields.wordCount = wordCount; }
         }
 
         if (data.modified !== undefined) {
-            data.modified = formatDateTime(new Date());
-            hasChanges = true;
+            const modified = formatDateTime(new Date());
+            if (data.modified !== modified) { fields.modified = modified; }
         }
 
         // 如果有变化，重新序列化
-        if (hasChanges) {
-            const updatedContent = stringifyFrontMatter(parsed.content, data);
+        if (Object.keys(fields).length) {
+            const updatedContent = patchFrontMatter(text, fields);
 
             // 替换整个文档
             const fullRange = new vscode.Range(

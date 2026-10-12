@@ -42,6 +42,15 @@ export class ActionNodesProvider {
     getToolItems(): NovelerTreeItem[] {
         return [
             new NovelerTreeItem(
+                '使用指南',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.showWelcome', title: '打开使用指南' },
+                'otherActionItem',
+                undefined,
+                '查看写作功能介绍和入门步骤'
+            ).withIcon(new vscode.ThemeIcon('book')),
+            new NovelerTreeItem(
                 '统计仪表板',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,
@@ -94,6 +103,15 @@ export class ActionNodesProvider {
                 undefined,
                 '配置敏感词检测级别和自定义词库'
             ).withIcon(new vscode.ThemeIcon('warning')),
+            new NovelerTreeItem(
+                '重新加载敏感词库',
+                NodeType.OtherActionItem,
+                vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.reloadSensitiveWords', title: '重新加载敏感词库' },
+                'otherActionItem',
+                undefined,
+                '手动重新读取内置词库、自定义词库和白名单'
+            ).withIcon(new vscode.ThemeIcon('refresh')),
             new NovelerTreeItem(
                 '打开配置文件',
                 NodeType.OtherActionItem,

@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
-import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
 import { generateVolumeFolderName } from '../utils/volumeHelper';
 import { formatDateTime } from '../utils/dateFormatter';
+import { ChapterMove, MigrationFile, migrateChapters, saveMigrationDocuments } from '../utils/chapterMigration';
 
 /**
  * 章节信息（用于迁移分析）
@@ -15,7 +15,6 @@ interface ChapterInfo {
     fileName: string;
     filePath: string;
     chapter?: number;
-    volume?: number;
     title?: string;
 }
 
@@ -31,16 +30,6 @@ interface VolumeGroup {
 /**
  * 结构迁移向导：扁平结构 → 嵌套结构（分卷）
  *
- * 新设计流程：
- * 1. 扫描所有章节文件，读取 frontmatter
- * 2. 智能分析：检查章节是否已有 volume 字段
- * 3. 提供迁移方案：
- *    - 方案A：根据现有 volume 字段自动分组（如果有）
- *    - 方案B：所有章节放入一个卷
- *    - 方案C：按章节数平均分配到 N 个卷
- *    - 方案D：自定义分配（高级）
- * 4. 批量创建卷文件夹和元数据
- * 5. 批量移动章节文件
  */
 export async function migrateToVolumeStructure(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -60,7 +49,7 @@ export async function migrateToVolumeStructure(): Promise<void> {
 
     // 确认操作
     const confirm = await vscode.window.showWarningMessage(
-        '📚 结构迁移向导\n\n即将将扁平的章节结构迁移为分卷结构。\n此操作会移动 chapters/ 目录下的所有章节文件到对应的卷文件夹中。\n\n⚠️ 建议先备份项目！',
+        '📚 结构迁移向导\n\n即将将扁平的章节结构迁移为分卷结构。\n此操作会移动 chapters/ 目录下的所有章节文件到对应的卷文件夹中。\n\n执行前会自动创建临时备份，校验成功后清理。',
         { modal: true },
         '继续', '取消'
     );
@@ -71,16 +60,9 @@ export async function migrateToVolumeStructure(): Promise<void> {
 
     const chaptersPath = path.join(workspaceFolder.uri.fsPath, 'chapters');
 
-    // 检查 chapters 目录
-    if (!fs.existsSync(chaptersPath)) {
-        vscode.window.showErrorMessage('未找到 chapters 目录');
-        return;
-    }
-
     try {
-        // 步骤 1: 扫描章节文件
+        await saveMigrationDocuments(workspaceFolder.uri);
         const chapters = await scanChapterFiles(chaptersPath);
-
         if (chapters.length === 0) {
             vscode.window.showInformationMessage('chapters 目录下没有章节文件');
             return;
@@ -106,21 +88,19 @@ export async function migrateToVolumeStructure(): Promise<void> {
             title: "迁移到分卷结构",
             cancellable: false  // 关键操作不允许取消
         }, async (progress) => {
-            await executeMigration(chaptersPath, volumeGroups, volumesConfig.numberFormat || 'arabic', progress);
+            await executeMigration(workspaceFolder.uri, volumeGroups, progress);
         });
-
-        // 步骤 5: 更新配置
-        await updateConfigToNested(workspaceFolder);
 
         // 步骤 6: 刷新 VolumeService 缓存
         const volumeService = VolumeService.getInstance();
-        await volumeService.scanVolumes();
+        await configService.reloadConfig();
+        await volumeService.scanVolumes(true);
 
         // 步骤 7: 完整刷新（迁移后需要更新所有数据）
         await vscode.commands.executeCommand('noveler.refresh');
 
         vscode.window.showInformationMessage(
-            `✅ 结构迁移完成！\n\n已创建 ${volumeGroups.length} 个卷，移动 ${chapters.length} 个章节。`
+            `结构迁移完成，已组织 ${volumeGroups.length} 个卷，移动 ${chapters.length} 个章节。`
         );
     } catch (error) {
         Logger.error('结构迁移失败', error);
@@ -134,33 +114,22 @@ export async function migrateToVolumeStructure(): Promise<void> {
 async function scanChapterFiles(chaptersPath: string): Promise<ChapterInfo[]> {
     const chapters: ChapterInfo[] = [];
 
-    const entries = fs.readdirSync(chaptersPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-        // 只处理 .md 文件
-        if (!entry.isFile() || !entry.name.endsWith('.md')) {
+    const folder = vscode.Uri.file(chaptersPath);
+    const entries = await vscode.workspace.fs.readDirectory(folder);
+    for (const [name, type] of entries) {
+        if (type !== vscode.FileType.File || !name.endsWith('.md') || name === 'outline.md' || name === 'README.md') {
             continue;
         }
-
-        const filePath = path.join(chaptersPath, entry.name);
-
-        try {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const parsed = parseFrontMatter(content);
-            const data = parsed.data as Record<string, unknown>;
-
-            const chapterInfo: ChapterInfo = {
-                fileName: entry.name,
-                filePath: filePath,
-                chapter: data.chapter ? Number(data.chapter) : undefined,
-                volume: data.volume ? Number(data.volume) : undefined,
-                title: (data.title as string) || entry.name.replace('.md', '')
-            };
-
-            chapters.push(chapterInfo);
-        } catch (error) {
-            Logger.warn(`读取章节文件失败: ${entry.name}`, error);
-        }
+        const uri = vscode.Uri.joinPath(folder, name);
+        const content = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
+        const parsed = parseFrontMatter(content);
+        const data = parsed.data as Record<string, unknown>;
+        chapters.push({
+            fileName: name,
+            filePath: uri.fsPath,
+            chapter: data.chapter ? Number(data.chapter) : undefined,
+            title: (data.title as string) || name.replace('.md', '')
+        });
     }
 
     // 按 chapter 字段排序
@@ -224,12 +193,15 @@ async function createCustomVolumeGroups(chapters: ChapterInfo[]): Promise<Volume
 
         // 询问卷名称
         const volumeTitle = await vscode.window.showInputBox({
-            prompt: `请输入第 ${volumeNum} 卷的名称`,
+            prompt: `请输入第 ${volumeNum} 卷的名称（同名旧卷可复用，已有卷资料保留）`,
             placeHolder: `例如：崛起`,
             value: `卷${volumeNum}`,
             validateInput: (value) => {
                 if (!value || value.trim().length === 0) {
                     return '卷名不能为空';
+                }
+                if (/[/\\:*?"<>|]/.test(value) || [...value].some(character => character.charCodeAt(0) < 32)) {
+                    return '卷名不能包含路径分隔符或文件名非法字符';
                 }
                 return undefined;
             },
@@ -289,316 +261,72 @@ async function confirmMigrationPlan(volumeGroups: VolumeGroup[]): Promise<boolea
  * 执行迁移
  */
 async function executeMigration(
-    chaptersPath: string,
+    root: vscode.Uri,
     volumeGroups: VolumeGroup[],
-    _numberFormat: string,
     progress?: vscode.Progress<{ message?: string; increment?: number }>
 ): Promise<void> {
-    // 计算总章节数用于进度计算
-    const totalChapters = volumeGroups.reduce((sum, group) => sum + group.chapters.length, 0);
-    let processedChapters = 0;
-
-    // 步骤 1: 检查所有卷文件夹是否已存在（防止重复迁移）
-    progress?.report({ message: "检查目标文件夹...", increment: 0 });
-
-    for (const volumeGroup of volumeGroups) {
-        const volumeFolderName = generateVolumeFolderName(
-            'main',
-            volumeGroup.volumeNumber,
-            volumeGroup.title
-        );
-        const volumePath = path.join(chaptersPath, volumeFolderName);
-
-        if (fs.existsSync(volumePath)) {
-            throw new Error(`卷文件夹已存在: ${volumeFolderName}\n\n请先删除或重命名该文件夹，然后重新执行迁移。`);
+    const moves: ChapterMove[] = [];
+    const files: MigrationFile[] = [];
+    for (const group of volumeGroups) {
+        const folderName = generateVolumeFolderName('main', group.volumeNumber, group.title);
+        const folder = vscode.Uri.joinPath(root, 'chapters', folderName);
+        for (const chapter of group.chapters) {
+            moves.push({ source: vscode.Uri.file(chapter.filePath), target: vscode.Uri.joinPath(folder, chapter.fileName) });
         }
-    }
-
-    // 步骤 2: 创建卷文件夹和元数据，移动章节
-    for (let i = 0; i < volumeGroups.length; i++) {
-        const volumeGroup = volumeGroups[i];
-        // 生成卷文件夹名
-        const volumeFolderName = generateVolumeFolderName(
-            'main',
-            volumeGroup.volumeNumber,
-            volumeGroup.title
-        );
-        const volumePath = path.join(chaptersPath, volumeFolderName);
-
-        // 报告当前进度
-        progress?.report({
-            message: `创建卷 ${i + 1}/${volumeGroups.length}: ${volumeGroup.title}`,
-            increment: 0
+        files.push({
+            uri: vscode.Uri.joinPath(folder, 'volume.json'),
+            content: JSON.stringify({
+                volume: group.volumeNumber, volumeType: 'main', title: group.title,
+                status: 'writing', description: '', created: formatDateTime(new Date())
+            }, null, 2)
         });
-
-        // 创建卷文件夹
-        fs.mkdirSync(volumePath, { recursive: true });
-        Logger.info(`创建卷文件夹: ${volumeFolderName}`);
-
-        // 创建 volume.json 元数据文件
-        const volumeMetadata = {
-            title: volumeGroup.title,
-            status: 'writing',
-            description: '',
-            created: formatDateTime(new Date()),
-            modified: formatDateTime(new Date())
-        };
-        fs.writeFileSync(
-            path.join(volumePath, 'volume.json'),
-            JSON.stringify(volumeMetadata, null, 2),
-            'utf-8'
-        );
-
-        // 创建 outline.md 卷大纲文件
-        // 生成章节列表（格式：1. 第X章 标题）
-        const chapterList = volumeGroup.chapters.map((c, idx) => {
-            // 如果章节有 chapter 字段，使用它；否则使用索引
-            const chapterNum = c.chapter ?? (idx + 1);
-            // 如果 title 已经包含章节号（旧格式），直接使用；否则添加章节号
-            const displayTitle = c.title?.startsWith('第') ? c.title : `第${chapterNum}章 ${c.title || c.fileName.replace('.md', '')}`;
-            return `${idx + 1}. ${displayTitle}`;
-        }).join('\n');
-
-        const outlineContent = `# ${volumeFolderName} - 大纲\n\n## 卷简介\n\n${volumeGroup.title}\n\n## 章节列表\n\n${chapterList}\n\n## 创作备注\n\n`;
-        fs.writeFileSync(
-            path.join(volumePath, 'outline.md'),
-            outlineContent,
-            'utf-8'
-        );
-
-        // 移动章节文件
-        for (const chapter of volumeGroup.chapters) {
-            const targetPath = path.join(volumePath, chapter.fileName);
-
-            try {
-                // 检查源文件是否存在
-                if (!fs.existsSync(chapter.filePath)) {
-                    Logger.warn(`源文件不存在，跳过: ${chapter.fileName}`);
-                    processedChapters++;
-                    continue;
-                }
-
-                // 检查目标文件是否已存在
-                if (fs.existsSync(targetPath)) {
-                    Logger.warn(`目标文件已存在，跳过: ${chapter.fileName}`);
-                    processedChapters++;
-                    continue;
-                }
-
-                // 移动文件
-                fs.renameSync(chapter.filePath, targetPath);
-                Logger.info(`移动章节: ${chapter.fileName} -> ${volumeFolderName}`);
-
-                // 更新进度
-                processedChapters++;
-                progress?.report({
-                    message: `移动章节 (${processedChapters}/${totalChapters})`,
-                    increment: (100 / totalChapters)
-                });
-
-                // 更新章节文件的 frontmatter，移除 volume 字段（因为现在通过文件夹结构管理）
-                try {
-                    const content = fs.readFileSync(targetPath, 'utf-8');
-                    const parsed = parseFrontMatter(content);
-                    const data = parsed.data as Record<string, unknown>;
-
-                    // 如果有 volume 字段，移除它
-                    if (data.volume !== undefined) {
-                        delete data.volume;
-
-                        // 重新生成文件内容
-                        const updatedContent = stringifyFrontMatter(parsed.content, data);
-                        fs.writeFileSync(targetPath, updatedContent, 'utf-8');
-                        Logger.info(`已清理章节 ${chapter.fileName} 的 volume 字段`);
-                    }
-                } catch (error) {
-                    Logger.warn(`更新章节 frontmatter 失败: ${chapter.fileName}`, error);
-                    // 不抛出错误，因为这不是致命问题
-                }
-            } catch (error) {
-                Logger.error(`移动章节失败: ${chapter.fileName}`, error);
-                throw new Error(`移动章节失败: ${chapter.fileName}\n${error instanceof Error ? error.message : String(error)}`);
-            }
-        }
+        const chapterList = group.chapters.map((chapter, index) => `${index + 1}. ${chapter.title || chapter.fileName}`).join('\n');
+        files.push({
+            uri: vscode.Uri.joinPath(folder, 'outline.md'),
+            content: `# ${folderName} - 大纲\n\n## 卷简介\n\n${group.title}\n\n## 章节列表\n\n${chapterList}\n\n## 创作备注\n\n`
+        });
     }
+    await migrateChapters(root, moves, files, 'nested', progress);
 }
 
-/**
- * 更新配置文件为 nested 结构
- */
-async function updateConfigToNested(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
-    const configPath = path.join(workspaceFolder.uri.fsPath, 'novel.jsonc');
-
-    if (!fs.existsSync(configPath)) {
-        Logger.warn('未找到 novel.jsonc 配置文件');
-        return;
-    }
-
-    try {
-        let configText = fs.readFileSync(configPath, 'utf-8');
-
-        // 启用分卷功能（处理多种可能的格式）
-        configText = configText.replace(
-            /"enabled":\s*false/g,
-            (match, offset) => {
-                // 检查是否在 volumes 配置块中
-                const before = configText.substring(Math.max(0, offset - 200), offset);
-                if (before.includes('"volumes"')) {
-                    return '"enabled": true';
-                }
-                return match;
-            }
-        );
-
-        // 将 folderStructure 从 flat 改为 nested
-        configText = configText.replace(
-            /"folderStructure":\s*"flat"/g,
-            '"folderStructure": "nested"'
-        );
-
-        // 更新 modified 时间戳
-        const now = formatDateTime(new Date());
-        configText = configText.replace(
-            /"modified":\s*"[^"]*"/,
-            `"modified": "${now}"`
-        );
-
-        fs.writeFileSync(configPath, configText, 'utf-8');
-        Logger.info('已更新配置为 nested 结构');
-    } catch (error) {
-        Logger.error('更新配置失败', error);
-        throw error;
-    }
-}
-
-/**
- * 回滚迁移：嵌套结构 → 扁平结构
- */
 export async function rollbackToFlatStructure(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('请先打开一个工作区');
         return;
     }
-
     const configService = ConfigService.getInstance();
-    const volumesConfig = configService.getVolumesConfig();
-
-    // 检查当前结构
-    if (volumesConfig.folderStructure === 'flat') {
+    if (configService.getVolumesConfig().folderStructure === 'flat') {
         vscode.window.showInformationMessage('当前已是扁平结构');
         return;
     }
-
-    // 确认操作
     const confirm = await vscode.window.showWarningMessage(
-        '⚠️ 回滚到扁平结构\n\n即将将所有卷文件夹中的章节移回 chapters/ 根目录，并删除卷文件夹。\n\n建议先备份项目！',
-        { modal: true },
-        '继续', '取消'
+        '将章节移回 chapters/ 根目录，原卷目录的大纲、元数据和附属文件保留。执行前自动备份，遇到同名章节则停止。',
+        { modal: true }, '继续', '取消'
     );
-
-    if (confirm !== '继续') {
-        return;
-    }
-
+    if (confirm !== '继续') { return; }
     try {
+        await saveMigrationDocuments(workspaceFolder.uri);
         const volumeService = VolumeService.getInstance();
-        const volumes = await volumeService.scanVolumes();
-
+        const volumes = await volumeService.scanVolumes(true);
         if (volumes.length === 0) {
             vscode.window.showInformationMessage('未找到卷文件夹');
             return;
         }
-
-        const chaptersPath = path.join(workspaceFolder.uri.fsPath, 'chapters');
-
-        // 移动所有章节回 chapters/ 根目录
+        const chapters = vscode.Uri.joinPath(workspaceFolder.uri, 'chapters');
+        const moves: ChapterMove[] = [];
         for (const volume of volumes) {
-            for (const chapterFile of volume.chapters) {
-                const sourcePath = path.join(chaptersPath, volume.folderName, chapterFile);
-                const targetPath = path.join(chaptersPath, chapterFile);
-
-                // 检查目标文件是否已存在
-                if (fs.existsSync(targetPath)) {
-                    Logger.warn(`文件已存在，跳过: ${chapterFile}`);
-                    continue;
-                }
-
-                // 移动文件
-                const finalTargetPath = targetPath;
-                fs.renameSync(sourcePath, finalTargetPath);
-                Logger.info(`移动章节: ${chapterFile} -> chapters/`);
-            }
-
-            // 删除空的卷文件夹（保留 volume.json 等元数据文件）
-            const remainingFiles = fs.readdirSync(volume.folderPath);
-            if (remainingFiles.every(f => !f.endsWith('.md') || f === 'outline.md')) {
-                // 只删除 .md 文件都移走后的文件夹
-                fs.rmSync(volume.folderPath, { recursive: true });
-                Logger.info(`删除卷文件夹: ${volume.folderName}`);
+            for (const chapter of volume.chapters) {
+                moves.push({ source: vscode.Uri.joinPath(chapters, volume.folderName, chapter), target: vscode.Uri.joinPath(chapters, chapter) });
             }
         }
-
-        // 更新配置
-        await updateConfigToFlat(workspaceFolder);
-
-        // 刷新 VolumeService 缓存
-        await volumeService.scanVolumes();
-
-        // 完整刷新（回滚后需要更新所有数据）
+        await migrateChapters(workspaceFolder.uri, moves, [], 'flat');
+        await configService.reloadConfig();
+        await volumeService.scanVolumes(true);
         await vscode.commands.executeCommand('noveler.refresh');
-
-        vscode.window.showInformationMessage(`✅ 已回滚到扁平结构！`);
+        vscode.window.showInformationMessage('已回到扁平结构，卷资料保留在原目录。');
     } catch (error) {
         Logger.error('回滚失败', error);
         vscode.window.showErrorMessage(`回滚失败: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-/**
- * 更新配置文件为 flat 结构
- */
-async function updateConfigToFlat(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
-    const configPath = path.join(workspaceFolder.uri.fsPath, 'novel.jsonc');
-
-    if (!fs.existsSync(configPath)) {
-        Logger.warn('未找到 novel.jsonc 配置文件');
-        return;
-    }
-
-    try {
-        let configText = fs.readFileSync(configPath, 'utf-8');
-
-        // 禁用分卷功能（处理多种可能的格式）
-        configText = configText.replace(
-            /"enabled":\s*true/g,
-            (match, offset) => {
-                // 检查是否在 volumes 配置块中
-                const before = configText.substring(Math.max(0, offset - 200), offset);
-                if (before.includes('"volumes"')) {
-                    return '"enabled": false';
-                }
-                return match;
-            }
-        );
-
-        // 将 folderStructure 从 nested 改为 flat
-        configText = configText.replace(
-            /"folderStructure":\s*"nested"/g,
-            '"folderStructure": "flat"'
-        );
-
-        // 更新 modified 时间戳
-        const now = formatDateTime(new Date());
-        configText = configText.replace(
-            /"modified":\s*"[^"]*"/,
-            `"modified": "${now}"`
-        );
-
-        fs.writeFileSync(configPath, configText, 'utf-8');
-        Logger.info('已更新配置为 flat 结构');
-    } catch (error) {
-        Logger.error('更新配置失败', error);
-        throw error;
     }
 }

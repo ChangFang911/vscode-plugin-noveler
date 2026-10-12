@@ -10,7 +10,7 @@ import { generateVolumeFolderName, getVolumeStatusName, getVolumeTypeName } from
 import { CHAPTER_NUMBER_PADDING, DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
 import { writeAndOpenChapter } from './createChapter';
 import { loadTemplates } from '../utils/templateLoader';
-import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
+import { patchFrontMatter, applyDocumentChange, copyDocument } from '../utils/documentOperations';
 
 /**
  * 重命名卷
@@ -558,7 +558,7 @@ export async function moveChapterToVolume(item: NovelerTreeItem): Promise<void> 
     }
 
     // 获取当前章节所属的卷
-    const currentVolume = volumeService.getVolumeForChapter(chapterPath);
+    const currentVolume = volumes.find(volume => volume.folderPath === path.dirname(chapterPath));
 
     // 显示卷选择器
     interface VolumeItem extends vscode.QuickPickItem {
@@ -568,7 +568,7 @@ export async function moveChapterToVolume(item: NovelerTreeItem): Promise<void> 
     const items: VolumeItem[] = volumes.map(v => ({
         label: `${getVolumeIconForType(v.volumeType)} ${v.title}`,
         description: `${v.stats.chapterCount} 章`,
-        detail: currentVolume?.volume === v.volume ? '(当前卷)' : undefined,
+        detail: currentVolume?.folderPath === v.folderPath ? '(当前卷)' : undefined,
         volume: v
     }));
 
@@ -582,7 +582,7 @@ export async function moveChapterToVolume(item: NovelerTreeItem): Promise<void> 
     }
 
     // 如果选择的是当前卷，不执行操作
-    if (currentVolume && selected.volume.volume === currentVolume.volume) {
+    if (currentVolume && selected.volume.folderPath === currentVolume.folderPath) {
         vscode.window.showInformationMessage('章节已在该卷中');
         return;
     }
@@ -594,37 +594,9 @@ export async function moveChapterToVolume(item: NovelerTreeItem): Promise<void> 
         const chapterUri = vscode.Uri.file(chapterPath);
         const targetUri = vscode.Uri.file(targetPath);
 
-        // 检查目标文件是否存在
-        try {
-            await vscode.workspace.fs.stat(targetUri);
-            vscode.window.showErrorMessage(`目标卷中已存在���名章节: ${fileName}`);
-            return;
-        } catch {
-            // 文件不存在，可以继续
-        }
-
-        // 读取章节内容
-        const contentBytes = await vscode.workspace.fs.readFile(chapterUri);
-        const content = Buffer.from(contentBytes).toString('utf8');
-
-        // 更新 frontmatter 的 volume 和 volumeType 字段
-        const updatedContent = updateChapterVolumeFrontMatter(content, selected.volume);
-
-        // 写入新位置
-        await vscode.workspace.fs.writeFile(targetUri, Buffer.from(updatedContent, 'utf8'));
-
-        // 删除原文件
-        await vscode.workspace.fs.delete(chapterUri, { useTrash: false });
+        await applyDocumentChange(chapterUri, content => updateChapterVolumeFrontMatter(content, selected.volume), targetUri);
 
         Logger.info(`移动章节: ${chapterPath} -> ${targetPath}`);
-
-        // 如果当前打开的是被移动的章节，重新打开新位置的文件
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document.uri.fsPath === chapterPath) {
-            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-            const doc = await vscode.workspace.openTextDocument(targetPath);
-            await vscode.window.showTextDocument(doc);
-        }
 
         vscode.window.showInformationMessage(`✅ 已将章节移动到卷「${selected.volume.title}」`);
 
@@ -684,24 +656,7 @@ export async function copyChapterToVolume(item: NovelerTreeItem): Promise<void> 
         const chapterUri = vscode.Uri.file(chapterPath);
         const targetUri = vscode.Uri.file(targetPath);
 
-        // 检查目标文件是否存在
-        try {
-            await vscode.workspace.fs.stat(targetUri);
-            vscode.window.showErrorMessage(`目标卷中已存在同名章节: ${fileName}`);
-            return;
-        } catch {
-            // 文件不存在，可以继续
-        }
-
-        // 读取章节内容
-        const contentBytes = await vscode.workspace.fs.readFile(chapterUri);
-        const content = Buffer.from(contentBytes).toString('utf8');
-
-        // 更新 frontmatter 的 volume 和 volumeType 字段
-        const updatedContent = updateChapterVolumeFrontMatter(content, selected.volume);
-
-        // 写入新位置
-        await vscode.workspace.fs.writeFile(targetUri, Buffer.from(updatedContent, 'utf8'));
+        await copyDocument(chapterUri, targetUri, content => updateChapterVolumeFrontMatter(content, selected.volume));
 
         Logger.info(`复制章节: ${chapterPath} -> ${targetPath}`);
 
@@ -719,14 +674,7 @@ export async function copyChapterToVolume(item: NovelerTreeItem): Promise<void> 
  * 更新章节 frontmatter 中的 volume 和 volumeType 字段
  */
 function updateChapterVolumeFrontMatter(content: string, targetVolume: VolumeInfo): string {
-    const parsed = parseFrontMatter(content);
-    if (parsed.isEmpty) {
-        return content;
-    }
-    const data = parsed.data as Record<string, unknown>;
-    data.volume = targetVolume.volume;
-    data.volumeType = targetVolume.volumeType;
-    return stringifyFrontMatter(parsed.content, data);
+    return patchFrontMatter(content, { volume: targetVolume.volume, volumeType: targetVolume.volumeType });
 }
 
 /**

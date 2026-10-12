@@ -1,7 +1,7 @@
 {
   "level": "low",
   "description": "低危敏感词：广告、争议词汇、不文明用语（可选启用）",
-  "totalWords": 300,
+  "totalWords": 279,
   "words": [
     "他妈的",
     "你妈的",

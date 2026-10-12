@@ -361,8 +361,8 @@ function registerUtilityCommands(deps: CommandRegistrarDeps): void {
 
     // 格式化文档
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.formatDocument', async () => {
-            await formatCurrentDocument();
+        vscode.commands.registerCommand('noveler.formatDocument', async (uri?: vscode.Uri) => {
+            await formatCurrentDocument(uri);
         })
     );
 
@@ -462,30 +462,32 @@ async function openConfigFile(context: vscode.ExtensionContext): Promise<void> {
 /**
  * 格式化当前文档
  */
-async function formatCurrentDocument(): Promise<void> {
+async function formatCurrentDocument(uri?: vscode.Uri): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) {
+    if (!editor && !uri) {
         vscode.window.showWarningMessage('没有打开的编辑器');
         return;
     }
 
-    if (editor.document.languageId !== 'markdown') {
-        vscode.window.showWarningMessage('只能格式化 Markdown 文档');
-        return;
-    }
-
     try {
+        const document = uri ? await vscode.workspace.openTextDocument(uri) : editor!.document;
+        if (document.languageId !== 'markdown') {
+            vscode.window.showWarningMessage('只能格式化 Markdown 文档');
+            return;
+        }
         const formatProvider = new ChineseNovelFormatProvider();
         const edits = formatProvider.provideDocumentFormattingEdits(
-            editor.document,
+            document,
             {} as vscode.FormattingOptions,
             {} as vscode.CancellationToken
         );
 
         if (edits.length > 0) {
             const workspaceEdit = new vscode.WorkspaceEdit();
-            workspaceEdit.set(editor.document.uri, edits);
-            await vscode.workspace.applyEdit(workspaceEdit);
+            workspaceEdit.set(document.uri, edits);
+            if (!await vscode.workspace.applyEdit(workspaceEdit)) {
+                throw new Error('文档修改未应用');
+            }
             vscode.window.showInformationMessage('文档格式化完成');
         } else {
             vscode.window.showInformationMessage('文档无需格式化');

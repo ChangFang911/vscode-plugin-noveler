@@ -4,11 +4,12 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { parseFrontMatter, stringifyFrontMatter } from '../utils/frontMatterParser';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { sanitizeFileName } from '../utils/inputValidator';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
 import { COMPLETED_STATUS, IN_PROGRESS_STATUS } from '../constants';
+import { applyDocumentChange, patchFrontMatter } from '../utils/documentOperations';
 
 /**
  * 重命名章节
@@ -22,8 +23,8 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
 
     try {
         // 读取当前文件内容
-        const content = await vscode.workspace.fs.readFile(item.resourceUri);
-        const text = Buffer.from(content).toString('utf8');
+        const document = await vscode.workspace.openTextDocument(item.resourceUri);
+        const text = document.getText();
 
         // 解析 Front Matter 获取当前标题
         const parsed = parseFrontMatter(text);
@@ -60,22 +61,9 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
             return;
         }
 
-        // 更新 Front Matter 中的标题
-        data.title = newTitle;
-
-        // 同时更新正文中的第一个 # 标题行
-        let bodyContent = parsed.content;
-        const headingMatch = bodyContent.match(/^#\s+(.+)$/m);
-        if (headingMatch) {
-            // 找到第一个 # 标题，替换为新标题
-            bodyContent = bodyContent.replace(/^#\s+.+$/m, `# ${newTitle}`);
-        }
-
-        const newContent = stringifyFrontMatter(bodyContent, data);
-
         // 生成新的文件名（保留编号前缀，更新名称部分）
         const oldFileName = path.basename(item.resourceUri.fsPath);
-        const fileNumberMatch = oldFileName.match(/^(\d+-)/); // 提取 "02-" 这样的前缀
+        const fileNumberMatch = oldFileName.match(/^((?:第.+?章|\d+)-)/); // 提取 "02-" 这样的前缀
 
         let newFileName: string;
         if (fileNumberMatch) {
@@ -92,18 +80,14 @@ export async function renameChapter(item: NovelerTreeItem): Promise<void> {
         const dir = path.dirname(item.resourceUri.fsPath);
         const newFileUri = vscode.Uri.file(path.join(dir, newFileName));
 
-        // 写入新文件
-        await vscode.workspace.fs.writeFile(newFileUri, Buffer.from(newContent, 'utf8'));
-
-        // 如果文件名改变了，删除旧文件
-        if (item.resourceUri.fsPath !== newFileUri.fsPath) {
-            await vscode.workspace.fs.delete(item.resourceUri);
-        }
+        await applyDocumentChange(item.resourceUri, latest => {
+            const updated = patchFrontMatter(latest, { title: newTitle });
+            const boundary = /^(?:\uFEFF)?---[^\S\r\n]*\r?\n[\s\S]*?^---[^\S\r\n]*(?:\r?\n|$)/m.exec(updated);
+            const offset = boundary?.[0].length ?? 0;
+            return updated.slice(0, offset) + updated.slice(offset).replace(/^#[^\S\r\n]+[^\r\n]+/m, () => `# ${newTitle}`);
+        }, newFileUri);
 
         vscode.window.showInformationMessage(`章节已重命名为：${newTitle}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('重命名章节失败', error, ErrorSeverity.Error);
@@ -157,23 +141,9 @@ export async function updateChapterStatusWithDialog(itemOrUri: NovelerTreeItem |
     }
 
     try {
-        // 读取当前文件内容
-        const content = await vscode.workspace.fs.readFile(fileUri);
-        const text = Buffer.from(content).toString('utf8');
-
-        // 解析并更新 Front Matter
-        const parsed = parseFrontMatter(text);
-        const data = parsed.data as Record<string, unknown>;
-        data.status = selected.value;
-        const newContent = stringifyFrontMatter(parsed.content, data);
-
-        // 写回文件
-        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(newContent, 'utf8'));
+        await applyDocumentChange(fileUri, text => patchFrontMatter(text, { status: selected.value }));
 
         vscode.window.showInformationMessage(`章节状态已更新为：${selected.value}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
@@ -190,23 +160,9 @@ async function updateChapterStatus(item: NovelerTreeItem, status: string): Promi
     }
 
     try {
-        // 读取当前文件内容
-        const content = await vscode.workspace.fs.readFile(item.resourceUri);
-        const text = Buffer.from(content).toString('utf8');
-
-        // 解析并更新 Front Matter
-        const parsed = parseFrontMatter(text);
-        const data = parsed.data as Record<string, unknown>;
-        data.status = status;
-        const newContent = stringifyFrontMatter(parsed.content, data);
-
-        // 写回文件
-        await vscode.workspace.fs.writeFile(item.resourceUri, Buffer.from(newContent, 'utf8'));
+        await applyDocumentChange(item.resourceUri, text => patchFrontMatter(text, { status }));
 
         vscode.window.showInformationMessage(`章节状态已更新为：${status}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('更新章节状态失败', error, ErrorSeverity.Error);
@@ -240,9 +196,6 @@ export async function deleteChapter(item: NovelerTreeItem): Promise<void> {
         await vscode.workspace.fs.delete(item.resourceUri);
 
         vscode.window.showInformationMessage(`已删除章节：${fileName}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('删除章节失败', error, ErrorSeverity.Error);
@@ -260,8 +213,8 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
 
     try {
         // 读取当前文件内容
-        const content = await vscode.workspace.fs.readFile(item.resourceUri);
-        const text = Buffer.from(content).toString('utf8');
+        const document = await vscode.workspace.openTextDocument(item.resourceUri);
+        const text = document.getText();
 
         // 解析 Front Matter 获取当前名称
         const parsed = parseFrontMatter(text);
@@ -285,27 +238,14 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
             return;
         }
 
-        // 更新 Front Matter 中的名称
-        data.name = newName;
-        const newContent = stringifyFrontMatter(parsed.content, data);
-
         // 生成新文件路径
         const oldPath = item.resourceUri;
         const dir = path.dirname(oldPath.fsPath);
         const newPath = vscode.Uri.file(path.join(dir, `${sanitizedName}.md`));
 
-        // 写入新文件
-        await vscode.workspace.fs.writeFile(newPath, Buffer.from(newContent, 'utf8'));
-
-        // 如果文件路径改变，删除旧文件
-        if (oldPath.fsPath !== newPath.fsPath) {
-            await vscode.workspace.fs.delete(oldPath);
-        }
+        await applyDocumentChange(oldPath, text => patchFrontMatter(text, { name: newName }), newPath);
 
         vscode.window.showInformationMessage(`人物名称已更新为：${newName}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('重命名人物失败', error, ErrorSeverity.Error);
@@ -339,9 +279,6 @@ export async function deleteCharacter(item: NovelerTreeItem): Promise<void> {
         await vscode.workspace.fs.delete(item.resourceUri);
 
         vscode.window.showInformationMessage(`已删除人物：${fileName}`);
-        vscode.commands.executeCommand('noveler.refresh');
-
-        // 根据配置自动更新 README
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('删除人物失败', error, ErrorSeverity.Error);

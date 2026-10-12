@@ -4,10 +4,21 @@
  */
 
 import * as assert from 'assert';
+import { readFileSync } from 'fs';
+import * as path from 'path';
 import * as sinon from 'sinon';
 import { validateChapterName } from '../../utils/inputValidator';
 
 suite('Command Integration Test Suite', () => {
+    test('formatting has mouse entrances restricted to Markdown editors', () => {
+        const manifest = JSON.parse(readFileSync(path.resolve(__dirname, '../../../package.json'), 'utf8'));
+        for (const menu of ['editor/title', 'editor/context']) {
+            const item = manifest.contributes.menus[menu].find((entry: { command: string }) => entry.command === 'noveler.formatDocument');
+            assert.ok(item, `Missing formatting entrance: ${menu}`);
+            assert.strictEqual(item.when, 'editorLangId == markdown');
+        }
+        assert.ok(manifest.contributes.commands.find((entry: { command: string }) => entry.command === 'noveler.formatDocument').icon);
+    });
     let sandbox: sinon.SinonSandbox;
 
     setup(() => {
