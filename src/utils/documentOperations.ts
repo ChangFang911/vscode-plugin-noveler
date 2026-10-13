@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import YAML from 'yaml';
 
 export const documentIO = {
+    workspaceFolder: (): vscode.WorkspaceFolder | undefined => vscode.workspace.workspaceFolders?.[0],
     stat: (uri: vscode.Uri): Thenable<vscode.FileStat> => vscode.workspace.fs.stat(uri),
     writeFile: (uri: vscode.Uri, content: Uint8Array): Thenable<void> => vscode.workspace.fs.writeFile(uri, content),
-    save: (document: vscode.TextDocument): Thenable<boolean> => document.save()
+    save: (document: vscode.TextDocument): Thenable<boolean> => document.save(),
+    delete: (uri: vscode.Uri, options: { recursive?: boolean; useTrash?: boolean }): Thenable<void> => vscode.workspace.fs.delete(uri, options)
 };
 
 export function patchFrontMatter(text: string, fields: Record<string, unknown>): string {
@@ -35,6 +37,33 @@ export async function fileExists(uri: vscode.Uri): Promise<boolean> {
             return false;
         }
         throw error;
+    }
+}
+
+export async function createDocument(uri: vscode.Uri, text: string): Promise<void> {
+    if (await fileExists(uri)) {
+        throw new Error(`文件已存在，未覆盖：${uri.fsPath}`);
+    }
+    const edit = new vscode.WorkspaceEdit();
+    edit.createFile(uri, { overwrite: false });
+    edit.insert(uri, new vscode.Position(0, 0), text);
+    if (!await vscode.workspace.applyEdit(edit)) {
+        throw new Error(`文件创建未完成：${uri.fsPath}`);
+    }
+    const document = await vscode.workspace.openTextDocument(uri);
+    if (!await documentIO.save(document) || document.isDirty) {
+        throw new Error(`文件未保存，请检查编辑器：${uri.fsPath}`);
+    }
+}
+
+export async function saveDocumentsUnder(folder: vscode.Uri): Promise<void> {
+    const prefix = folder.toString() + '/';
+    for (const document of vscode.workspace.textDocuments) {
+        if (document.isDirty && document.uri.toString().startsWith(prefix)) {
+            if (!await documentIO.save(document) || document.isDirty) {
+                throw new Error(`文档未保存，操作已停止：${document.uri.fsPath}`);
+            }
+        }
     }
 }
 

@@ -4,6 +4,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 
 async function main() {
+    if (process.platform === 'darwin' && process.env.CODEX_SANDBOX === 'seatbelt') {
+        console.error('无法在当前 macOS 受限沙箱中启动 VS Code 图形测试宿主。请从桌面终端运行 npm test；当前环境可运行 npm run test:unit。此次未启动扩展宿主，测试未执行。');
+        process.exitCode = 1;
+        return;
+    }
     const workspace = await mkdtemp(path.join(tmpdir(), 'noveler-tests-'));
     try {
         await mkdir(path.join(workspace, '.vscode'));

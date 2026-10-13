@@ -14,6 +14,20 @@ import { VolumeService } from '../services/volumeService';
 import { CHAPTERS_FOLDER, CHAPTER_NUMBER_PADDING, VOLUME_TYPE_NAMES, SIDEBAR_REFRESH_DELAY } from '../constants';
 import { Logger } from '../utils/logger';
 import { VolumeInfo } from '../types/volume';
+import { createDocument, fileExists } from '../utils/documentOperations';
+
+let creatingChapter = false;
+
+export async function runChapterCreation(action: () => Promise<void>): Promise<void> {
+    if (creatingChapter) {
+        vscode.window.showWarningMessage('正在创建章节，请完成当前操作后再试');
+        return;
+    }
+    creatingChapter = true;
+    try { await action(); }
+    catch (error) { handleError('创建章节失败', error); }
+    finally { creatingChapter = false; }
+}
 
 /**
  * 公共：写入章节文件并在编辑器中打开
@@ -32,12 +46,9 @@ export async function writeAndOpenChapter(params: {
     const fileUri = vscode.Uri.joinPath(folderUri, fileName);
 
     // 检查文件是否已存在
-    try {
-        await vscode.workspace.fs.stat(fileUri);
+    if (await fileExists(fileUri)) {
         vscode.window.showWarningMessage(`Noveler: 文件已存在: ${fileName}`);
         return;
-    } catch {
-        // 文件不存在，继续创建
     }
 
     const now = formatDateTime(new Date());
@@ -45,7 +56,7 @@ export async function writeAndOpenChapter(params: {
     const content = template?.content || "\n";
 
     const frontMatterLines: string[] = [
-        `title: ${params.chapterTitle.replace(/^第\S+章\s*/, '')}`,  // title 只存章节名，不含序号
+        `title: ${JSON.stringify(params.chapterTitle.replace(/^第\S+章\s*/, ''))}`,
         `chapter: ${chapterNumber}`
     ];
     if (volumeInfo) {
@@ -53,7 +64,7 @@ export async function writeAndOpenChapter(params: {
         frontMatterLines.push(`volumeType: ${volumeInfo.volumeType}`);
     }
     frontMatterLines.push(
-        `status: ${fm?.status ?? 'draft'}`,
+        `status: ${JSON.stringify(fm?.status ?? 'draft')}`,
         `created: ${now}`,
         `modified: ${now}`,
         `wordCount: ${fm?.wordCount ?? 0}`,
@@ -66,7 +77,7 @@ export async function writeAndOpenChapter(params: {
     const fileContent = `---\n${frontMatterLines.join('\n')}\n---\n\n# ${chapterTitle}\n${content}`;
 
     try {
-        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(fileContent, 'utf8'));
+        await createDocument(fileUri, fileContent);
         const doc = await vscode.workspace.openTextDocument(fileUri);
         const editor = await vscode.window.showTextDocument(doc, {
             viewColumn: vscode.ViewColumn.Active,
@@ -98,6 +109,10 @@ export async function writeAndOpenChapter(params: {
  * 创建新章节
  */
 export async function createChapter(chapterName: string): Promise<void> {
+    await runChapterCreation(() => createChapterInternal(chapterName));
+}
+
+async function createChapterInternal(chapterName: string): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
@@ -161,9 +176,7 @@ export async function createChapter(chapterName: string): Promise<void> {
 
             // 打开 chapters 目录
             const chaptersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
-            try {
-                await vscode.workspace.fs.stat(chaptersFolderUri);
-            } catch {
+            if (!await fileExists(chaptersFolderUri)) {
                 await vscode.workspace.fs.createDirectory(chaptersFolderUri);
             }
 
@@ -184,7 +197,7 @@ export async function createChapter(chapterName: string): Promise<void> {
             return {
                 label: `$(book) ${v.folderName}`,
                 description: `${typeLabel} | ${v.stats.chapterCount} 章 | ${v.stats.totalWords.toLocaleString()} 字`,
-                detail: `下一章节号: ${v.stats.chapterCount + 1}`,
+                detail: '新章节使用当前编号模式下的最大章号加一',
                 volume: v
             };
         });
@@ -212,9 +225,7 @@ export async function createChapter(chapterName: string): Promise<void> {
         targetFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHAPTERS_FOLDER);
 
         // 确保 chapters 目录存在
-        try {
-            await vscode.workspace.fs.stat(targetFolderUri);
-        } catch {
+        if (!await fileExists(targetFolderUri)) {
             try {
                 await vscode.workspace.fs.createDirectory(targetFolderUri);
             } catch (error) {

@@ -8,6 +8,7 @@ import { Logger } from '../utils/logger';
 import { WordCountService } from './wordCountService';
 import { getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
 import { VOLUME_TYPE_OFFSETS, MINIMUM_COMPLETED_WORD_COUNT } from '../constants';
+import { fileExists, documentIO } from '../utils/documentOperations';
 
 /**
  * 分卷管理服务
@@ -40,7 +41,7 @@ export class VolumeService {
      * 设置文件监听器，当 chapters 目录变化时失效缓存
      */
     private setupFileWatcher(): void {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
@@ -71,7 +72,7 @@ export class VolumeService {
             return this.volumes;
         }
 
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return [];
         }
@@ -307,40 +308,32 @@ export class VolumeService {
     }
 
     /**
-     * 解析中文数字（支持 1-99）
+     * 解析中文整数
      */
     private parseChineseNumber(chinese: string): number {
-        // 基本数字映射
-        const digitMap: { [key: string]: number } = {
-            '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-            '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
-            '十': 10
-        };
-
-        // 单个字符，直接返回
-        if (chinese.length === 1) {
-            return digitMap[chinese] || 1;
-        }
-
-        // 处理 "十" 开头的数字：十一 = 11, 十二 = 12
-        if (chinese.startsWith('十')) {
-            if (chinese.length === 1) {
-                return 10;
+        if (!/^[零一二三四五六七八九十百千万亿兆]+$/.test(chinese)) { return 1; }
+        for (const [unit, value] of [['兆', 1e12], ['亿', 1e8], ['万', 1e4]] as const) {
+            const index = chinese.indexOf(unit);
+            if (index !== -1) {
+                const left = chinese.slice(0, index);
+                const right = chinese.slice(index + 1);
+                return (left ? this.parseChineseNumber(left) : 1) * value
+                    + (right ? this.parseChineseNumber(right) : 0);
             }
-            const unit = digitMap[chinese[1]] || 0;
-            return 10 + unit;
         }
-
-        // 处理 "X十" 格式：二十 = 20, 三十 = 30
-        if (chinese.includes('十')) {
-            const parts = chinese.split('十');
-            const tens = digitMap[parts[0]] || 0;
-            const units = parts[1] ? (digitMap[parts[1]] || 0) : 0;
-            return tens * 10 + units;
+        const digits = '零一二三四五六七八九';
+        const units: Record<string, number> = { 十: 10, 百: 100, 千: 1000 };
+        let result = 0;
+        let digit = 0;
+        for (const char of chinese) {
+            if (units[char]) {
+                result += (digit || 1) * units[char];
+                digit = 0;
+            } else {
+                digit = digits.indexOf(char);
+            }
         }
-
-        // 默认返回 1
-        return digitMap[chinese] || 1;
+        return result + digit;
     }
 
     /**
@@ -533,120 +526,48 @@ export class VolumeService {
 
     /**
      * 计算下一个章节号
-     * 根据配置的章节编号模式（global/volume/hybrid）计算正确的章节号
+     * 根据配置的章节编号模式（global/volume/mixed）读取最大章号并追加
      * @param targetVolume 目标卷（如果是在卷中创建章节）
      * @returns 下一个章节号
      */
     public async calculateNextChapterNumber(targetVolume?: VolumeInfo): Promise<number> {
-        const volumesConfig = this.configService.getVolumesConfig();
-        const chapterNumbering = volumesConfig.chapterNumbering || 'global';
-
-        // 如果未启用分卷功能，使用扁平模式计算
-        if (!volumesConfig.enabled || !targetVolume) {
-            return this.calculateFlatChapterNumber();
+        const config = this.configService.getVolumesConfig();
+        if (!config.enabled || !targetVolume) {
+            const root = documentIO.workspaceFolder()?.uri;
+            return root ? this.nextNumberInFolders([vscode.Uri.joinPath(root, 'chapters')]) : 1;
         }
-
-        switch (chapterNumbering) {
-            case 'global':
-                // 全局编号：统计所有卷的章节总数，按卷顺序累加
-                return this.calculateGlobalChapterNumber(targetVolume);
-
-            case 'volume':
-                // 卷内编号：每卷独立编号，从 1 开始
-                return targetVolume.chapters.length + 1;
-
-            case 'mixed':
-                // 混合编号：主线卷全局编号，其他卷独立编号
-                if (targetVolume.volumeType === 'main') {
-                    return this.calculateGlobalChapterNumber(targetVolume, 'main');
-                } else {
-                    return targetVolume.chapters.length + 1;
-                }
-
-            default:
-                return targetVolume.chapters.length + 1;
+        await this.scanVolumes(true);
+        const current = this.volumes.find(volume => volume.folderPath === targetVolume.folderPath);
+        if (!current) { throw new Error('目标卷已不存在，请刷新后重试'); }
+        let volumes = [current];
+        if (config.chapterNumbering === 'global') {
+            volumes = this.volumes;
+        } else if (config.chapterNumbering === 'mixed' && current.volumeType === 'main') {
+            volumes = this.volumes.filter(volume => volume.volumeType === 'main');
         }
+        return this.nextNumberInFolders(volumes.map(volume => vscode.Uri.file(volume.folderPath)));
     }
 
-    /**
-     * 计算全局章节号
-     * 统计目标卷之前所有卷的章节总数，加上当前卷的章节数 + 1
-     * @param targetVolume 目标卷
-     * @param filterType 可选的过滤类型（用于 hybrid 模式）
-     */
-    private calculateGlobalChapterNumber(targetVolume: VolumeInfo, filterType?: 'main'): number {
-        let totalChapters = 0;
-
-        // 按卷序号排序，统计目标卷之前的所有章节
-        const sortedVolumes = [...this.volumes].sort((a, b) => a.volume - b.volume);
-
-        for (const volume of sortedVolumes) {
-            // 如果指定了过滤类型，只统计该类型的卷
-            if (filterType && volume.volumeType !== filterType) {
-                continue;
+    private async nextNumberInFolders(folders: vscode.Uri[]): Promise<number> {
+        let maximum = 0;
+        for (const folder of folders) {
+            if (!await fileExists(folder)) { continue; }
+            const files = await vscode.workspace.fs.readDirectory(folder);
+            for (const [name, type] of files) {
+                if (type !== vscode.FileType.File || !name.endsWith('.md')) { continue; }
+                const match = name.match(/^第(.+?)章[-_]/) || name.match(/^(\d+)-/);
+                const filenameNumber = match ? (/^[IVXLCDM]+$/.test(match[1])
+                    ? this.parseRomanNumber(match[1]) : this.parseNumber(match[1])) : 0;
+                const uri = vscode.Uri.joinPath(folder, name);
+                const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+                const text = open?.getText() ?? Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
+                const chapter = parseFrontMatter(text).data.chapter;
+                const metadataNumber = typeof chapter === 'number' && Number.isSafeInteger(chapter) && chapter > 0 ? chapter : 0;
+                maximum = Math.max(maximum, filenameNumber, metadataNumber);
             }
-
-            // 如果是目标卷，停止统计
-            if (volume.volume === targetVolume.volume && volume.volumeType === targetVolume.volumeType) {
-                break;
-            }
-
-            // 累加该卷的章节数
-            totalChapters += volume.chapters.length;
         }
-
-        // 返回总数 + 目标卷当前章节数 + 1
-        return totalChapters + targetVolume.chapters.length + 1;
-    }
-
-    /**
-     * 计算扁平模式下的章节号（未启用分卷时）
-     * 扫描 chapters/ 目录中的所有 .md 文件，提取最大章节号
-     */
-    private async calculateFlatChapterNumber(): Promise<number> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            return 1;
-        }
-
-        const chaptersPath = path.join(workspaceFolder.uri.fsPath, 'chapters');
-        const chaptersUri = vscode.Uri.file(chaptersPath);
-
-        // 检查 chapters 目录是否存在
-        try {
-            await vscode.workspace.fs.stat(chaptersUri);
-        } catch {
-            return 1;
-        }
-
-        try {
-            const files = await vscode.workspace.fs.readDirectory(chaptersUri);
-            const mdFiles = files
-                .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
-                .map(([name]) => name);
-
-            // 从文件名中提取章节号（格式：第001章-xxx.md, 001-xxx.md）
-            const chapterNumbers = mdFiles
-                .map(name => {
-                    // 尝试匹配 "第001章-" 格式
-                    let match = name.match(/^第(\d+)章-/);
-                    if (match) {
-                        return parseInt(match[1], 10);
-                    }
-                    // 尝试匹配 "001-" 格式
-                    match = name.match(/^(\d+)-/);
-                    return match ? parseInt(match[1], 10) : 0;
-                })
-                .filter(num => num > 0);
-
-            if (chapterNumbers.length > 0) {
-                return Math.max(...chapterNumbers) + 1;
-            }
-        } catch (error) {
-            Logger.warn('扫描扁平章节目录失败', error);
-        }
-
-        return 1;
+        if (!Number.isSafeInteger(maximum + 1)) { throw new Error('章节号超出安全范围'); }
+        return maximum + 1;
     }
 
     /**

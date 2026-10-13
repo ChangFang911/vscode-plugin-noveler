@@ -8,12 +8,13 @@ import { formatDateTime } from '../utils/dateFormatter';
 import { validateCharacterName } from '../utils/inputValidator';
 import { handleError, handleSuccess } from '../utils/errorHandler';
 import { CHARACTERS_FOLDER } from '../constants';
+import { createDocument, fileExists, documentIO } from '../utils/documentOperations';
 
 /**
  * 创建人物文件
  */
 export async function createCharacter(characterName: string): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
         return;
@@ -40,9 +41,7 @@ export async function createCharacter(characterName: string): Promise<void> {
     const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
     // 确保 characters 目录存在
-    try {
-        await vscode.workspace.fs.stat(charactersFolderUri);
-    } catch {
+    if (!await fileExists(charactersFolderUri)) {
         try {
             await vscode.workspace.fs.createDirectory(charactersFolderUri);
         } catch (error) {
@@ -74,7 +73,7 @@ export async function createCharacter(characterName: string): Promise<void> {
     // 如果用户取消选择,使用默认值"重要配角"
     const importance = selectedImportance?.value || '重要配角';
 
-    const frontMatter = characterTemplate?.frontMatter || {
+    const frontMatter = { ...(characterTemplate?.frontMatter || {
         gender: "",
         age: "",
         appearance: "",
@@ -85,18 +84,18 @@ export async function createCharacter(characterName: string): Promise<void> {
         importance: importance,
         firstAppearance: "",
         tags: []
-    };
+    }) };
 
     // 使用用户选择的 importance
     frontMatter.importance = importance;
 
     const content = characterTemplate?.content || "\n## 基本信息\n\n## 外貌描写\n\n## 性格特点\n\n## 背景故事\n\n## 人际关系\n\n## 能力特长\n\n## 成长轨迹\n\n## 重要事件\n\n## 备注\n\n";
 
-    // 辅助函数：将空字符串转为引号包裹的空字符串，避免 YAML 解析为 null
-    const toYamlString = (value: string) => value === "" ? '""' : value;
+    // JSON 字符串也是合法 YAML，可避免名称被识别为数字或注释。
+    const toYamlString = (value: string) => JSON.stringify(value ?? '');
 
     const template = `---
-name: ${sanitizedName}
+name: ${toYamlString(sanitizedName)}
 gender: ${toYamlString(frontMatter.gender)}
 age: ${toYamlString(frontMatter.age)}
 appearance: ${toYamlString(frontMatter.appearance)}
@@ -117,16 +116,13 @@ ${content}`;
     const fileUri = vscode.Uri.joinPath(charactersFolderUri, fileName);
 
     // 检查文件是否已存在
-    try {
-        await vscode.workspace.fs.stat(fileUri);
+    if (await fileExists(fileUri)) {
         vscode.window.showWarningMessage(`Noveler: 人物文件已存在: ${fileName}`);
         return;
-    } catch {
-        // 文件不存在，继续创建
     }
 
     try {
-        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(template, 'utf8'));
+        await createDocument(fileUri, template);
         const doc = await vscode.workspace.openTextDocument(fileUri);
         await vscode.window.showTextDocument(doc);
         handleSuccess(`人物文件已创建: ${sanitizedName}`);

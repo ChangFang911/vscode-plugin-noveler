@@ -9,13 +9,13 @@ import { handleError, handleSuccess } from '../utils/errorHandler';
 import { PROJECT_DIRECTORIES, CONFIG_FILE_NAME, DEFAULT_CONFIG_TEMPLATE_PATH } from '../constants';
 import { Logger } from '../utils/logger';
 import { mergeRecommendedSettings } from '../utils/settingsHelper';
-import { applyDocumentChange, fileExists } from '../utils/documentOperations';
+import { applyDocumentChange, fileExists, createDocument, documentIO } from '../utils/documentOperations';
 
 /**
  * 初始化小说项目
  */
 export async function initProject(context: vscode.ExtensionContext): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个文件夹作为工作区');
         return;
@@ -106,22 +106,24 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
         // 创建目录结构
         for (const dir of PROJECT_DIRECTORIES) {
             const dirUri = vscode.Uri.joinPath(workspaceFolder.uri, dir);
-            try {
-                await vscode.workspace.fs.stat(dirUri);
-            } catch {
+            if (!await fileExists(dirUri)) {
                 await vscode.workspace.fs.createDirectory(dirUri);
             }
         }
 
         // 检查 novel.jsonc 是否已存在
         const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
-        let configExists = false;
-        try {
-            await vscode.workspace.fs.stat(configUri);
-            configExists = true;
-        } catch {
-            // 文件不存在，继续
-        }
+        const configExists = await fileExists(configUri);
+        const writeInitialFile = async (uri: vscode.Uri, text: string, overwrite = false) => {
+            if (await fileExists(uri)) {
+                if (!overwrite) { return; }
+                await applyDocumentChange(uri, () => text);
+                const document = await vscode.workspace.openTextDocument(uri);
+                if (!await documentIO.save(document) || document.isDirty) { throw new Error('初始化文件未保存：' + uri.fsPath); }
+            } else {
+                await createDocument(uri, text);
+            }
+        };
 
         if (configExists) {
             const overwrite = await vscode.window.showWarningMessage(
@@ -160,7 +162,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
   "version": "${version}",
 
   // ==================== 项目基本信息 ====================
-  "name": "${novelName}",
+  "name": ${JSON.stringify(novelName)},
   "author": "",
   "description": "",
   "genre": "",
@@ -193,10 +195,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
         const novelConfigText = projectMeta + novelerConfigText + '\n  }\n}';
 
         // configUri 已在前面声明
-        await vscode.workspace.fs.writeFile(
-            configUri,
-            Buffer.from(novelConfigText, 'utf8')
-        );
+        await writeInitialFile(configUri, novelConfigText, configExists);
 
         // 从模板配置读取 README 和大纲模板
         const templates = await loadTemplates();
@@ -220,13 +219,10 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
 使用命令 \`Noveler: 创建新章节\` 来创建新的章节。
 `;
-        readmeContent = readmeContent.replace(/{novelName}/g, novelName);
+        readmeContent = readmeContent.replace(/{novelName}/g, () => novelName);
 
         const readmeUri = vscode.Uri.joinPath(workspaceFolder.uri, 'README.md');
-        await vscode.workspace.fs.writeFile(
-            readmeUri,
-            Buffer.from(readmeContent, 'utf8')
-        );
+        await writeInitialFile(readmeUri, readmeContent, configExists);
 
         // 在 drafts 目录创建一个示例大纲文件
         let outlineContent = templates?.outline?.content || `# {novelName} - 大纲
@@ -243,13 +239,10 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
 -
 `;
-        outlineContent = outlineContent.replace(/{novelName}/g, novelName);
+        outlineContent = outlineContent.replace(/{novelName}/g, () => novelName);
 
         const outlineUri = vscode.Uri.joinPath(workspaceFolder.uri, 'drafts', '大纲.md');
-        await vscode.workspace.fs.writeFile(
-            outlineUri,
-            Buffer.from(outlineContent, 'utf8')
-        );
+        await writeInitialFile(outlineUri, outlineContent, configExists);
 
         // 在 references 目录创建一个示例参考资料文件
         const referenceContent = templates?.reference?.content || `# 参考资料
@@ -258,16 +251,11 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 `;
 
         const referenceUri = vscode.Uri.joinPath(workspaceFolder.uri, 'references', '参考资料.md');
-        await vscode.workspace.fs.writeFile(
-            referenceUri,
-            Buffer.from(referenceContent, 'utf8')
-        );
+        await writeInitialFile(referenceUri, referenceContent);
 
         // 创建 .vscode/settings.json（项目级 VSCode 配置）
         const vscodeDir = vscode.Uri.joinPath(workspaceFolder.uri, '.vscode');
-        try {
-            await vscode.workspace.fs.stat(vscodeDir);
-        } catch {
+        if (!await fileExists(vscodeDir)) {
             await vscode.workspace.fs.createDirectory(vscodeDir);
         }
 
@@ -331,9 +319,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
         // 创建 .noveler/sensitive-words 目录并创建空的配置文件
         const sensitiveWordsDir = vscode.Uri.joinPath(workspaceFolder.uri, '.noveler', 'sensitive-words');
-        try {
-            await vscode.workspace.fs.stat(sensitiveWordsDir);
-        } catch {
+        if (!await fileExists(sensitiveWordsDir)) {
             await vscode.workspace.fs.createDirectory(sensitiveWordsDir);
         }
 
@@ -401,12 +387,7 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
         for (const file of sensitiveWordFiles) {
             const fileUri = vscode.Uri.joinPath(sensitiveWordsDir, file.name);
-            try {
-                await vscode.workspace.fs.writeFile(fileUri, Buffer.from(file.content, 'utf8'));
-            } catch (error) {
-                // 静默失败，不影响项目初始化
-                Logger.warn(`创建敏感词配置文件失败: ${file.name}`, error);
-            }
+            await writeInitialFile(fileUri, file.content);
         }
 
         handleSuccess(`小说项目"${novelName}"初始化完成！已创建目录结构和配置文件\n${enableVolumes ? `✅ 已启用分卷功能（${numberFormat === 'arabic' ? '阿拉伯数字' : numberFormat === 'chinese' ? '中文数字' : '罗马数字'}编号）` : '📄 使用扁平章节结构'}`);

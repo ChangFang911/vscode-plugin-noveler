@@ -1,16 +1,108 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as jsoncParser from 'jsonc-parser';
+import { randomBytes } from 'crypto';
+import { patchJsoncFields } from '../utils/settingsHelper';
 import { VolumeInfo, VolumeStatus, VolumeType } from '../types/volume';
 import { Logger } from '../utils/logger';
 import { VolumeService } from '../services/volumeService';
 import { ConfigService } from '../services/configService';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
 import { generateVolumeFolderName, getVolumeStatusName, getVolumeTypeName } from '../utils/volumeHelper';
-import { CHAPTER_NUMBER_PADDING, DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
-import { writeAndOpenChapter } from './createChapter';
+import { CHAPTER_NUMBER_PADDING, DEFAULT_VOLUME_TARGET_WORDS, VOLUME_TYPE_OFFSETS } from '../constants';
+import { writeAndOpenChapter, runChapterCreation } from './createChapter';
+import { validateChapterName } from '../utils/inputValidator';
 import { loadTemplates } from '../utils/templateLoader';
-import { patchFrontMatter, applyDocumentChange, copyDocument } from '../utils/documentOperations';
+import { patchFrontMatter, applyDocumentChange, copyDocument, createDocument, fileExists, documentIO, saveDocumentsUnder } from '../utils/documentOperations';
+
+
+function defaultVolumeMetadata(volume: VolumeInfo): Record<string, unknown> {
+    return { volume: volume.volume, volumeType: volume.volumeType, title: volume.title,
+        subtitle: '', status: volume.status, targetWords: DEFAULT_VOLUME_TARGET_WORDS,
+        description: '', startDate: '', endDate: '', theme: '', mainConflict: '' };
+}
+
+let updatingVolume = false;
+
+async function updateVolumeMetadata(volume: VolumeInfo, fields: Record<string, unknown>, folderName?: string): Promise<void> {
+    if (updatingVolume) { throw new Error('正在修改卷，请完成当前操作后再试'); }
+    updatingVolume = true;
+    const folder = vscode.Uri.file(volume.folderPath);
+    const target = folderName ? vscode.Uri.joinPath(folder, '..', folderName) : folder;
+    const uri = vscode.Uri.joinPath(folder, 'volume.json');
+    let original = '';
+    let updated = '';
+    let existed = false;
+    let attempted = false;
+    try {
+        if (!await fileExists(folder)) { throw new Error('原卷目录已不存在，请刷新后重试'); }
+        if (target.toString() !== folder.toString() && await fileExists(target)) {
+            throw new Error('目标卷目录已存在，未覆盖');
+        }
+        existed = await fileExists(uri);
+        const document = existed ? await vscode.workspace.openTextDocument(uri) : undefined;
+        original = document?.getText() ?? JSON.stringify(defaultVolumeMetadata(volume), null, 2);
+        patchJsoncFields(original, fields);
+        await saveDocumentsUnder(folder);
+        original = document?.getText() ?? original;
+        updated = patchJsoncFields(original, fields);
+        if (existed) {
+            attempted = true;
+            await applyDocumentChange(uri, text => {
+                if (text !== original) { throw new Error('卷资料已变化，请重试'); }
+                return updated;
+            });
+            if (!await documentIO.save(document!) || document!.isDirty) { throw new Error('卷资料未保存，操作已停止'); }
+        } else {
+            await createDocument(uri, updated);
+            attempted = true;
+        }
+        if (target.toString() !== folder.toString()) {
+            const edit = new vscode.WorkspaceEdit();
+            edit.renameFile(folder, target, { overwrite: false });
+            if (!await vscode.workspace.applyEdit(edit)) { throw new Error('卷目录重命名未完成'); }
+        }
+    } catch (error) {
+        if (attempted) {
+            try {
+                if (!await fileExists(folder)) { throw new Error('原卷目录位置已变化，请检查：' + target.fsPath); }
+                const metadataExists = await fileExists(uri);
+                if (existed && !metadataExists) { throw new Error('原卷资料已不存在'); }
+                if (metadataExists) {
+                    const document = await vscode.workspace.openTextDocument(uri);
+                    if (document.getText() !== original && document.getText() !== updated) {
+                        throw new Error('卷资料存在新的修改，未覆盖');
+                    }
+                    if (existed) {
+                        await applyDocumentChange(uri, text => {
+                            if (text !== original && text !== updated) {
+                                throw new Error('卷资料存在新的修改，未覆盖');
+                            }
+                            return original;
+                        });
+                        if (!await documentIO.save(document) || document.isDirty) { throw new Error('卷资料恢复未保存'); }
+                    } else {
+                        const edit = new vscode.WorkspaceEdit();
+                        edit.deleteFile(uri, { ignoreIfNotExists: true });
+                        if (!await vscode.workspace.applyEdit(edit)) { throw new Error('新建卷资料清理失败'); }
+                    }
+                }
+            } catch (restoreError) {
+                const root = documentIO.workspaceFolder()?.uri;
+                let recovery = '';
+                if (root && existed) {
+                    const backup = vscode.Uri.joinPath(root, '.noveler', 'backups', 'volume-' + randomBytes(8).toString('hex') + '.json');
+                    await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(backup, '..'));
+                    await documentIO.writeFile(backup, Buffer.from(original));
+                    recovery = '；原卷资料备份：' + backup.fsPath;
+                }
+                throw new Error(String(error) + '；恢复未完成：' + String(restoreError) + recovery);
+            }
+        }
+        throw error;
+    } finally {
+        updatingVolume = false;
+    }
+}
 
 /**
  * 重命名卷
@@ -42,47 +134,13 @@ export async function renameVolume(item: NovelerTreeItem): Promise<void> {
     }
 
     try {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
 
-        // 生成新的文件夹名称
         const newFolderName = generateVolumeFolderName(volume.volumeType, volume.volume, newTitle);
-        const oldFolderPath = volume.folderPath;
-        const newFolderPath = path.join(path.dirname(oldFolderPath), newFolderName);
-
-        // 检查新文件夹是否已存在
-        const oldFolderUri = vscode.Uri.file(oldFolderPath);
-        const newFolderUri = vscode.Uri.file(newFolderPath);
-
-        try {
-            await vscode.workspace.fs.stat(newFolderUri);
-            vscode.window.showErrorMessage(`卷文件夹已存在: ${newFolderName}`);
-            return;
-        } catch {
-            // 文件夹不存在，可以继续
-        }
-
-        // 重命名文件夹
-        await vscode.workspace.fs.rename(oldFolderUri, newFolderUri);
-        Logger.info(`重命名卷文件夹: ${oldFolderPath} -> ${newFolderPath}`);
-
-        // 更新 volume.json
-        const volumeJsonPath = path.join(newFolderPath, 'volume.json');
-        const volumeJsonUri = vscode.Uri.file(volumeJsonPath);
-
-        try {
-            const contentBytes = await vscode.workspace.fs.readFile(volumeJsonUri);
-            const content = Buffer.from(contentBytes).toString('utf8');
-            const metadata = jsoncParser.parse(content);
-            metadata.title = newTitle;
-            const updatedContent = JSON.stringify(metadata, null, 2);
-            await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(updatedContent, 'utf8'));
-            Logger.info(`更新 volume.json: ${volumeJsonPath}`);
-        } catch (error) {
-            Logger.warn(`volume.json 不存在或读取失败: ${volumeJsonPath}`, error);
-        }
+        await updateVolumeMetadata(volume, { title: newTitle }, newFolderName);
 
         vscode.window.showInformationMessage(`✅ 成功重命名卷: ${newTitle}`);
 
@@ -105,7 +163,7 @@ export async function deleteVolume(item: NovelerTreeItem): Promise<void> {
     }
 
     const confirm = await vscode.window.showWarningMessage(
-        `确定要删除卷「${volume.title}」吗？\n此操作将删除卷文件夹及其下的所有章节（${volume.stats.chapterCount} 章）。`,
+        `确定要删除卷「${volume.title}」吗？\n此操作将把卷文件夹及其下的所有章节移入废纸篓（${volume.stats.chapterCount} 章）。\n恢复时可将整个卷文件夹从废纸篓拖回 chapters 目录，再刷新插件。`,
         { modal: true },
         '删除', '取消'
     );
@@ -117,10 +175,18 @@ export async function deleteVolume(item: NovelerTreeItem): Promise<void> {
     try {
         // 删除文件夹（异步）
         const folderUri = vscode.Uri.file(volume.folderPath);
-        await vscode.workspace.fs.delete(folderUri, { recursive: true, useTrash: false });
+        await saveDocumentsUnder(folderUri);
+        await documentIO.delete(folderUri, { recursive: true, useTrash: true });
         Logger.info(`删除卷文件夹: ${volume.folderPath}`);
 
-        vscode.window.showInformationMessage(`✅ 已删除卷: ${volume.title}`);
+        vscode.window.showInformationMessage(
+            `已移入废纸篓：${volume.title}。若“放回原处”不可用，将整个卷文件夹拖回 chapters 目录后刷新即可恢复。`,
+            '定位恢复目录'
+        ).then(choice => {
+            if (choice === '定位恢复目录') {
+                return vscode.commands.executeCommand('revealFileInOS', vscode.Uri.joinPath(folderUri, '..'));
+            }
+        }).then(undefined, error => Logger.warn('显示或定位卷恢复目录失败', error));
 
         // 智能刷新：刷新侧边栏 + 根据配置决定是否更新 README
         await vscode.commands.executeCommand('noveler.refresh');
@@ -223,38 +289,7 @@ async function setVolumeStatusInternal(volume: VolumeInfo): Promise<void> {
     }
 
     try {
-        // 更新 volume.json
-        const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
-        const volumeJsonUri = vscode.Uri.file(volumeJsonPath);
-
-        try {
-            // 尝试读取现有文件
-            const contentBytes = await vscode.workspace.fs.readFile(volumeJsonUri);
-            const content = Buffer.from(contentBytes).toString('utf8');
-            const metadata = jsoncParser.parse(content);
-            metadata.status = selected.status;
-            const updatedContent = JSON.stringify(metadata, null, 2);
-            await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(updatedContent, 'utf8'));
-            Logger.info(`更新卷状态: ${volume.title} -> ${selected.status}`);
-        } catch {
-            // 如果没有 volume.json，创建一个
-            const metadata = {
-                "volume": volume.volume,
-                "volumeType": volume.volumeType,
-                "title": volume.title,
-                "subtitle": "",
-                "status": selected.status,
-                "targetWords": DEFAULT_VOLUME_TARGET_WORDS,
-                "description": "",
-                "startDate": "",
-                "endDate": "",
-                "theme": "",
-                "mainConflict": ""
-            };
-            const content = JSON.stringify(metadata, null, 2);
-            await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(content, 'utf8'));
-            Logger.info(`创建 volume.json 并设置状态: ${volume.title} -> ${selected.status}`);
-        }
+        await updateVolumeMetadata(volume, { status: selected.status });
 
         vscode.window.showInformationMessage(`✅ 已将卷「${volume.title}」状态设置为：${getVolumeStatusName(selected.status)}`);
 
@@ -307,51 +342,18 @@ async function setVolumeTypeInternal(volume: VolumeInfo): Promise<void> {
     }
 
     try {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
 
-        // 更新 volume.json
-        const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
-        const volumeJsonUri = vscode.Uri.file(volumeJsonPath);
-
-        // 读取并更新 volume.json
-        try {
-            const contentBytes = await vscode.workspace.fs.readFile(volumeJsonUri);
-            const content = Buffer.from(contentBytes).toString('utf8');
-            const metadata = jsoncParser.parse(content);
-            metadata.volumeType = selected.type;
-            const updatedContent = JSON.stringify(metadata, null, 2);
-            await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(updatedContent, 'utf8'));
-            Logger.info(`更新卷类型: ${volume.title} -> ${selected.type}`);
-        } catch (error) {
-            Logger.warn(`volume.json 不存在或读取失败: ${volumeJsonPath}`, error);
-        }
-
-        // 生成新的文件夹名称（反映类型变化）
-        const newFolderName = generateVolumeFolderName(selected.type, volume.volume, volume.title);
-        const oldFolderPath = volume.folderPath;
-        const newFolderPath = path.join(path.dirname(oldFolderPath), newFolderName);
-
-        // 如果文件夹名称需要变化，执行重命名
-        if (oldFolderPath !== newFolderPath) {
-            const oldFolderUri = vscode.Uri.file(oldFolderPath);
-            const newFolderUri = vscode.Uri.file(newFolderPath);
-
-            // 检查新文件夹是否已存在
-            try {
-                await vscode.workspace.fs.stat(newFolderUri);
-                vscode.window.showErrorMessage(`卷文件夹已存在: ${newFolderName}`);
-                return;
-            } catch {
-                // 文件夹不存在，可以继续
-            }
-
-            // 重命名文件夹
-            await vscode.workspace.fs.rename(oldFolderUri, newFolderUri);
-            Logger.info(`重命名卷文件夹: ${oldFolderPath} -> ${newFolderPath}`);
-        }
+        const ordinal = volume.volumeType === 'prequel' ? Math.abs(volume.volume)
+            : volume.volume >= VOLUME_TYPE_OFFSETS[volume.volumeType]
+                ? volume.volume - VOLUME_TYPE_OFFSETS[volume.volumeType] : volume.volume;
+        if (!Number.isSafeInteger(ordinal) || ordinal < 1) { throw new Error('卷序号无效，请先修复卷资料'); }
+        const number = selected.type === 'prequel' ? -ordinal : VOLUME_TYPE_OFFSETS[selected.type] + ordinal;
+        const newFolderName = generateVolumeFolderName(selected.type, number, volume.title);
+        await updateVolumeMetadata(volume, { volumeType: selected.type, volume: number }, newFolderName);
 
         vscode.window.showInformationMessage(`✅ 已将卷「${volume.title}」类型设置为：${getVolumeTypeName(selected.type)}`);
 
@@ -370,25 +372,8 @@ async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
     const volumeJsonPath = path.join(volume.folderPath, 'volume.json');
     const volumeJsonUri = vscode.Uri.file(volumeJsonPath);
 
-    // 如果 volume.json 不存在，先创建
-    try {
-        await vscode.workspace.fs.stat(volumeJsonUri);
-    } catch {
-        const metadata = {
-            "volume": volume.volume,
-            "volumeType": volume.volumeType,
-            "title": volume.title,
-            "subtitle": "",
-            "status": volume.status,
-            "targetWords": DEFAULT_VOLUME_TARGET_WORDS,
-            "description": "",
-            "startDate": "",
-            "endDate": "",
-            "theme": "",
-            "mainConflict": ""
-        };
-        await vscode.workspace.fs.writeFile(volumeJsonUri, Buffer.from(JSON.stringify(metadata, null, 2), 'utf-8'));
-        Logger.info(`创建 volume.json: ${volumeJsonPath}`);
+    if (!await fileExists(volumeJsonUri)) {
+        await createDocument(volumeJsonUri, JSON.stringify(defaultVolumeMetadata(volume), null, 2));
     }
 
     // 打开文件
@@ -400,21 +385,31 @@ async function editVolumeInfoInternal(volume: VolumeInfo): Promise<void> {
  * 快速创建章节到当前卷
  */
 export async function createChapterInVolume(item: NovelerTreeItem): Promise<void> {
+    await runChapterCreation(() => createChapterInVolumeInternal(item));
+}
+
+async function createChapterInVolumeInternal(item: NovelerTreeItem): Promise<void> {
     const volume = item.metadata;
     if (!volume) {
         vscode.window.showErrorMessage('无法获取卷信息');
         return;
     }
 
-    const chapterTitle = await vscode.window.showInputBox({
+    const input = await vscode.window.showInputBox({
         prompt: '请输入章节名称（不需要输入"第几章"）',
         placeHolder: '例如：陨落的天才',
         ignoreFocusOut: true
     });
 
+    if (!input) { return; }
+    const chapterTitle = validateChapterName(input);
     if (!chapterTitle) {
+        vscode.window.showErrorMessage('章节名称无效');
         return;
     }
+    if (chapterTitle !== input && await vscode.window.showWarningMessage(
+        `章节名称包含非法字符，将使用清理后的名称：${chapterTitle}`, '确定', '取消'
+    ) !== '确定') { return; }
 
     // 获取配置服务，读取最新配置
     const configService = ConfigService.getInstance();

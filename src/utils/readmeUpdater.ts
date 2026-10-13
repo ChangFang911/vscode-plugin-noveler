@@ -6,6 +6,7 @@ import { VolumeService } from '../services/volumeService';
 import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
 import { Logger } from './logger';
 import { getStatusDisplayName } from './statusHelper';
+import { applyDocumentChange, documentIO, fileExists } from './documentOperations';
 
 interface ChapterInfo {
     number: number;
@@ -49,7 +50,7 @@ interface ProjectStats {
  * 扫描章节目录，获取统计信息
  */
 export async function scanChapters(): Promise<ProjectStats> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         throw new Error('未找到工作区');
     }
@@ -231,7 +232,7 @@ export async function scanChapters(): Promise<ProjectStats> {
  * 扫描人物目录，获取人物信息
  */
 export async function scanCharacters(): Promise<CharacterInfo[]> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         return [];
     }
@@ -302,7 +303,7 @@ export async function scanCharacters(): Promise<CharacterInfo[]> {
  * @param silent 是否静默更新（不显示通知）
  */
 export async function updateReadme(silent = false): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('Noveler: 请先打开一个工作区');
         return;
@@ -311,22 +312,13 @@ export async function updateReadme(silent = false): Promise<void> {
     const readmeUri = vscode.Uri.joinPath(workspaceFolder.uri, 'README.md');
 
     try {
-        // 检查 README 是否存在
-        await vscode.workspace.fs.stat(readmeUri);
-    } catch {
-        // README 不存在，跳过更新（用户可以通过初始化项目创建）
-        return;
-    }
-
-    try {
-        // 读取 README 内容
-        const readmeData = await vscode.workspace.fs.readFile(readmeUri);
-        let readmeContent = Buffer.from(readmeData).toString('utf8');
-
-        // 使用正则表达式检查必要的章节标题（更宽松的匹配）
-        const hasCatalog = /^##\s*目录/m.test(readmeContent);
-        const hasProgress = /^##\s*写作进度/m.test(readmeContent);
-        const hasCharacters = /^##\s*人物设定/m.test(readmeContent);
+        if (!await fileExists(readmeUri)) { return; }
+        const document = await vscode.workspace.openTextDocument(readmeUri);
+        const sections = readmeSections(document.getText());
+        const hasCatalog = sections.some(section => section.title === '目录');
+        const hasProgress = sections.some(section => section.title === '写作进度');
+        const hasCharacters = sections.some(section => section.title === '人物设定');
+        let addMissing = ConfigService.getInstance().getReadmeAutoUpdateMode() === 'always';
 
         // 如果缺少必要的标题，根据配置处理
         if (!hasCatalog || !hasProgress || !hasCharacters) {
@@ -335,7 +327,7 @@ export async function updateReadme(silent = false): Promise<void> {
 
             if (autoUpdateMode === 'always') {
                 // 总是自动添加
-                readmeContent = appendMissingSections(readmeContent, hasCatalog, hasProgress, hasCharacters);
+                addMissing = true;
             } else if (autoUpdateMode === 'ask') {
                 // 询问用户
                 const missingSections = [];
@@ -349,7 +341,7 @@ export async function updateReadme(silent = false): Promise<void> {
                 );
 
                 if (result === '自动添加') {
-                    readmeContent = appendMissingSections(readmeContent, hasCatalog, hasProgress, hasCharacters);
+                    addMissing = true;
                 } else {
                     return;
                 }
@@ -368,50 +360,20 @@ export async function updateReadme(silent = false): Promise<void> {
         ]);
         stats.characters = characters;
 
-        // 更新目录部分
-        const chapterListContent = generateChapterList(stats);
-        readmeContent = updateSection(
-            readmeContent,
-            '## 目录',
-            '## 写作进度',
-            chapterListContent
-        );
-
-        // 更新写作进度部分
-        const progressContent = generateProgressSection(stats);
-        readmeContent = updateSection(
-            readmeContent,
-            '## 写作进度',
-            '## 人物设定',
-            progressContent
-        );
-
-        // 更新人物设定部分
-        const characterContent = generateCharacterSection(stats.characters);
-        const hasRemarks = /^##\s*备注/m.test(readmeContent);
-
-        if (hasRemarks) {
-            // 如果有"备注"部分，更新到备注之前
-            readmeContent = updateSection(
-                readmeContent,
-                '## 人物设定',
-                '## 备注',
-                characterContent
-            );
-        } else {
-            // 如果没有"备注"部分，更新到末尾
-            readmeContent = updateSectionToEnd(
-                readmeContent,
-                '## 人物设定',
-                characterContent
-            );
+        await applyDocumentChange(readmeUri, text => {
+            const current = readmeSections(text);
+            const has = (title: string) => current.some(section => section.title === title);
+            if (['目录', '写作进度', '人物设定'].some(title => !has(title)) && !addMissing) {
+                throw new Error('README 标题已变化，更新已停止');
+            }
+            let result = addMissing ? appendMissingSections(text, has('目录'), has('写作进度'), has('人物设定')) : text;
+            result = updateSection(result, '目录', generateChapterList(stats));
+            result = updateSection(result, '写作进度', generateProgressSection(stats));
+            return updateSection(result, '人物设定', generateCharacterSection(stats.characters));
+        });
+        if (!await documentIO.save(document) || document.isDirty) {
+            throw new Error('README 更新未保存，请检查编辑器内容');
         }
-
-        // 写回文件
-        await vscode.workspace.fs.writeFile(
-            readmeUri,
-            Buffer.from(readmeContent, 'utf8')
-        );
 
         // 只在非静默模式下显示通知
         if (!silent) {
@@ -430,18 +392,20 @@ export async function updateReadme(silent = false): Promise<void> {
  */
 function appendMissingSections(content: string, hasCatalog: boolean, hasProgress: boolean, hasCharacters: boolean): string {
     let result = content;
+    const eol = content.includes('\r\n') ? '\r\n' : '\n';
+    const append = (text: string) => { result += text.replace(/\n/g, eol); };
 
     // 在文件末尾添加缺失的章节
     if (!hasCatalog) {
-        result += '\n\n## 目录\n\n暂无章节\n';
+        append('\n\n## 目录\n\n暂无章节\n');
     }
 
     if (!hasProgress) {
-        result += '\n\n## 写作进度\n\n- **总字数**：0 字\n- **完成章节**：0 / 0 章 (0%)\n- **章节列表**：见上方目录\n';
+        append('\n\n## 写作进度\n\n- **总字数**：0 字\n- **完成章节**：0 / 0 章 (0%)\n- **章节列表**：见上方目录\n');
     }
 
     if (!hasCharacters) {
-        result += '\n\n## 人物设定\n\n暂无人物\n';
+        append('\n\n## 人物设定\n\n暂无人物\n');
     }
 
     return result;
@@ -625,57 +589,48 @@ function getStatusEmoji(status: string): string {
 /**
  * 更新 README 中的某个部分
  */
-function updateSection(
-    content: string,
-    startMarker: string,
-    endMarker: string,
-    newContent: string
-): string {
-    const startIndex = content.indexOf(startMarker);
-    if (startIndex === -1) {
-        return content;
+function readmeSections(content: string): Array<{ title: string; start: number; end: number }> {
+    const sections: Array<{ title: string; start: number; end: number }> = [];
+    let offset = 0;
+    let comment = false;
+    let fence = '';
+    for (const line of content.split('\n')) {
+        const delimiter = line.match(/^ {0,3}(\u0060{3,}|~{3,})/);
+        if (fence) {
+            if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length
+                && line.slice(delimiter[0].length).trim() === '') { fence = ''; }
+        } else {
+            let visible = '';
+            let position = 0;
+            while (position < line.length) {
+                const token = line.indexOf(comment ? '-->' : '<!--', position);
+                if (token === -1) {
+                    visible += comment ? ' '.repeat(line.length - position) : line.slice(position);
+                    break;
+                }
+                visible += comment ? ' '.repeat(token - position + 3) : line.slice(position, token) + '    ';
+                position = token + (comment ? 3 : 4);
+                comment = !comment;
+            }
+            const opening = visible.match(/^ {0,3}(\u0060{3,}|~{3,})/);
+            if (opening) { fence = opening[1]; }
+            else {
+                const heading = visible.match(/^ {0,3}##[ \t]+(.+?)\s*$/);
+                if (heading) { sections.push({ title: heading[1].replace(/[ \t]+#+$/, ''), start: offset, end: offset + line.length }); }
+            }
+        }
+        offset += line.length + 1;
     }
-
-    const endIndex = content.indexOf(endMarker, startIndex + startMarker.length);
-    if (endIndex === -1) {
-        return content;
-    }
-
-    const before = content.substring(0, startIndex + startMarker.length);
-    const after = content.substring(endIndex);
-
-    return before + newContent + '\n' + after;
+    return sections;
 }
 
-/**
- * 更新到文件末尾（当没有结束标记时）
- */
-function updateSectionToEnd(
-    content: string,
-    startMarker: string,
-    newContent: string
-): string {
-    const startIndex = content.indexOf(startMarker);
-    if (startIndex === -1) {
-        return content;
-    }
-
-    // 找到标题结束位置（标题行之后）
-    const afterStartMarker = startIndex + startMarker.length;
-
-    // 使用正则表达式查找下一个二级标题（更健壮）
-    const restContent = content.substring(afterStartMarker);
-    const nextHeaderMatch = restContent.match(/\n##\s/);
-
-    const before = content.substring(0, afterStartMarker);
-
-    if (!nextHeaderMatch || nextHeaderMatch.index === undefined) {
-        // 没有下一个标题，更新到末尾
-        return before + newContent + '\n';
-    } else {
-        // 有下一个标题，保留该标题及之后的内容
-        const nextHeaderPosition = afterStartMarker + nextHeaderMatch.index;
-        const after = content.substring(nextHeaderPosition);
-        return before + newContent + '\n' + after;
-    }
+function updateSection(content: string, title: string, newContent: string): string {
+    const sections = readmeSections(content);
+    const matches = sections.filter(section => section.title === title);
+    if (matches.length !== 1) { throw new Error('README 中的“' + title + '”标题缺失或重复，更新已停止'); }
+    const section = matches[0];
+    const next = sections.find(item => item.start > section.start);
+    const eol = content.includes('\r\n') ? '\r\n' : '\n';
+    return content.slice(0, section.end).replace(/\r$/, '')
+        + newContent.replace(/\r?\n/g, eol) + eol + content.slice(next?.start ?? content.length);
 }
