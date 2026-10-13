@@ -147,6 +147,7 @@ export class DoubtMarkNodesProvider {
                 `${mark.resolved ? '✓ 已完成' : '○ 待处理'}\n第 ${mark.lineNumber + 1} 行\n${mark.content}`,
                 mark
             );
+            node.id = mark.id;
             node.iconPath = mark.resolved
                 ? new vscode.ThemeIcon('pass')
                 : new vscode.ThemeIcon('circle-outline');

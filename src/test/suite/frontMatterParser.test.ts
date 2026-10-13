@@ -79,16 +79,31 @@ Content`;
             });
 
             test('should handle Windows line endings (CRLF)', () => {
-                // Note: YAML parser may include \r in values, so we check isEmpty and content
                 const text = '---\r\ntitle: Test\r\n---\r\n\r\nContent';
                 const result = parseFrontMatter(text);
-                // YAML values may have trailing \r due to CRLF
-                assert.ok(String(result.data.title).startsWith('Test'));
+                assert.strictEqual(result.data.title, 'Test');
+                assert.strictEqual(result.content, '\r\nContent');
                 assert.strictEqual(result.isEmpty, false);
+            });
+
+            test('parses quoted CRLF metadata with comments and preserves the body', () => {
+                const text = '\uFEFF---\r\n# 备注\r\ntitle: "开篇 # 伏笔"\r\nstatus: "completed"\r\ntargetWords: 2500\r\n---\r\n\r\n# 开篇\r\n正文';
+                const result = parseFrontMatter(text);
+                assert.deepStrictEqual(result.data, { title: '开篇 # 伏笔', status: 'completed', targetWords: 2500 });
+                assert.strictEqual(result.content, '\r\n# 开篇\r\n正文');
+                assert.ok(result.matter.includes('# 备注\r\n'));
             });
         });
 
         suite('Invalid Front Matter', () => {
+
+            test('requires complete delimiter lines and leaves malformed headers unchanged', () => {
+                for (const text of ['---other\ntitle: Test\n---\n正文', '---\ntitle: Test\n---other\n正文']) {
+                    const result = parseFrontMatter(text);
+                    assert.strictEqual(result.isEmpty, true);
+                    assert.strictEqual(result.content, text);
+                }
+            });
             test('should return empty result for text without front matter', () => {
                 const text = 'Just plain text without front matter';
                 const result = parseFrontMatter(text);

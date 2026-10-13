@@ -181,7 +181,8 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.languages.registerCodeLensProvider(
                 [
                     { language: 'markdown', pattern: '**/chapters/**' },
-                    { language: 'markdown', pattern: '**/characters/**' }
+                    { language: 'markdown', pattern: '**/characters/**' },
+                    { language: 'markdown', pattern: '**/drafts/大纲.md' }
                 ],
                 codeLensProvider
             )

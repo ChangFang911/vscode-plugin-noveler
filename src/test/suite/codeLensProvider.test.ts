@@ -23,6 +23,12 @@ suite('CodeLensProvider Test Suite', () => {
     });
 
     suite('Actual provider title placement', () => {
+        test('reads completed status and target words from quoted CRLF metadata', () => {
+            const document = new MockTextDocument(MockUri.file('/novel/chapters/第01章.md'), '---\r\ntitle: "开篇"\r\nstatus: "completed"\r\ntargetWords: 2500\r\n---\r\n# 开篇\r\n正文', 'markdown');
+            const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+            assert.ok(lenses.some(lens => lens.command?.command === 'noveler.updateChapterStatus' && lens.command.title.includes('已完成')));
+            assert.ok(lenses.some(lens => lens.command?.title.includes('2,500')));
+        });
         const cases: Array<{ name: string; text: string; line: number | null }> = [
             { name: 'skips YAML comments before the chapter title', text: '---\n# 元数据备注\ntitle: 开篇\nstatus: draft\ntargetWords: 2500\n---\n# 第1章 开篇\n正文', line: 6 },
             { name: 'skips heading-like lines in YAML block values', text: '---\ndescription: |\n  # 元数据内的标题\n---\n\n# 正文标题', line: 5 },
@@ -52,6 +58,21 @@ suite('CodeLensProvider Test Suite', () => {
                 assert.strictEqual(format?.command?.arguments?.[0], document.uri);
                 const status = lenses.find(lens => lens.command?.command === 'noveler.updateChapterStatus');
                 assert.strictEqual(status?.command?.arguments?.[0], document.uri);
+            });
+        }
+    });
+
+    suite('Supporting document actions', () => {
+        for (const file of ['/novel/chapters/第一卷/outline.md', '/novel/chapters/第一卷/README.md',
+            '/novel/chapters/第一卷/volume.md', '/novel/chapters/第一卷/OUTLINE.md',
+            '/novel/drafts/大纲.md', 'C:\\novel\\chapters\\第一卷\\outline.md']) {
+            test(`only formats supporting document ${file}`, () => {
+                const document = new MockTextDocument(MockUri.file(file), '---\nstatus: draft\ntargetWords: 2500\n---\n# 卷资料\n正文', 'markdown');
+                const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+                assert.strictEqual(lenses.length, 1);
+                assert.strictEqual(lenses[0].command?.command, 'noveler.formatDocument');
+                assert.strictEqual(lenses[0].command?.arguments?.[0], document.uri);
+                assert.strictEqual(lenses[0].range.start.line, 4);
             });
         }
     });

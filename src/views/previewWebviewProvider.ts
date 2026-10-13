@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
+import { parseFrontMatter } from '../utils/frontMatterParser';
 
 /**
  * 预览设置接口
@@ -152,50 +153,25 @@ export class PreviewWebviewProvider {
      * 根据行号计算段落索引
      */
     private getParagraphIndexFromLine(content: string, line: number): number {
-        const lines = content.split('\n');
-
-        // 跳过 Front Matter
-        let startLine = 0;
-        if (lines[0] === '---') {
-            for (let i = 1; i < lines.length; i++) {
-                if (lines[i] === '---') {
-                    startLine = i + 1;
-                    break;
-                }
-            }
-        }
-
-        // 如果光标在 Front Matter 内，返回 -1
-        if (line < startLine) {
+        const lines = this.getVisibleContent(content).split(/\r?\n/);
+        if (!lines[line]?.trim()) {
             return -1;
         }
-
-        // 计算段落索引
         let paragraphIndex = -1;
-        let inParagraph = false;
-
-        for (let i = startLine; i <= line && i < lines.length; i++) {
-            const trimmedLine = lines[i].trim();
-
-            // 跳过标题行
-            if (trimmedLine.startsWith('#')) {
-                continue;
-            }
-
-            // 空行表示段落结束
-            if (trimmedLine === '') {
-                inParagraph = false;
-                continue;
-            }
-
-            // 非空行，如果不在段落中，开始新段落
-            if (!inParagraph) {
+        for (let i = 0; i <= line; i++) {
+            if (lines[i].trim()) {
                 paragraphIndex++;
-                inParagraph = true;
             }
         }
-
         return paragraphIndex;
+    }
+
+    private getVisibleContent(content: string): string {
+        const hide = (value: string) => value.replace(/[^\r\n]/g, '');
+        return content
+            .replace(/^\uFEFF?---[^\S\r\n]*\r?\n(?:[\s\S]*?\r?\n)?---[^\S\r\n]*(?:\r?\n|$)/, hide)
+            .replace(/<!--[\s\S]*?(?:-->|$)/g, hide)
+            .replace(/^[^\S\r\n]*#.*$/gm, '');
     }
 
     /**
@@ -261,26 +237,11 @@ export class PreviewWebviewProvider {
      */
     private parseContent(content: string): { title: string; body: string } {
         let title = '未命名章节';
-        let body = content;
-
-        // 解析 Front Matter
-        const frontMatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-        if (frontMatterMatch) {
-            const frontMatter = frontMatterMatch[1];
-            body = frontMatterMatch[2];
-
-            // 提取标题
-            const titleMatch = frontMatter.match(/title:\s*["']?([^"'\n]+)["']?/);
-            if (titleMatch) {
-                title = titleMatch[1].trim();
-            }
+        const parsed = parseFrontMatter(content);
+        if (typeof parsed.data.title === 'string' && parsed.data.title.trim()) {
+            title = parsed.data.title.trim();
         }
-
-        // 移除 Markdown 标题（# 开头的行）
-        body = body.replace(/^#.*$/gm, '').trim();
-
-        // 处理段落
-        body = this.formatBody(body);
+        const body = this.formatBody(this.getVisibleContent(content));
 
         return { title, body };
     }

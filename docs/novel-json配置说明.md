@@ -290,7 +290,7 @@ chapters/
 - `format.autoFormat` 当前未接入保存事件；使用 `editor.formatOnSave` 和 Markdown 默认格式化器。
 - `wordCount.includePunctuation` 当前未接入计算，总计始终为正文加标点。
 - `focusMode.typewriter`、`typewriterPosition` 是旧兼容字段，不提供打字机滚动功能。
-- `doubtMark.deleteOnResolve` 当前未正确接入，完成待办只改变标记，删除请使用明确的删除命令。
+- `doubtMark.deleteOnResolve` 默认关闭；在 `noveler` 下设置 `"doubtMark": { "deleteOnResolve": true }`，单项和批量完成时自动删除待办标记，保留同行正文。
 
 修改后保存配置，大多数功能会重新加载。如果显示未更新，可切换文件或重新加载窗口。
 遇到格式错误先修复 JSONC，不要通过覆盖整个配置来解决。

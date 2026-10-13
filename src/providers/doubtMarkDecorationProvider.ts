@@ -23,7 +23,7 @@ export class DoubtMarkDecorationProvider {
         });
 
         this.resolvedDecoration = vscode.window.createTextEditorDecorationType({
-            isWholeLine: true,
+            isWholeLine: false,
             opacity: '0.5',
             overviewRulerColor: new vscode.ThemeColor('testing.iconPassed'),
             overviewRulerLane: vscode.OverviewRulerLane.Right,
@@ -40,14 +40,16 @@ export class DoubtMarkDecorationProvider {
         const unresolvedRanges: vscode.Range[] = [];
         const resolvedRanges: vscode.Range[] = [];
 
+        const pendingLines = new Set<number>();
         for (const mark of marks) {
-            const lineObj = editor.document.lineAt(mark.lineNumber);
-            const range = lineObj.range;
             if (mark.resolved) {
-                resolvedRanges.push(range);
+                resolvedRanges.push(new vscode.Range(mark.lineNumber, mark.startCharacter, mark.lineNumber, mark.endCharacter));
             } else {
-                unresolvedRanges.push(range);
+                pendingLines.add(mark.lineNumber);
             }
+        }
+        for (const lineNumber of pendingLines) {
+            unresolvedRanges.push(editor.document.lineAt(lineNumber).range);
         }
 
         editor.setDecorations(this.unresolvedDecoration, unresolvedRanges);

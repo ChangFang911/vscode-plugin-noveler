@@ -56,10 +56,10 @@ export function registerDoubtMarkCommands(
                 const mark = extractMark(itemOrMark);
                 if (!mark) { return; }
                 try {
-                    await svc.resolveMark(mark);
-                    const deleteOnResolve = getDeleteOnResolve();
-                    if (deleteOnResolve) {
-                        await svc.deleteMark({ ...mark, resolved: true });
+                    if (getDeleteOnResolve()) {
+                        await svc.deleteMark(mark);
+                    } else {
+                        await svc.resolveMark(mark);
                     }
                 } catch (error) {
                     handleError('标记为已完成失败', error);
@@ -112,7 +112,7 @@ export function registerDoubtMarkCommands(
                 try {
                     const doc = await vscode.workspace.openTextDocument(mark.fileUri);
                     const editor = await vscode.window.showTextDocument(doc);
-                    const pos = new vscode.Position(mark.lineNumber, 0);
+                    const pos = new vscode.Position(mark.lineNumber, mark.startCharacter ?? 0);
                     editor.selection = new vscode.Selection(pos, pos);
                     editor.revealRange(
                         new vscode.Range(pos, pos),
@@ -153,7 +153,7 @@ export function registerDoubtMarkCommands(
             );
             if (confirm !== '确定') { return; }
             try {
-                await svc.resolveAll();
+                await svc.resolveAll(getDeleteOnResolve());
             } catch (error) {
                 handleError('批量完成待办失败', error);
             }
@@ -195,10 +195,7 @@ function extractMark(itemOrMark: DoubtMarkTreeItem | DoubtMark): DoubtMark | und
 
 function getDeleteOnResolve(): boolean {
     try {
-        const config = ConfigService.getInstance().getConfig() as Record<string, unknown>;
-        const noveler = config?.noveler as Record<string, unknown> | undefined;
-        const doubtMark = noveler?.doubtMark as Record<string, unknown> | undefined;
-        return Boolean(doubtMark?.deleteOnResolve ?? false);
+        return ConfigService.getInstance().getConfig().doubtMark?.deleteOnResolve === true;
     } catch {
         return false;
     }

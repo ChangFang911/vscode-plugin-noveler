@@ -46,29 +46,12 @@ export function parseFrontMatter<T = Record<string, unknown>>(text: string): Par
         isEmpty: true
     };
 
-    // 检查是否以 --- 开头
-    if (!text.startsWith('---')) {
+    const match = /^\uFEFF?---[^\S\r\n]*\r?\n([\s\S]*?)^---[^\S\r\n]*(?:\r?\n|$)/m.exec(text);
+    if (!match || match.index !== 0) {
         return defaultResult;
     }
-
-    // 查找第二个 --- 的位置
-    const secondDelimiterIndex = text.indexOf('\n---', 3);
-    if (secondDelimiterIndex === -1) {
-        return defaultResult;
-    }
-
-    // 提取 Front Matter 字符串（不包含分隔符）
-    const matterString = text.slice(4, secondDelimiterIndex);
-
-    // 计算正文开始位置
-    let contentStart = secondDelimiterIndex + 4; // '\n---'.length = 4
-
-    // 跳过紧随其后的换行符
-    if (text[contentStart] === '\n') {
-        contentStart++;
-    } else if (text[contentStart] === '\r' && text[contentStart + 1] === '\n') {
-        contentStart += 2;
-    }
+    const matterString = match[1].replace(/\r?\n$/, '');
+    const contentStart = match[0].length;
 
     // 解析 YAML
     let data: T;

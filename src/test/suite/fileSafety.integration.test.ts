@@ -6,9 +6,12 @@ import { renameChapter, renameCharacter, updateChapterStatusWithDialog } from '.
 import { NovelerTreeItem } from '../../views/novelerViewProvider';
 import { ConfigService } from '../../services/configService';
 import { ChineseNovelFormatProvider } from '../../providers/formatProvider';
-import { DoubtMarkService, findMarksInText } from '../../services/doubtMarkService';
+import { DoubtMarkService, DoubtMark, findMarksInText } from '../../services/doubtMarkService';
 import { mergeRecommendedSettings } from '../../utils/settingsHelper';
 import { registerAllCommands, CommandRegistrarDeps } from '../../commands/commandRegistrar';
+import { registerDoubtMarkCommands } from '../../commands/doubtMarkCommands';
+import { DoubtMarkNodesProvider } from '../../views/nodes/doubtMarkNodes';
+import { DoubtMarkCodeLensProvider } from '../../providers/doubtMarkCodeLensProvider';
 import { createTestWorkspace, readTestFile, removeTestWorkspace, writeTestFile } from './testWorkspace';
 
 suite('File Safety Integration', () => {
@@ -28,6 +31,227 @@ suite('File Safety Integration', () => {
     teardown(async () => {
         sandbox.restore();
         await removeTestWorkspace(root);
+    });
+
+    for (const enabled of [true, false, undefined]) {
+        test(`completing an inline todo honors deleteOnResolve=${enabled} and preserves the body`, async () => {
+            const uri = vscode.Uri.joinPath(root, 'chapters', '待办配置.md');
+            const original = '  正文 <!--? 检查伏笔 -->\n下一段';
+            await writeTestFile(uri, original);
+            await applyDocumentChange(uri, text => text + '\n未保存内容');
+            sandbox.stub(ConfigService, 'getInstance').returns({ getConfig: () => ({ doubtMark: { deleteOnResolve: enabled } }) } as unknown as ConfigService);
+            let resolve!: (mark: unknown) => Promise<void>;
+            sandbox.stub(vscode.commands, 'registerCommand').callsFake((command: string, callback: (...args: unknown[]) => unknown) => {
+                if (command === 'noveler.resolveDoubtMark') { resolve = callback as typeof resolve; }
+                return { dispose: () => undefined };
+            });
+            registerDoubtMarkCommands({ subscriptions: [] } as unknown as vscode.ExtensionContext, {} as DoubtMarkNodesProvider, () => undefined);
+            await resolve({ fileUri: uri, lineNumber: 0, content: '检查伏笔', resolved: false });
+            const document = await vscode.workspace.openTextDocument(uri);
+            assert.strictEqual(document.getText(), enabled ? '  正文\n下一段\n未保存内容' : '  正文 <!--✓ 检查伏笔 -->\n下一段\n未保存内容');
+            await vscode.commands.executeCommand('undo');
+            assert.strictEqual(document.getText(), original + '\n未保存内容');
+        });
+    }
+
+    test('bulk completion removes pending markers from bottom to top and preserves existing resolved ones', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '批量待办.md');
+        const text = '<!--? 第一项 -->\n正文 <!--? 第二项 -->\n<!--✓ 原已完成 -->\n<!--? 第三项 -->\n结尾';
+        await writeTestFile(uri, text);
+        const service = DoubtMarkService.getInstance();
+        sandbox.stub(service, 'getAllMarks').returns(findMarksInText(text).map(mark => ({ ...mark, fileUri: uri, fileName: '批量待办', id: String(mark.lineNumber) })));
+        sandbox.stub(ConfigService, 'getInstance').returns({ getConfig: () => ({ doubtMark: { deleteOnResolve: true } }) } as unknown as ConfigService);
+        let resolveAll!: () => Promise<void>;
+        sandbox.stub(vscode.commands, 'registerCommand').callsFake((command: string, callback: (...args: unknown[]) => unknown) => {
+            if (command === 'noveler.resolveAllDoubtMarks') { resolveAll = callback as typeof resolveAll; }
+            return { dispose: () => undefined };
+        });
+        (vscode.window.showWarningMessage as sinon.SinonStub).resolves('确定');
+        registerDoubtMarkCommands({ subscriptions: [] } as unknown as vscode.ExtensionContext, {} as DoubtMarkNodesProvider, () => undefined);
+        await resolveAll();
+        assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), '正文\n<!--✓ 原已完成 -->\n结尾');
+    });
+
+    test('failed todo edits report failure and keep the pending marker', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '失败待办.md');
+        const text = '正文 <!--? 检查 -->';
+        await writeTestFile(uri, text);
+        sandbox.stub(vscode.workspace, 'applyEdit').resolves(false);
+        await assert.rejects(() => DoubtMarkService.getInstance().deleteMark({ fileUri: uri, lineNumber: 0, content: '检查', resolved: false } as never), /待办修改未完成/);
+        assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), text);
+    });
+
+    test('deleting a pending marker does not delete an earlier resolved marker on the same line', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '混合待办.md');
+        await writeTestFile(uri, '正文 <!--✓ 已完成 --> <!--? 待处理 -->');
+        await DoubtMarkService.getInstance().deleteMark({ fileUri: uri, lineNumber: 0, content: '待处理', resolved: false } as never);
+        assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), '正文 <!--✓ 已完成 -->');
+    });
+
+    test('each duplicate inline todo can be completed, reopened and deleted without changing its neighbors', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '同行待办.md');
+        const original = '  正文 <!--? 重复 --> <!--✓ 已完成 --> <!--? 重复 -->\n结尾';
+        await writeTestFile(uri, original);
+        const document = await vscode.workspace.openTextDocument(uri);
+        const marks = (): DoubtMark[] => findMarksInText(document.getText()).map(mark => ({ ...mark,
+            fileUri: uri, fileName: '同行待办', id: `${mark.lineNumber}:${mark.startCharacter}`, documentVersion: document.version }));
+        const service = DoubtMarkService.getInstance();
+        await service.resolveMark(marks()[2]);
+        assert.strictEqual(document.getText(), '  正文 <!--? 重复 --> <!--✓ 已完成 --> <!--✓ 重复 -->\n结尾');
+        await service.reopenMark(marks()[2]);
+        assert.strictEqual(document.getText(), original);
+        await service.deleteMark(marks()[2]);
+        assert.strictEqual(document.getText(), '  正文 <!--? 重复 --> <!--✓ 已完成 -->\n结尾');
+        await vscode.commands.executeCommand('undo');
+        assert.strictEqual(document.getText(), original);
+    });
+
+    for (const autoDelete of [false, true]) {
+        test(`bulk completion handles multiple markers on a line with autoDelete=${autoDelete}`, async () => {
+            const uri = vscode.Uri.joinPath(root, 'chapters', '批量同行待办.md');
+            const original = '正文 <!--? 第一项 --> <!--✓ 保留 --> <!--? 第三项 -->\n<!--? 第四项 --> <!--? 第五项 -->\n结尾';
+            await writeTestFile(uri, original);
+            const document = await vscode.workspace.openTextDocument(uri);
+            const service = DoubtMarkService.getInstance();
+            sandbox.stub(service, 'getAllMarks').callsFake(() => findMarksInText(document.getText()).map(mark => ({ ...mark,
+                fileUri: uri, fileName: '批量同行待办', id: `${mark.lineNumber}:${mark.startCharacter}`, documentVersion: document.version })));
+            await service.resolveAll(autoDelete);
+            assert.strictEqual(document.getText(), autoDelete ? '正文 <!--✓ 保留 -->\n结尾'
+                : '正文 <!--✓ 第一项 --> <!--✓ 保留 --> <!--✓ 第三项 -->\n<!--✓ 第四项 --> <!--✓ 第五项 -->\n结尾');
+            await vscode.commands.executeCommand('undo');
+            assert.strictEqual(document.getText(), original);
+        });
+    }
+
+    test('bulk cleanup removes only resolved markers and keeps pending markers and prose', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '清理同行待办.md');
+        const original = '正文 <!--? 保留 --> <!--✓ 删除一 --> <!--✓ 删除二 --> 结尾\n<!--✓ 独立一 --> <!--✓ 独立二 -->\n末段';
+        await writeTestFile(uri, original);
+        const document = await vscode.workspace.openTextDocument(uri);
+        const service = DoubtMarkService.getInstance();
+        sandbox.stub(service, 'getAllMarks').returns(findMarksInText(original).map(mark => ({ ...mark,
+            fileUri: uri, fileName: '清理同行待办', id: `${mark.lineNumber}:${mark.startCharacter}`, documentVersion: document.version })));
+        await service.deleteAllResolved();
+        assert.strictEqual(document.getText(), '正文 <!--? 保留 --> 结尾\n末段');
+        await vscode.commands.executeCommand('undo');
+        assert.strictEqual(document.getText(), original);
+    });
+
+    test('stale todo actions refuse to modify another marker after document changes', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '过期待办.md');
+        const original = '正文 <!--? 第一项 --> <!--? 第二项 -->';
+        await writeTestFile(uri, original);
+        const document = await vscode.workspace.openTextDocument(uri);
+        const position = findMarksInText(original)[1];
+        const mark = { ...position, fileUri: uri, fileName: '过期待办', id: 'second', documentVersion: document.version };
+        await applyDocumentChange(uri, text => '新增文字' + text);
+        await assert.rejects(() => DoubtMarkService.getInstance().deleteMark(mark), /待办位置已变化/);
+        assert.strictEqual(document.getText(), '新增文字' + original);
+    });
+
+    test('old CodeLens buttons can complete multiple todos consecutively without waiting for refresh', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '连续完成.md');
+        await writeTestFile(uri, '正文 <!--? 重复 --> <!--? 重复 -->\n另一段 <!--? 第三项 -->');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const marks = new DoubtMarkCodeLensProvider().provideCodeLenses(document, {} as vscode.CancellationToken)
+            .filter(lens => lens.command?.command === 'noveler.resolveDoubtMark').map(lens => lens.command!.arguments![0] as DoubtMark);
+        const service = DoubtMarkService.getInstance();
+        for (const mark of marks) { await service.resolveMark(mark); }
+        assert.strictEqual(document.getText(), '正文 <!--✓ 重复 --> <!--✓ 重复 -->\n另一段 <!--✓ 第三项 -->');
+        const version = document.version;
+        await service.resolveMark(marks[0]);
+        assert.strictEqual(document.version, version);
+    });
+
+    test('concurrent clicks complete different inline todos without overwriting one another', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '并发完成.md');
+        await writeTestFile(uri, '正文 <!--? 第一项 --> <!--? 第二项 --> <!--? 第三项 -->');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const marks = new DoubtMarkCodeLensProvider().provideCodeLenses(document, {} as vscode.CancellationToken)
+            .filter(lens => lens.command?.command === 'noveler.resolveDoubtMark').map(lens => lens.command!.arguments![0] as DoubtMark);
+        await Promise.all(marks.map(mark => DoubtMarkService.getInstance().resolveMark(mark)));
+        assert.strictEqual(document.getText(), '正文 <!--✓ 第一项 --> <!--✓ 第二项 --> <!--✓ 第三项 -->');
+    });
+
+    test('a rejected queued operation does not block the following valid operation', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '失败后继续.md');
+        await writeTestFile(uri, '正文 <!--? 第一项 --> <!--? 第二项 -->');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const provider = new DoubtMarkCodeLensProvider();
+        const stale = provider.provideCodeLenses(document, {} as vscode.CancellationToken)
+            .find(lens => lens.command?.command === 'noveler.resolveDoubtMark')!.command!.arguments![0] as DoubtMark;
+        await applyDocumentChange(uri, text => '新增' + text);
+        const valid = provider.provideCodeLenses(document, {} as vscode.CancellationToken)
+            .filter(lens => lens.command?.command === 'noveler.resolveDoubtMark')[1].command!.arguments![0] as DoubtMark;
+        const service = DoubtMarkService.getInstance();
+        const results = await Promise.allSettled([service.resolveMark(stale), service.resolveMark(valid)]);
+        assert.deepStrictEqual(results.map(result => result.status), ['rejected', 'fulfilled']);
+        assert.strictEqual(document.getText(), '新增正文 <!--? 第一项 --> <!--✓ 第二项 -->');
+    });
+
+    test('a stale marker in a second file prevents the entire batch from modifying either file', async () => {
+        const first = vscode.Uri.joinPath(root, 'chapters', '批量第一份.md');
+        const second = vscode.Uri.joinPath(root, 'chapters', '批量第二份.md');
+        await writeTestFile(first, '第一份 <!--? 第一项 -->');
+        await writeTestFile(second, '第二份 <!--? 第二项 -->');
+        const provider = new DoubtMarkCodeLensProvider();
+        const marks: DoubtMark[] = [];
+        for (const uri of [first, second]) {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            marks.push(provider.provideCodeLenses(doc, {} as vscode.CancellationToken)
+                .find(lens => lens.command?.command === 'noveler.resolveDoubtMark')!.command!.arguments![0]);
+        }
+        await applyDocumentChange(second, text => '新增' + text);
+        const service = DoubtMarkService.getInstance();
+        sandbox.stub(service, 'getAllMarks').returns(marks);
+        await assert.rejects(() => service.resolveAll(), /待办位置已变化/);
+        assert.strictEqual((await vscode.workspace.openTextDocument(first)).getText(), '第一份 <!--? 第一项 -->');
+        assert.strictEqual((await vscode.workspace.openTextDocument(second)).getText(), '新增第二份 <!--? 第二项 -->');
+    });
+
+    test('typing in unrelated paragraphs does not replace unchanged todo entries', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '待办刷新范围.md');
+        await writeTestFile(uri, '正文 <!--? 检查 -->\n其他段落');
+        const service = DoubtMarkService.getInstance();
+        await service.initialize();
+        await applyDocumentChange(uri, text => text + '\n初始正文');
+        const before = service.getMarksByFile().get(uri.toString())![0];
+        await applyDocumentChange(uri, text => text.replace('初始正文', '继续写正文'));
+        assert.strictEqual(service.getMarksByFile().get(uri.toString())![0], before);
+        await applyDocumentChange(uri, text => '新增' + text);
+        const after = service.getMarksByFile().get(uri.toString())![0];
+        assert.notStrictEqual(after, before);
+        assert.strictEqual(after.startCharacter, before.startCharacter! + 2);
+    });
+
+    test('unrelated metadata edits do not prevent completing an unchanged todo', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '自动保存待办.md');
+        await writeTestFile(uri, '---\nmodified: 原时间\n---\n正文 <!--? 检查 -->');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const mark = new DoubtMarkCodeLensProvider().provideCodeLenses(document, {} as vscode.CancellationToken)
+            .find(lens => lens.command?.command === 'noveler.resolveDoubtMark')!.command!.arguments![0] as DoubtMark;
+        await applyDocumentChange(uri, text => text.replace('原时间', '新时间'));
+        await DoubtMarkService.getInstance().resolveMark(mark);
+        assert.strictEqual(document.getText(), '---\nmodified: 新时间\n---\n正文 <!--✓ 检查 -->');
+    });
+
+    test('a removed duplicate is not confused with an identical marker shifted into its old position', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '重复位置保护.md');
+        await writeTestFile(uri, '<!--? 重复 --><!--? 重复 -->');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const mark = new DoubtMarkCodeLensProvider().provideCodeLenses(document, {} as vscode.CancellationToken)
+            .find(lens => lens.command?.command === 'noveler.resolveDoubtMark')!.command!.arguments![0] as DoubtMark;
+        await applyDocumentChange(uri, text => text.replace('<!--? 重复 -->', ''));
+        await assert.rejects(() => DoubtMarkService.getInstance().resolveMark(mark), /待办位置已变化/);
+        assert.strictEqual(document.getText(), '<!--? 重复 -->');
+    });
+
+    test('ambiguous legacy todo positions stop instead of modifying the first duplicate', async () => {
+        const uri = vscode.Uri.joinPath(root, 'chapters', '重复待办.md');
+        const text = '正文 <!--? 重复 --> <!--? 重复 -->';
+        await writeTestFile(uri, text);
+        await assert.rejects(() => DoubtMarkService.getInstance().resolveMark({ fileUri: uri, lineNumber: 0, content: '重复', resolved: false } as DoubtMark), /待办位置已变化/);
+        assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), text);
     });
 
     test('formatting uses the clicked document even when another editor is active', async () => {
@@ -150,7 +374,7 @@ suite('File Safety Integration', () => {
     });
     test('formatting keeps todo resolution and reopening usable', async () => {
         const source = vscode.Uri.joinPath(root, 'chapters', '待办.md');
-        await writeTestFile(source, '前一段,\n正文, <!--? 检查 "伏笔" -->\n后一段.');
+        await writeTestFile(source, '前一段,\n正文, <!--? 检查 "伏笔" --> <!--? 第二项 -->\n后一段.');
         sandbox.stub(ConfigService, 'getInstance').returns({
             getChineseQuoteStyle: () => '「」', shouldConvertQuotes: () => true,
             shouldAutoEmptyLine: () => true, shouldParagraphIndent: () => true
@@ -165,13 +389,21 @@ suite('File Safety Integration', () => {
         assert.ok(position);
         assert.strictEqual(position.lineNumber, 2);
         assert.strictEqual(DoubtMarkService.getInstance().getMarksByFile().get(source.toString())?.[0].lineNumber, position.lineNumber);
+        const scanned = DoubtMarkService.getInstance().getMarksByFile().get(source.toString())!;
+        assert.strictEqual(scanned.length, 2);
+        assert.strictEqual(new Set(scanned.map(mark => mark.id)).size, 2);
+        assert.ok(scanned[1].startCharacter! > scanned[0].startCharacter!);
+        const nodes = new DoubtMarkNodesProvider(DoubtMarkService.getInstance()).getMarkItemNodes({ fileUriStr: source.toString() } as never);
+        assert.strictEqual(nodes.length, 2);
+        assert.strictEqual(new Set(nodes.map(node => node.id)).size, 2);
         const mark = { ...position, id: 'test', fileUri: source, fileName: '待办' };
         await DoubtMarkService.getInstance().resolveMark(mark);
         assert.ok(document.getText().includes('<!--✓ 检查 "伏笔" -->'));
         await DoubtMarkService.getInstance().reopenMark({ ...mark, resolved: true });
         assert.ok(document.getText().includes('<!--? 检查 "伏笔" -->'));
         await DoubtMarkService.getInstance().deleteMark(mark);
-        assert.ok(!document.getText().includes('<!--?'));
+        assert.ok(!document.getText().includes('<!--? 检查'));
+        assert.ok(document.getText().includes('<!--? 第二项 -->'));
         assert.ok(document.getText().includes('正文，'));
     });
     test('settings merge uses the dirty document and is undoable', async () => {

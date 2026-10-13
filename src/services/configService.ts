@@ -77,6 +77,9 @@ export interface NovelConfig {
     };
     /** 敏感词检测配置 */
     sensitiveWords?: SensitiveWordConfig;
+    doubtMark?: {
+        deleteOnResolve?: boolean;
+    };
     /** 分卷功能配置 */
     volumes?: VolumesConfig;
     /** 护眼模式配置 */

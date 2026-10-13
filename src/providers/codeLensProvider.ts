@@ -32,7 +32,10 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
         const documentPath = document.uri.fsPath.replace(/\\/g, '/');
         const isChapter = documentPath.includes('/chapters/');
         const isCharacter = documentPath.includes('/characters/');
-        if (document.languageId !== 'markdown' || (!isChapter && !isCharacter)) {
+        const fileName = documentPath.split('/').pop()?.toLowerCase();
+        const isSupportingDocument = isChapter && ['outline.md', 'readme.md', 'volume.md'].includes(fileName ?? '')
+            || documentPath.endsWith('/drafts/大纲.md');
+        if (document.languageId !== 'markdown' || (!isChapter && !isCharacter && !isSupportingDocument)) {
             return codeLenses;
         }
 
@@ -55,10 +58,10 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
             if (match && match[1].trim()) {
                 const range = new vscode.Range(i, 0, i, line.length);
 
-                if (isCharacter) {
+                if (isCharacter || isSupportingDocument) {
                     codeLenses.push(new vscode.CodeLens(range, {
                         title: '格式化',
-                        tooltip: '格式化当前人物档案',
+                        tooltip: isCharacter ? '格式化当前人物档案' : '格式化当前文档',
                         command: 'noveler.formatDocument',
                         arguments: [document.uri]
                     }));
