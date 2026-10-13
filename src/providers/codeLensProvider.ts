@@ -1,3 +1,4 @@
+import { getCharacterAliases } from '../utils/characterAliases';
 /**
  * Code Lens Provider - 在章节标题上方显示快捷操作
  */
@@ -65,6 +66,15 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
                         command: 'noveler.formatDocument',
                         arguments: [document.uri]
                     }));
+                    if (isCharacter) {
+                        const aliases = getCharacterAliases(text);
+                        codeLenses.push(new vscode.CodeLens(range, {
+                            title: aliases.length ? `管理别名（${aliases.length}）` : '管理别名',
+                            tooltip: aliases.length ? aliases.join('、') : '添加、修改或删除人物别名',
+                            command: 'noveler.manageCharacterAliases',
+                            arguments: [document.uri]
+                        }));
+                    }
                     break;
                 }
 

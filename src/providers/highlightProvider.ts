@@ -1,3 +1,5 @@
+import { documentIO } from '../utils/documentOperations';
+import { getCharacterAliases } from '../utils/characterAliases';
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { parseFrontMatter } from '../utils/frontMatterParser';
@@ -32,6 +34,7 @@ export class NovelHighlightProvider {
     private configService: ConfigService;
     private characterNamesCache: string[] = [];
     private lastCacheUpdate = 0;
+    private loadGeneration = 0;
 
     // Trie 树缓存（替代正则）
     private cachedCharacterTrie: SimpleTrieTree | null = null;
@@ -87,11 +90,12 @@ export class NovelHighlightProvider {
 
     // 从 characters/ 目录加载所有人物名称
     private async loadCharacterNames() {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
 
+        const generation = ++this.loadGeneration;
         const charactersFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, CHARACTERS_FOLDER);
 
         try {
@@ -110,8 +114,9 @@ export class NovelHighlightProvider {
             for (const [fileName] of mdFiles) {
                 try {
                     const fileUri = vscode.Uri.joinPath(charactersFolderUri, fileName);
-                    const fileData = await vscode.workspace.fs.readFile(fileUri);
-                    const fileContent = Buffer.from(fileData).toString('utf8');
+                    const document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUri.toString());
+                    const fileContent = document ? document.getText()
+                        : Buffer.from(await vscode.workspace.fs.readFile(fileUri)).toString('utf8');
 
                     // 解析 Front Matter
                     const parsed = parseFrontMatter(fileContent);
@@ -123,23 +128,29 @@ export class NovelHighlightProvider {
                             : String(data.name);
                         names.push(nameStr);
                     }
+                    names.push(...getCharacterAliases(fileContent));
                 } catch (error) {
                     Logger.warn(`无法读取人物文件 ${fileName}`, error);
                 }
             }
 
-            this.characterNamesCache = names;
+            if (generation !== this.loadGeneration) { return; }
+            this.characterNamesCache = [...new Set(names)];
             this.lastCacheUpdate = Date.now();
             Logger.debug(`从 characters/ 目录加载了 ${names.length} 个人物名称`, names);
         } catch (error) {
             // characters 目录不存在或为空
+            if (generation === this.loadGeneration && (error as { code?: string }).code === 'FileNotFound') {
+                this.characterNamesCache = [];
+                this.lastCacheUpdate = Date.now();
+            }
             Logger.debug('characters 目录不存在');
         }
     }
 
     // 监视 characters/ 目录变化
     private watchCharactersFolder() {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
@@ -174,6 +185,13 @@ export class NovelHighlightProvider {
         }
     }
 
+    public async refreshCharacterNames(): Promise<void> {
+        await this.loadCharacterNames();
+        await Promise.all(vscode.window.visibleTextEditors
+            .filter(editor => editor.document.languageId === 'markdown')
+            .map(editor => this.updateHighlights(editor)));
+    }
+
     // 获取人物名称列表（使用缓存）
     private async getCharacterNames(): Promise<string[]> {
         // 如果缓存为空，加载一次
@@ -196,7 +214,7 @@ export class NovelHighlightProvider {
         }
 
         // 生成缓存键（排序后的名称列表）
-        const cacheKey = [...validNames].sort().join('|');
+        const cacheKey = JSON.stringify([...validNames].sort());
 
         // 如果缓存命中，直接返回
         if (this.cachedCharacterTrie && this.cachedCharacterNamesCacheKey === cacheKey) {

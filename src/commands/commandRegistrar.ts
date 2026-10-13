@@ -1,3 +1,4 @@
+import { manageCharacterAliases } from './manageCharacterAliases';
 /**
  * 命令注册模块
  * 将所有命令注册逻辑集中管理
@@ -221,6 +222,10 @@ function registerCharacterCommands(deps: CommandRegistrarDeps): void {
         vscode.commands.registerCommand('noveler.generateRandomName', async () => {
             await generateRandomName();
         })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.manageCharacterAliases', manageCharacterAliases)
     );
 
     // 人物右键菜单命令

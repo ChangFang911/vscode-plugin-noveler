@@ -78,13 +78,22 @@ suite('CodeLensProvider Test Suite', () => {
     });
 
     suite('Character document actions', () => {
-        test('shows only formatting above the real character title', () => {
+        test('shows formatting and alias management above the real character title', () => {
             const document = new MockTextDocument(MockUri.file('/novel/characters/林舟.md'), '---\n# 人物备注\nname: 林舟\n---\n<!--\n# 隐藏标题\n-->\n# 林舟\n## 人物设定', 'markdown');
             const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
-            assert.strictEqual(lenses.length, 1);
+            assert.strictEqual(lenses.length, 2);
+            assert.strictEqual(lenses[1].command?.command, 'noveler.manageCharacterAliases');
+            assert.strictEqual(lenses[1].command?.arguments?.[0], document.uri);
             assert.strictEqual(lenses[0].range.start.line, 7);
             assert.strictEqual(lenses[0].command?.command, 'noveler.formatDocument');
             assert.strictEqual(lenses[0].command?.arguments?.[0], document.uri);
+        });
+        test('shows alias count and names with the correct document target', () => {
+            const document = new MockTextDocument(MockUri.file('/novel/characters/王明.md'), '---\nname: 王明\naliases: [小王, William]\n---\n# 王明', 'markdown');
+            const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
+            assert.strictEqual(lenses[1].command?.title, '管理别名（2）');
+            assert.strictEqual(lenses[1].command?.tooltip, '小王、William');
+            assert.strictEqual(lenses[1].command?.arguments?.[0], document.uri);
         });
         test('does not add chapter actions to references or non-Markdown documents', () => {
             for (const [file, language] of [['/novel/references/资料.md', 'markdown'], ['/novel/characters/人物.txt', 'plaintext']]) {

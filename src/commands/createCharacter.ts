@@ -96,6 +96,7 @@ export async function createCharacter(characterName: string): Promise<void> {
 
     const template = `---
 name: ${toYamlString(sanitizedName)}
+aliases: []
 gender: ${toYamlString(frontMatter.gender)}
 age: ${toYamlString(frontMatter.age)}
 appearance: ${toYamlString(frontMatter.appearance)}

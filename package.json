@@ -100,6 +100,10 @@
         "title": "删除章节"
       },
       {
+        "command": "noveler.manageCharacterAliases",
+        "title": "管理人物别名"
+      },
+      {
         "command": "noveler.renameCharacter",
         "title": "重命名人物"
       },
@@ -300,6 +304,11 @@
           "command": "noveler.deleteChapter",
           "when": "view == novelerView && viewItem == chapter",
           "group": "3_delete@1"
+        },
+        {
+          "command": "noveler.manageCharacterAliases",
+          "when": "view == novelerView && viewItem == character",
+          "group": "1_modification@2"
         },
         {
           "command": "noveler.renameCharacter",

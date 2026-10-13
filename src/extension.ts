@@ -23,7 +23,7 @@ import { PARAGRAPH_INDENT, VOLUME_TYPE_NAMES } from './constants';
 import { MigrationService } from './services/migrationService';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
-import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, CONFIG_FILE_NAME } from './constants';
+import { WORD_COUNT_DEBOUNCE_DELAY, HIGHLIGHT_DEBOUNCE_DELAY, README_UPDATE_DEBOUNCE_DELAY, CHAPTERS_FOLDER, CHARACTERS_FOLDER, CONFIG_FILE_NAME } from './constants';
 import { Logger, LogLevel } from './utils/logger';
 import { DoubtMarkService } from './services/doubtMarkService';
 import { DoubtMarkDecorationProvider } from './providers/doubtMarkDecorationProvider';
@@ -41,6 +41,7 @@ let sensitiveWordDiagnostic: SensitiveWordDiagnosticProvider;
 // 防抖器
 let wordCountDebouncer: Debouncer;
 let highlightDebouncer: Debouncer;
+let characterRefreshDebouncer: Debouncer;
 let readmeUpdateDebouncer: Debouncer;
 let isApplyingAutoLineBreak = false;
 
@@ -53,6 +54,7 @@ export async function activate(context: vscode.ExtensionContext) {
         // 初始化防抖器
         wordCountDebouncer = new Debouncer(WORD_COUNT_DEBOUNCE_DELAY);
         highlightDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
+        characterRefreshDebouncer = new Debouncer(HIGHLIGHT_DEBOUNCE_DELAY);
         readmeUpdateDebouncer = new Debouncer(README_UPDATE_DEBOUNCE_DELAY);
 
         // 初始化模板加载器
@@ -270,6 +272,20 @@ function registerEventListeners(
     novelerViewProvider: NovelerViewProvider,
     statsWebviewProvider: StatsWebviewProvider
 ): void {
+    const refreshCharacterDocument = (document: vscode.TextDocument) => {
+        const folder = vscode.workspace.workspaceFolders?.[0];
+        const characterPrefix = folder && vscode.Uri.joinPath(folder.uri, CHARACTERS_FOLDER).toString() + '/';
+        if (characterPrefix && document.uri.toString().startsWith(characterPrefix)
+            && document.uri.path.endsWith('.md')) {
+            characterRefreshDebouncer.debounce(() => {
+                highlightProvider.refreshCharacterNames().catch(error => Logger.warn('刷新人物别名失败', error));
+                novelerViewProvider.refresh();
+                codeLensProvider.refresh();
+            });
+        }
+    };
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(refreshCharacterDocument));
+
     // 监听文档变化，更新字数统计和高亮
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -284,6 +300,7 @@ function registerEventListeners(
                 updateWordCountDebounced(vscode.window.activeTextEditor);
                 updateHighlightsDebounced(vscode.window.activeTextEditor);
             }
+            refreshCharacterDocument(e.document);
             handleLineBreak(e);
         })
     );
@@ -636,5 +653,6 @@ export function deactivate() {
 
     wordCountDebouncer?.dispose();
     highlightDebouncer?.dispose();
+    characterRefreshDebouncer?.dispose();
     readmeUpdateDebouncer?.dispose();
 }

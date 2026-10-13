@@ -1,8 +1,13 @@
+import { CharacterNodesProvider } from '../../views/nodes/characterNodes';
+import { renameCharacter } from '../../commands/contextMenuCommands';
+import { NovelHighlightProvider } from '../../providers/highlightProvider';
+import { manageCharacterAliases } from '../../commands/manageCharacterAliases';
+import { getCharacterAliases } from '../../utils/characterAliases';
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { parse } from 'jsonc-parser';
-import { createDocument, applyDocumentChange, documentIO, fileExists } from '../../utils/documentOperations';
+import { createDocument, applyDocumentChange, documentIO, fileExists, patchFrontMatter } from '../../utils/documentOperations';
 import { parseFrontMatter } from '../../utils/frontMatterParser';
 import { patchJsoncFields } from '../../utils/settingsHelper';
 import { writeAndOpenChapter, runChapterCreation } from '../../commands/createChapter';
@@ -69,7 +74,242 @@ suite('Phase Two Data Safety Integration', () => {
     test('numeric character names remain strings', async () => {
         sandbox.stub(vscode.window, 'showQuickPick').resolves({ value: '主角' } as unknown as vscode.QuickPickItem);
         await createCharacter('123');
-        assert.strictEqual(parseFrontMatter(await readTestFile(file('characters', '123.md'))).data.name, '123');
+        const data = parseFrontMatter(await readTestFile(file('characters', '123.md'))).data;
+        assert.strictEqual(data.name, '123');
+        assert.deepStrictEqual(data.aliases, []);
+    });
+    async function aliasFixture(text = '---\r\n# 人物备注\r\nname: 王明\r\n---\r\n# 王明\r\n正文') {
+        await vscode.workspace.fs.createDirectory(file('characters'));
+        const uri = file('characters', '王明.md');
+        await writeTestFile(uri, text);
+        return uri;
+    }
+    async function openAliasPanel(uri: vscode.Uri) {
+        type AliasItem = vscode.QuickPickItem & { alias?: string; action?: string };
+        const change = new vscode.EventEmitter<string>();
+        const accept = new vscode.EventEmitter<void>();
+        const hide = new vscode.EventEmitter<void>();
+        const button = new vscode.EventEmitter<vscode.QuickPickItemButtonEvent<AliasItem>>();
+        let value = '';
+        const picker = {
+            items: [] as AliasItem[], activeItems: [] as AliasItem[], busy: false, enabled: true, shown: false, disposed: false,
+            get value() { return value; },
+            set value(input: string) { value = input; change.fire(input); },
+            onDidChangeValue: change.event, onDidAccept: accept.event,
+            onDidHide: hide.event, onDidTriggerItemButton: button.event,
+            show() { this.shown = true; },
+            dispose() { this.disposed = true; this.shown = false; }
+        };
+        sandbox.stub(vscode.window, 'createQuickPick').returns(picker as unknown as vscode.QuickPick<vscode.QuickPickItem>);
+        const pending = manageCharacterAliases({ resourceUri: uri });
+        const waitFor = async (condition: () => boolean) => {
+            for (let attempt = 0; attempt < 100 && !condition(); attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 1));
+            }
+            assert.ok(condition(), '别名面板未完成预期操作');
+        };
+        await waitFor(() => picker.shown);
+        return {
+            picker, hide, accept,
+            async add(alias: string) {
+                picker.value = alias;
+                accept.fire();
+                await waitFor(() => !picker.busy || picker.disposed);
+            },
+            async click(alias: string, tooltip: string) {
+                const item = picker.items.find(item => item.alias === alias)!;
+                assert.ok(item, `缺少别名：${alias}`);
+                const selectedButton = item.buttons?.find(button => button.tooltip === tooltip);
+                assert.ok(selectedButton);
+                button.fire({ item, button: selectedButton });
+                await waitFor(() => !picker.busy || picker.disposed);
+            },
+            async close() {
+                hide.fire();
+                await pending;
+                change.dispose(); accept.dispose(); hide.dispose(); button.dispose();
+            }
+        };
+    }
+    test('alias insertion into an old profile preserves dirty prose, comments and CRLF and is undoable', async () => {
+        const uri = await aliasFixture();
+        await applyDocumentChange(uri, text => text + '\r\n未保存正文');
+        const document = await vscode.workspace.openTextDocument(uri);
+        const original = document.getText();
+        const input = sandbox.spy(vscode.window, 'showInputBox');
+        const panel = await openAliasPanel(uri);
+        await panel.add(' William ');
+        assert.strictEqual(input.called, false);
+        assert.strictEqual(panel.picker.value, '');
+        assert.strictEqual(panel.picker.disposed, false);
+        assert.deepStrictEqual(getCharacterAliases(document.getText()), ['William']);
+        assert.ok(document.getText().includes('# 人物备注\r\n'));
+        assert.ok(document.getText().endsWith('# 王明\r\n正文\r\n未保存正文'));
+        assert.ok(!/(?<!\r)\n/.test(document.getText()));
+        assert.ok(!getCharacterAliases(await readTestFile(uri)).length);
+        await panel.close();
+        await vscode.window.showTextDocument(document);
+        await vscode.commands.executeCommand('undo');
+        assert.strictEqual(document.getText(), original);
+    });
+    test('alias edits merge changes made during input and do not edit the active other profile', async () => {
+        const uri = await aliasFixture();
+        const other = file('characters', '别人.md');
+        await writeTestFile(other, '# 别人\n保留正文');
+        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(other));
+        const panel = await openAliasPanel(uri);
+        panel.picker.value = 'William';
+        await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: ['小王'] }) + '\r\n新增正文');
+        await panel.add('William');
+        assert.deepStrictEqual(getCharacterAliases((await vscode.workspace.openTextDocument(uri)).getText()), ['小王', 'William']);
+        assert.ok((await vscode.workspace.openTextDocument(uri)).getText().endsWith('新增正文'));
+        assert.strictEqual((await vscode.workspace.openTextDocument(other)).getText(), '# 别人\n保留正文');
+        await panel.close();
+    });
+    test('existing aliases can be renamed and deleted through item buttons without changing prose', async () => {
+        const uri = await aliasFixture('---\nname: 王明\naliases: [小王, William]\n---\n# 王明\n小王遇见 William');
+        const panel = await openAliasPanel(uri);
+        sandbox.stub(vscode.window, 'showInputBox').callsFake(async () => { panel.hide.fire(); return '老王'; });
+        await panel.click('小王', '修改别名');
+        const document = await vscode.workspace.openTextDocument(uri);
+        assert.deepStrictEqual(getCharacterAliases(document.getText()), ['老王', 'William']);
+        assert.strictEqual(panel.picker.disposed, false);
+        await panel.click('William', '删除别名');
+        assert.deepStrictEqual(getCharacterAliases(document.getText()), ['老王']);
+        assert.ok(document.getText().endsWith('小王遇见 William'));
+        await panel.close();
+    });
+    for (const alias of ['王明', '小王', '   ']) {
+        test(`rejects invalid or duplicate alias ${JSON.stringify(alias)} without changing the profile`, async () => {
+            const original = '---\nname: 王明\naliases: [小王]\n---\n# 王明\n正文';
+            const uri = await aliasFixture(original);
+            const panel = await openAliasPanel(uri);
+            await panel.add(alias);
+            assert.strictEqual(panel.picker.items[0].action, undefined);
+            assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), original);
+            if (alias.trim()) { assert.ok(panel.picker.items[0].label.includes(alias === '王明' ? '本名' : '已存在')); }
+            await panel.close();
+        });
+    }
+    test('closing unsubmitted alias input does not insert a field into an old profile', async () => {
+        const uri = await aliasFixture();
+        const document = await vscode.workspace.openTextDocument(uri);
+        const original = document.getText();
+        const panel = await openAliasPanel(uri);
+        panel.picker.value = '尚未确认';
+        await panel.close();
+        assert.strictEqual(document.getText(), original);
+        assert.strictEqual(document.isDirty, false);
+    });
+    test('one panel supports consecutive additions and cancelling an edit keeps existing aliases', async () => {
+        const uri = await aliasFixture();
+        const panel = await openAliasPanel(uri);
+        await panel.add('小王');
+        await panel.add('William');
+        sandbox.stub(vscode.window, 'showInputBox').callsFake(async () => { panel.hide.fire(); return undefined; });
+        await panel.click('小王', '修改别名');
+        assert.deepStrictEqual(getCharacterAliases((await vscode.workspace.openTextDocument(uri)).getText()), ['小王', 'William']);
+        assert.strictEqual(panel.picker.disposed, false);
+        await panel.close();
+    });
+    test('rapid Enter and closing during an addition write once and finish the confirmed edit', async () => {
+        const uri = await aliasFixture();
+        const panel = await openAliasPanel(uri);
+        const apply = vscode.workspace.applyEdit.bind(vscode.workspace);
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        const edit = sandbox.stub(vscode.workspace, 'applyEdit').callsFake(async changes => {
+            await gate;
+            return apply(changes);
+        });
+        const adding = panel.add('小王');
+        panel.accept.fire();
+        const closing = panel.close();
+        release();
+        await Promise.all([adding, closing]);
+        assert.strictEqual(edit.callCount, 1);
+        assert.deepStrictEqual(getCharacterAliases((await vscode.workspace.openTextDocument(uri)).getText()), ['小王']);
+        assert.strictEqual(panel.picker.disposed, true);
+    });
+    for (const metadata of ['aliases: broken', 'aliases: [123]', 'aliases: [未闭合']) {
+        test(`malformed alias metadata is never overwritten: ${metadata}`, async () => {
+            const original = `---\nname: 王明\n${metadata}\n---\n# 王明\n正文`;
+            const uri = await aliasFixture(original);
+            const panel = await openAliasPanel(uri);
+            await panel.add('小王');
+            assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), original);
+            assert.ok((vscode.window.showErrorMessage as sinon.SinonStub).called);
+            await panel.close();
+        });
+    }
+    test('highlighting uses dirty aliases, prefers longer names and drops removed aliases after undo', async () => {
+        const uri = await aliasFixture('---\nname: 王明\naliases: [小王]\n---\n# 王明');
+        (ConfigService.getInstance as sinon.SinonStub).returns({ getHighlightStyle: () => ({}), getCharacters: () => [] } as unknown as ConfigService);
+        const chapterUri = file('chapters', '别名高亮.md');
+        await writeTestFile(chapterUri, '王明 小王 小王子 William <!-- 小王 --> 「小王」');
+        const chapter = await vscode.workspace.openTextDocument(chapterUri);
+        const decorations = sinon.spy();
+        const editor = { document: chapter, setDecorations: decorations } as unknown as vscode.TextEditor;
+        const provider = new NovelHighlightProvider();
+        const refresh = async () => {
+            await provider.refreshCharacterNames();
+            decorations.resetHistory();
+            await provider.updateHighlights(editor);
+            return (decorations.lastCall.args[1] as vscode.Range[]).map(range => chapter.getText(range));
+        };
+        try {
+            assert.deepStrictEqual(await refresh(), ['王明', '小王', '小王']);
+            await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: ['小王', '小王子', 'William'] }));
+            assert.deepStrictEqual(await refresh(), ['王明', '小王', '小王子', 'William']);
+            assert.deepStrictEqual(getCharacterAliases(await readTestFile(uri)), ['小王']);
+            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+            await vscode.commands.executeCommand('undo');
+            assert.deepStrictEqual(await refresh(), ['王明', '小王', '小王']);
+            await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: [] }));
+            assert.deepStrictEqual(await refresh(), ['王明']);
+        } finally { provider.dispose(); }
+    });
+    test('sidebar tooltip reflects unsaved aliases without adding extra people', async () => {
+        const uri = await aliasFixture();
+        await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: ['小王', 'William'] }));
+        const items = await new CharacterNodesProvider().getItems();
+        assert.strictEqual(items.length, 1);
+        assert.strictEqual(items[0].label, '王明');
+        assert.ok(items[0].tooltip?.includes('别名：小王、William'));
+        assert.strictEqual(items[0].resourceUri?.toString(), uri.toString());
+    });
+    test('character renaming preserves aliases and does not add the old name automatically', async () => {
+        const uri = await aliasFixture('---\nname: 王明\naliases: [小王, William]\n---\n# 王明\n正文');
+        sandbox.stub(vscode.window, 'showInputBox').resolves('王亮');
+        await renameCharacter({ resourceUri: uri } as NovelerTreeItem);
+        const text = (await vscode.workspace.openTextDocument(file('characters', '王亮.md'))).getText();
+        assert.strictEqual(parseFrontMatter(text).data.name, '王亮');
+        assert.deepStrictEqual(getCharacterAliases(text), ['小王', 'William']);
+    });
+    test('a stale alias selection cannot overwrite subsequent alias changes', async () => {
+        const uri = await aliasFixture('---\nname: 王明\naliases: [小王]\n---\n# 王明');
+        const panel = await openAliasPanel(uri);
+        sandbox.stub(vscode.window, 'showInputBox').callsFake(async () => {
+            panel.hide.fire();
+            await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: ['老王'] }));
+            return 'William';
+        });
+        await panel.click('小王', '修改别名');
+        assert.deepStrictEqual(getCharacterAliases((await vscode.workspace.openTextDocument(uri)).getText()), ['老王']);
+        assert.ok((vscode.window.showErrorMessage as sinon.SinonStub).called);
+        await panel.close();
+    });
+    test('a rejected alias edit leaves the original document intact and reports failure', async () => {
+        const uri = await aliasFixture();
+        const document = await vscode.workspace.openTextDocument(uri);
+        const original = document.getText();
+        const panel = await openAliasPanel(uri);
+        sandbox.stub(vscode.workspace, 'applyEdit').resolves(false);
+        await panel.add('小王');
+        assert.strictEqual(document.getText(), original);
+        assert.strictEqual(panel.picker.value, '小王');
+        assert.ok((vscode.window.showErrorMessage as sinon.SinonStub).called);
+        await panel.close();
     });
     test('creation refuses an existing file without changing it', async () => {
         const uri = file('chapters', '已有.md');

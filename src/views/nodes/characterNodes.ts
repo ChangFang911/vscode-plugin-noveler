@@ -1,3 +1,5 @@
+import { documentIO } from '../../utils/documentOperations';
+import { getCharacterAliases } from '../../utils/characterAliases';
 /**
  * 人物节点提供器
  */
@@ -12,7 +14,7 @@ export class CharacterNodesProvider {
     private static readonly FIRST_HEADING_REGEX = /^#\s+(.+)$/m;
 
     async getItems(): Promise<NovelerTreeItem[]> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return [];
         }
@@ -43,8 +45,10 @@ export class CharacterNodesProvider {
                 const filePath = vscode.Uri.joinPath(folderPath, filename);
 
                 try {
-                    const content = await vscode.workspace.fs.readFile(filePath);
-                    const text = Buffer.from(content).toString('utf8');
+                    const document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === filePath.toString());
+                    const text = document ? document.getText()
+                        : Buffer.from(await vscode.workspace.fs.readFile(filePath)).toString('utf8');
+                    const aliases = getCharacterAliases(text);
 
                     const name = this.extractCharacterName(text, filename);
                     const role = this.extractCharacterRole(text);
@@ -60,7 +64,7 @@ export class CharacterNodesProvider {
                         },
                         'character',
                         role || undefined,
-                        `${name}${role ? `\n角色：${role}` : ''}`
+                        `${name}${role ? `\n角色：${role}` : ''}${aliases.length ? `\n别名：${aliases.join('、')}` : ''}`
                     );
                     item.resourceUri = filePath;
                     items.push(item);
