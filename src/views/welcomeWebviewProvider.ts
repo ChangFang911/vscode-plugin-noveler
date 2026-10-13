@@ -4,13 +4,63 @@
  */
 
 import * as vscode from 'vscode';
+import { CONFIG_FILE_NAME } from '../constants';
+import { documentIO } from '../utils/documentOperations';
+import { Logger } from '../utils/logger';
+import { compareVersions, getReleaseUpdates, parseReleaseNotes, ReleaseNotes, renderReleaseNotes, escapeReleaseText } from '../utils/releaseNotes';
 
 const WELCOME_STATE_KEY = 'noveler.welcomeShown';
+const UPDATE_VERSION_KEY = 'noveler.lastNotifiedVersion';
 
 export class WelcomeWebviewProvider {
     private static currentPanel: vscode.WebviewPanel | undefined;
 
+    private updatesChecked = false;
+
     constructor(private context: vscode.ExtensionContext) {}
+
+    private get version(): string {
+        return String(this.context.extension?.packageJSON?.version ?? '未知版本');
+    }
+
+    private async readReleaseNotes(): Promise<ReleaseNotes[]> {
+        let data: Uint8Array;
+        try {
+            data = await documentIO.readFile(vscode.Uri.joinPath(this.context.extensionUri, 'CHANGELOG.md'));
+        } catch (error) {
+            if ((error as { code?: string }).code !== 'FileNotFound') { throw error; }
+            data = await documentIO.readFile(vscode.Uri.joinPath(this.context.extensionUri, 'changelog.md'));
+        }
+        return parseReleaseNotes(Buffer.from(data).toString('utf8'));
+    }
+
+    public async checkForUpdates(firstUse: boolean): Promise<void> {
+        if (this.updatesChecked || compareVersions(this.version, this.version) === undefined) { return; }
+        if (firstUse) {
+            await this.context.globalState.update(UPDATE_VERSION_KEY, this.version);
+            this.updatesChecked = true;
+            return;
+        }
+        const folder = documentIO.workspaceFolder();
+        if (!folder) { return; }
+        try { await documentIO.stat(vscode.Uri.joinPath(folder.uri, CONFIG_FILE_NAME)); }
+        catch (error) {
+            if ((error as { code?: string }).code !== 'FileNotFound') { Logger.warn('检查更新提醒的项目状态失败', error); }
+            return;
+        }
+        const previous = this.context.globalState.get<string>(UPDATE_VERSION_KEY);
+        const difference = previous ? compareVersions(this.version, previous) : undefined;
+        if (difference !== undefined && difference <= 0) { return; }
+        const updates = getReleaseUpdates(await this.readReleaseNotes(), previous, this.version);
+        await this.context.globalState.update(UPDATE_VERSION_KEY, this.version);
+        this.updatesChecked = true;
+        if (!updates.length) { return; }
+        const summary = [...new Set(updates.flatMap(release => release.changes.map(change => change.title)))].join('、');
+        const selected = await vscode.window.showInformationMessage(
+            `Noveler 已更新至 v${this.version}，包含${summary}。`, '查看更新', '稍后'
+        );
+        if (selected === '查看更新') { await this.show(false, updates); }
+    }
 
     /**
      * 检查是否应该显示欢迎页面
@@ -38,13 +88,28 @@ export class WelcomeWebviewProvider {
     /**
      * 显示欢迎页面
      */
-    public async show(autoShow = false): Promise<void> {
+    public async show(autoShow = false, updates?: ReleaseNotes[]): Promise<void> {
+        let releaseNotes = '';
+        try {
+            const releases = updates ?? (await this.readReleaseNotes()).filter(release =>
+                release.version === 'Unreleased'
+                    ? this.context.extensionMode === vscode.ExtensionMode?.Development
+                    : (compareVersions(release.version, this.version) ?? 1) <= 0);
+            releaseNotes = renderReleaseNotes(releases, updates ? '本次更新' : '版本更新');
+        } catch (error) {
+            Logger.warn('读取更新日志失败', error);
+            releaseNotes = '<section class="release-notes"><h2>版本更新</h2><p>更新日志暂时无法读取，请重新打开使用指南。</p></section>';
+        }
         const columnToShowIn = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
         if (WelcomeWebviewProvider.currentPanel) {
+            WelcomeWebviewProvider.currentPanel.webview.html = this.getHtmlContent(
+                WelcomeWebviewProvider.currentPanel.webview, autoShow, releaseNotes, updates !== undefined
+            );
             WelcomeWebviewProvider.currentPanel.reveal(columnToShowIn);
+            if (autoShow) { await this.markWelcomeShown(); }
             return;
         }
 
@@ -65,7 +130,7 @@ export class WelcomeWebviewProvider {
         // 设置 HTML 内容
         WelcomeWebviewProvider.currentPanel.webview.html = this.getHtmlContent(
             WelcomeWebviewProvider.currentPanel.webview,
-            autoShow
+            autoShow, releaseNotes, updates !== undefined
         );
 
         // 监听面板关闭
@@ -115,7 +180,7 @@ export class WelcomeWebviewProvider {
     /**
      * 生成 HTML 内容
      */
-    private getHtmlContent(webview: vscode.Webview, showDontShowAgain: boolean): string {
+    private getHtmlContent(webview: vscode.Webview, showDontShowAgain: boolean, releaseNotes: string, updatesMode: boolean): string {
         // 获取图片资源路径
         const imagesUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.context.extensionUri, 'images')
@@ -301,6 +366,17 @@ export class WelcomeWebviewProvider {
             color: var(--vscode-descriptionForeground);
             margin-top: 16px;
         }
+        .release-notes { margin: 24px 0; text-align: left; }
+        .release-notes h2 { font-size: 22px; margin-bottom: 16px; }
+        .release-notes details { padding: 16px; margin-bottom: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 8px; }
+        .release-notes summary { cursor: pointer; font-weight: bold; }
+        .release-notes h3 { margin: 16px 0 8px; font-size: 16px; }
+        .release-notes ul { padding-left: 24px; }
+        .release-notes li { margin-bottom: 8px; line-height: 1.6; }
+        .release-notes code { background: var(--vscode-textCodeBlock-background); padding: 2px 4px; }
+        .release-notes .release-details { border: 0; padding: 0; margin-top: 12px; }
+        .release-details > summary { color: var(--vscode-textLink-foreground); font-weight: normal; }
+        .release-notes .change-details { color: var(--vscode-descriptionForeground); margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -309,6 +385,7 @@ export class WelcomeWebviewProvider {
             <div class="logo">📖</div>
             <h1>欢迎使用 Noveler</h1>
             <p class="subtitle">专为中文小说创作设计的 VS Code 插件</p>
+            <a href="#release-notes">查看版本更新</a>
         </div>
 
         <!-- 功能预览区 -->
@@ -359,6 +436,7 @@ export class WelcomeWebviewProvider {
                 📂 打开现有项目
             </button>
         </div>
+        ${releaseNotes}
     </div>
 
     <div class="footer">
@@ -371,11 +449,12 @@ export class WelcomeWebviewProvider {
             <input type="checkbox" id="dontShowAgain" onchange="handleDontShowAgain(this.checked)" />
             <label for="dontShowAgain">不再显示此页面</label>
         </div>
-        <div class="version">Noveler v0.7.1</div>
+        <div class="version">Noveler v${escapeReleaseText(this.version)}</div>
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
+        ${updatesMode ? "document.getElementById('release-notes')?.scrollIntoView();" : ''}
 
         function createSampleProject() {
             vscode.postMessage({ command: 'createSampleProject' });

@@ -4,6 +4,7 @@ import YAML from 'yaml';
 export const documentIO = {
     workspaceFolder: (): vscode.WorkspaceFolder | undefined => vscode.workspace.workspaceFolders?.[0],
     stat: (uri: vscode.Uri): Thenable<vscode.FileStat> => vscode.workspace.fs.stat(uri),
+    readFile: (uri: vscode.Uri): Thenable<Uint8Array> => vscode.workspace.fs.readFile(uri),
     writeFile: (uri: vscode.Uri, content: Uint8Array): Thenable<void> => vscode.workspace.fs.writeFile(uri, content),
     save: (document: vscode.TextDocument): Thenable<boolean> => document.save(),
     delete: (uri: vscode.Uri, options: { recursive?: boolean; useTrash?: boolean }): Thenable<void> => vscode.workspace.fs.delete(uri, options)

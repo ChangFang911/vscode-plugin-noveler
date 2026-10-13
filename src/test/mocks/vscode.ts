@@ -464,6 +464,7 @@ export interface MockWindow {
     showInputBox: sinon.SinonStub;
     showQuickPick: sinon.SinonStub;
     createStatusBarItem: sinon.SinonStub;
+    createWebviewPanel: sinon.SinonStub;
     activeTextEditor: MockTextEditor | undefined;
     onDidChangeActiveTextEditor: MockEventEmitter<MockTextEditor | undefined>;
 }
@@ -477,6 +478,7 @@ export function createMockWindow(): MockWindow {
         showInputBox: sinon.stub().resolves(),
         showQuickPick: sinon.stub().resolves(),
         createStatusBarItem: sinon.stub().returns(statusBarItem),
+        createWebviewPanel: sinon.stub(),
         activeTextEditor: undefined,
         onDidChangeActiveTextEditor: new MockEventEmitter<MockTextEditor | undefined>()
     };
@@ -634,6 +636,9 @@ export interface VSCodeMock {
     CodeAction: typeof MockCodeAction;
     CodeActionKind: typeof MockCodeActionKind;
     EventEmitter: typeof MockEventEmitter;
+    ViewColumn: { One: number };
+    ExtensionMode: { Production: number; Development: number; Test: number };
+    FileType: { File: number; Directory: number; SymbolicLink: number };
     window: MockWindow;
     workspace: MockWorkspace;
     commands: MockCommands;
@@ -654,6 +659,9 @@ export function createVSCodeMock(workspacePath?: string): VSCodeMock {
         CodeAction: MockCodeAction,
         CodeActionKind: MockCodeActionKind,
         EventEmitter: MockEventEmitter,
+        ViewColumn: { One: 1 },
+        ExtensionMode: { Production: 1, Development: 2, Test: 3 },
+        FileType: { File: 1, Directory: 2, SymbolicLink: 64 },
         window: createMockWindow(),
         workspace: createMockWorkspace(workspacePath),
         commands: createMockCommands(),

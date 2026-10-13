@@ -19,7 +19,7 @@ import { initTemplateLoader } from '../../utils/templateLoader';
 import { ConfigService } from '../../services/configService';
 import { VolumeService } from '../../services/volumeService';
 import { VolumeInfo } from '../../types/volume';
-import { NovelerTreeItem } from '../../views/novelerViewProvider';
+import { NovelerTreeItem, NovelerViewProvider } from '../../views/novelerViewProvider';
 import { createTestWorkspace, readTestFile, removeTestWorkspace, writeTestFile } from './testWorkspace';
 
 suite('Phase Two Data Safety Integration', () => {
@@ -277,6 +277,13 @@ suite('Phase Two Data Safety Integration', () => {
         assert.strictEqual(items[0].label, '王明');
         assert.ok(items[0].tooltip?.includes('别名：小王、William'));
         assert.strictEqual(items[0].resourceUri?.toString(), uri.toString());
+        const shown = NovelerViewProvider.prototype.getTreeItem.call({} as NovelerViewProvider, items[0]);
+        assert.strictEqual(shown.resourceUri, undefined);
+        assert.strictEqual(shown.tooltip, items[0].tooltip);
+        assert.strictEqual(shown.command?.arguments?.[0].toString(), uri.toString());
+        assert.strictEqual(shown.contextValue, 'character');
+        assert.strictEqual(items[0].resourceUri?.toString(), uri.toString());
+        assert.strictEqual((shown.iconPath as vscode.ThemeIcon).id, 'person');
     });
     test('character renaming preserves aliases and does not add the old name automatically', async () => {
         const uri = await aliasFixture('---\nname: 王明\naliases: [小王, William]\n---\n# 王明\n正文');

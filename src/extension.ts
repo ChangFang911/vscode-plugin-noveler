@@ -245,7 +245,9 @@ export async function activate(context: vscode.ExtensionContext) {
         });
 
         // 检查是否需要显示欢迎页面（首次安装）
-        if (welcomeWebviewProvider.shouldShowWelcome()) {
+        const firstUse = welcomeWebviewProvider.shouldShowWelcome();
+        welcomeWebviewProvider.checkForUpdates(firstUse).catch(error => Logger.warn('检查版本更新失败', error));
+        if (firstUse) {
             // 延迟显示，确保 UI 完全加载
             setTimeout(async () => {
                 try {

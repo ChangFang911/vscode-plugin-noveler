@@ -5,6 +5,10 @@ src/**
 !src/data/**
 .git/**
 .github/**
+AGENTS.md
+CLAUDE.md
+.c8rc.json
+releases/**
 
 # 排除开发依赖，但保留生产依赖
 node_modules/@types/**

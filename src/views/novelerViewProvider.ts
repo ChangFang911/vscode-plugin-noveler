@@ -87,6 +87,10 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
      * 获取树节点
      */
     getTreeItem(element: NovelerTreeItem): vscode.TreeItem {
+        if (element.nodeType === NodeType.CharacterItem && element.resourceUri) {
+            // 文件路径留在操作对象中，避免 VS Code 给人物提示追加文件状态。
+            return { ...element, resourceUri: undefined, iconPath: new vscode.ThemeIcon('person') };
+        }
         return element;
     }
 
