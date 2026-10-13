@@ -49,6 +49,7 @@ suite('File Safety Integration', () => {
             await resolve({ fileUri: uri, lineNumber: 0, content: '检查伏笔', resolved: false });
             const document = await vscode.workspace.openTextDocument(uri);
             assert.strictEqual(document.getText(), enabled ? '  正文\n下一段\n未保存内容' : '  正文 <!--✓ 检查伏笔 -->\n下一段\n未保存内容');
+            await vscode.window.showTextDocument(document);
             await vscode.commands.executeCommand('undo');
             assert.strictEqual(document.getText(), original + '\n未保存内容');
         });
@@ -102,6 +103,7 @@ suite('File Safety Integration', () => {
         assert.strictEqual(document.getText(), original);
         await service.deleteMark(marks()[2]);
         assert.strictEqual(document.getText(), '  正文 <!--? 重复 --> <!--✓ 已完成 -->\n结尾');
+        await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand('undo');
         assert.strictEqual(document.getText(), original);
     });
@@ -118,6 +120,7 @@ suite('File Safety Integration', () => {
             await service.resolveAll(autoDelete);
             assert.strictEqual(document.getText(), autoDelete ? '正文 <!--✓ 保留 -->\n结尾'
                 : '正文 <!--✓ 第一项 --> <!--✓ 保留 --> <!--✓ 第三项 -->\n<!--✓ 第四项 --> <!--✓ 第五项 -->\n结尾');
+            await vscode.window.showTextDocument(document);
             await vscode.commands.executeCommand('undo');
             assert.strictEqual(document.getText(), original);
         });
@@ -133,6 +136,7 @@ suite('File Safety Integration', () => {
             fileUri: uri, fileName: '清理同行待办', id: `${mark.lineNumber}:${mark.startCharacter}`, documentVersion: document.version })));
         await service.deleteAllResolved();
         assert.strictEqual(document.getText(), '正文 <!--? 保留 --> 结尾\n末段');
+        await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand('undo');
         assert.strictEqual(document.getText(), original);
     });
