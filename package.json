@@ -434,6 +434,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "node esbuild.js --production",
+    "package:vsix": "node scripts/package-vsix.js",
     "compile-watch": "node esbuild.js --watch",
     "pretest": "npm run compile",
     "test": "node ./out/test/runTest.js",

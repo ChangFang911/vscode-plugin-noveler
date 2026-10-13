@@ -18,6 +18,28 @@ export async function readTestFile(uri: vscode.Uri): Promise<string> {
     return Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8');
 }
 
+export async function undoDocumentChange(document: vscode.TextDocument, expected: string): Promise<void> {
+    await vscode.window.showTextDocument(document);
+    await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = (error?: unknown) => {
+            if (settled) { return; }
+            settled = true;
+            clearTimeout(timer);
+            listener.dispose();
+            if (error) { reject(error); } else { resolve(); }
+        };
+        const check = () => {
+            if (document.getText() === expected) { finish(); }
+        };
+        const listener = vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document === document) { check(); }
+        });
+        const timer = setTimeout(() => finish(new Error('撤销未恢复预期文档内容')), 3000);
+        vscode.commands.executeCommand('undo').then(check, finish);
+    });
+}
+
 export async function removeTestWorkspace(root: vscode.Uri): Promise<void> {
     for (const document of vscode.workspace.textDocuments) {
         if (document.uri.toString().startsWith(root.toString() + '/') && document.isDirty) {

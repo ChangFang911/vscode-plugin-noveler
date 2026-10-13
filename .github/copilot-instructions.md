@@ -6,7 +6,7 @@
 默认模板位于 templates/default-config.jsonc。命令声明在 package.json。
 
 使用 npm run compile 编译、npm run lint 检查、npm run test:unit 运行单元测试，
-npm test 运行需要桌面环境的 VS Code 扩展宿主测试。发布打包使用 npm run package。
+npm test 运行需要桌面环境的 VS Code 扩展宿主测试。生产编译使用 npm run package，发布安装包使用 npm run package:vsix，统一输出 releases/Noveler-版本号.vsix，并校验图标尺寸。
 
 保持修改聚焦，保留用户已有改动；修改行为时同步使用文档和必要的回归测试。
 默认中文沟通。

@@ -20,7 +20,7 @@ import { ConfigService } from '../../services/configService';
 import { VolumeService } from '../../services/volumeService';
 import { VolumeInfo } from '../../types/volume';
 import { NovelerTreeItem, NovelerViewProvider } from '../../views/novelerViewProvider';
-import { createTestWorkspace, readTestFile, removeTestWorkspace, writeTestFile } from './testWorkspace';
+import { createTestWorkspace, readTestFile, removeTestWorkspace, writeTestFile, undoDocumentChange } from './testWorkspace';
 
 suite('Phase Two Data Safety Integration', () => {
     let root: vscode.Uri;
@@ -244,6 +244,9 @@ suite('Phase Two Data Safety Integration', () => {
     }
     test('highlighting uses dirty aliases, prefers longer names and drops removed aliases after undo', async () => {
         const uri = await aliasFixture('---\nname: 王明\naliases: [小王]\n---\n# 王明');
+        const character = await vscode.workspace.openTextDocument(uri);
+        const original = character.getText();
+        await vscode.window.showTextDocument(character);
         (ConfigService.getInstance as sinon.SinonStub).returns({ getHighlightStyle: () => ({}), getCharacters: () => [] } as unknown as ConfigService);
         const chapterUri = file('chapters', '别名高亮.md');
         await writeTestFile(chapterUri, '王明 小王 小王子 William <!-- 小王 --> 「小王」');
@@ -262,8 +265,7 @@ suite('Phase Two Data Safety Integration', () => {
             await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: ['小王', '小王子', 'William'] }));
             assert.deepStrictEqual(await refresh(), ['王明', '小王', '小王子', 'William']);
             assert.deepStrictEqual(getCharacterAliases(await readTestFile(uri)), ['小王']);
-            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
-            await vscode.commands.executeCommand('undo');
+            await undoDocumentChange(character, original);
             assert.deepStrictEqual(await refresh(), ['王明', '小王', '小王']);
             await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: [] }));
             assert.deepStrictEqual(await refresh(), ['王明']);

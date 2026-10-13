@@ -25,6 +25,9 @@ npm run compile-watch
 # 生产打包（用于发布）
 npm run package
 
+# 生成安装包（统一命名为 releases/Noveler-版本号.vsix，并检查图标尺寸）
+npm run package:vsix
+
 # 代码检查
 npm run lint
 ```

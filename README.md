@@ -644,9 +644,11 @@ npm run compile
 npm run lint
 npm run test:unit
 npm test
+npm run package:vsix
 ```
 
 `test:unit` 在 Node 中运行单元测试，`npm test` 启动真实 VS Code 扩展宿主，需桌面环境。
+`package:vsix` 检查插件图标尺寸并生成 `releases/Noveler-版本号.vsix`，同时输出 SHA-256 校验文件。图标的宽、高均不得超过 1024 像素。
 可以设置 `NOVELER_TEST_VSCODE_EXECUTABLE` 指向本机 VS Code 可执行文件；未设置时测试工具会下载 VS Code。
 macOS 的受限沙箱无法用于启动图形测试宿主，测试脚本会提前报错，避免触发 Electron 崩溃弹窗。此时从桌面终端运行扩展宿主测试；`test:unit` 可在受限环境中运行。
 手动调试按 F5，启动目录见 `.vscode/launch.json`。
