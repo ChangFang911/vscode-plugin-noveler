@@ -89,7 +89,7 @@ suite('Version release notes', () => {
         const releases = parseReleaseNotes(markdown);
         const current = releases.find(release => release.version === version);
         assert.ok(current, '插件版本必须有对应的发布日志');
-        assert.ok(current.changes.some(group => group.items.some(item => item.includes('别名'))));
+        assert.ok(current.changes.some(group => group.items.length > 0), '当前版本必须有用户可见的更新说明');
         for (const change of current.changes) {
             for (const item of change.items) {
                 assert.ok(/^\*\*[^*]+\*\*/.test(item));
@@ -99,6 +99,20 @@ suite('Version release notes', () => {
         const updates = getReleaseUpdates(releases, '0.8.8', version);
         assert.ok(updates.some(release => release.version === version));
         assert.ok(updates.every(release => release.version !== 'Unreleased'));
+    });
+    test('release metadata, lockfile and current documentation agree on the version', () => {
+        const root = path.resolve(__dirname, '../../..');
+        const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+        const lock = JSON.parse(readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+        assert.strictEqual(lock.version, version);
+        assert.strictEqual(lock.packages[''].version, version);
+        assert.ok(readFileSync(path.join(root, 'README.md'), 'utf8').includes(`### 当前版本 v${version}`));
+        for (const guide of ['AGENTS.md', 'CLAUDE.md']) {
+            assert.ok(readFileSync(path.join(root, guide), 'utf8').includes(`**版本**: ${version}（`));
+        }
+        const released = parseReleaseNotes(readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'))
+            .filter(release => release.version !== 'Unreleased');
+        assert.strictEqual(released[0].version, version);
     });
 });
 

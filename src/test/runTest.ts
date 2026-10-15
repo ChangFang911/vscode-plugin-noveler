@@ -17,7 +17,7 @@ async function main() {
             'files.autoSave': 'off'
         }));
         // The folder containing the Extension Manifest package.json
-        const extensionDevelopmentPath = path.resolve(__dirname, '../../');
+        const extensionDevelopmentPath = process.env.NOVELER_TEST_EXTENSION_PATH || path.resolve(__dirname, '../../');
 
         // The path to the extension test script
         const extensionTestsPath = path.resolve(__dirname, './suite/index');

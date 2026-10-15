@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { applyEdits, modify } from 'jsonc-parser';
 import { loadTemplates } from '../utils/templateLoader';
 import { formatDateTime } from '../utils/dateFormatter';
 import { handleError, handleSuccess } from '../utils/errorHandler';
@@ -182,24 +183,16 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 `;
 
         // 提取 noveler 配置部分（去掉最外层的 { "version": "...", "noveler": { ... } }）
-        let novelerConfigText = templateText
+        const novelerConfigText = templateText
             .substring(templateText.indexOf('"noveler"'))
             .replace(/^\s*"noveler":\s*{/, '')  // 去掉 "noveler": {
             .replace(/}\s*}\s*$/, '');  // 去掉末尾的两个 } }（noveler 的 } 和整个 JSON 的 }）
 
-        // 根据用户选择修改分卷配置
-        if (enableVolumes) {
-            // 启用分卷：设置 enabled: true, folderStructure: "nested"
-            novelerConfigText = novelerConfigText
-                .replace(/"enabled":\s*false/, '"enabled": true')
-                .replace(/"folderStructure":\s*"flat"/, '"folderStructure": "nested"')
-                .replace(/"numberFormat":\s*"arabic"/, `"numberFormat": "${numberFormat}"`);
-        } else {
-            // 不启用分卷：保持默认 enabled: false, folderStructure: "flat"
-            // 无需修改，模板默认值已经是这样
+        let novelConfigText = projectMeta + novelerConfigText + '\n  }\n}';
+        for (const [key, value] of Object.entries({ enabled: enableVolumes,
+            folderStructure: enableVolumes ? 'nested' : 'flat', numberFormat })) {
+            novelConfigText = applyEdits(novelConfigText, modify(novelConfigText, ['noveler', 'volumes', key], value, {}));
         }
-
-        const novelConfigText = projectMeta + novelerConfigText + '\n  }\n}';
 
         // configUri 已在前面声明
         await writeInitialFile(configUri, novelConfigText, configExists);

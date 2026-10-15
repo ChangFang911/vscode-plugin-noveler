@@ -253,12 +253,14 @@ suite('Sensitive Word Safety Integration', () => {
         const document = await chapter('小王子来了');
         diagnosticProvider.updateDiagnostics(document);
         const collection = createCollection('noveler-safety-native');
+        const values = [...diagnostics];
+        assert.strictEqual(values.length, 1);
         const registration = vscode.languages.registerCodeActionsProvider('markdown', new SensitiveWordCodeActionProvider(diagnosticProvider));
         try {
-            collection.set(document.uri, diagnostics);
+            collection.set(document.uri, values);
             await vscode.window.showTextDocument(document);
             const result = await vscode.commands.executeCommand<vscode.CodeAction[]>('vscode.executeCodeActionProvider',
-                document.uri, diagnostics[0].range, vscode.CodeActionKind.QuickFix.value);
+                document.uri, values[0].range, vscode.CodeActionKind.QuickFix.value);
             const fix = result.find(value => value.command?.command === 'noveler.applySensitiveWordFix' && value.title.startsWith('删除'));
             assert.ok(fix?.command, '灯泡应在真实宿主诊断往返后仍提供安全删除入口');
             await vscode.commands.executeCommand(fix.command.command, ...fix.command.arguments!);

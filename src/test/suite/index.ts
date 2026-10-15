@@ -17,8 +17,11 @@ export function run(): Promise<void> {
         // Use glob to find test files
         const sourceRoot = path.resolve(testsRoot, '../../../src/test/suite');
         const testFiles = globSync('**/**.test.js', { cwd: testsRoot }).filter(file =>
-            existsSync(path.join(sourceRoot, file.replace(/\.js$/, '.ts')))
-        );
+            (process.env.NOVELER_TEST_SMOKE_ONLY === '1' ? file === 'extension.test.js'
+                : file.endsWith('.integration.test.js') || file === 'extension.test.js')
+            && existsSync(path.join(sourceRoot, file.replace(/\.js$/, '.ts')))
+        ).sort((a, b) => Number(b === 'extension.test.js') - Number(a === 'extension.test.js') || a.localeCompare(b));
+        if (!testFiles.length) { reject(new Error('未发现扩展宿主测试，拒绝空跑')); return; }
 
         // Add files to the test suite
         testFiles.forEach((f: string) => mocha.addFile(path.resolve(testsRoot, f)));

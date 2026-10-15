@@ -1,6 +1,9 @@
 # 开发文件和目录
 .vscode/**
 .vscode-test/**
+coverage/**
+.c8-temp/**
+.nyc_output/**
 src/**
 !src/data/**
 .git/**

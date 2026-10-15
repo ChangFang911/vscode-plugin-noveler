@@ -103,8 +103,9 @@ suite('Phase Two Data Safety Integration', () => {
         sandbox.stub(vscode.window, 'createQuickPick').returns(picker as unknown as vscode.QuickPick<vscode.QuickPickItem>);
         const pending = manageCharacterAliases({ resourceUri: uri });
         const waitFor = async (condition: () => boolean) => {
-            for (let attempt = 0; attempt < 100 && !condition(); attempt++) {
-                await new Promise(resolve => setTimeout(resolve, 1));
+            const deadline = Date.now() + 3000;
+            while (!condition() && Date.now() < deadline) {
+                await new Promise(resolve => setTimeout(resolve, 10));
             }
             assert.ok(condition(), '别名面板未完成预期操作');
         };

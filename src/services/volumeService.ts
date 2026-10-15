@@ -515,9 +515,10 @@ export class VolumeService {
      * 获取章节所属的卷
      */
     public getVolumeForChapter(chapterPath: string): VolumeInfo | undefined {
+        const chapterFolder = path.resolve(path.dirname(chapterPath));
         for (const volume of this.volumes) {
             const chapterFileName = path.basename(chapterPath);
-            if (volume.chapters.includes(chapterFileName)) {
+            if (path.resolve(volume.folderPath) === chapterFolder && volume.chapters.includes(chapterFileName)) {
                 return volume;
             }
         }

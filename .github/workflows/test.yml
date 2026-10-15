@@ -31,3 +31,6 @@ jobs:
 
       - name: Run tests
         run: xvfb-run -a npm test
+
+      - name: Test packaged extension
+        run: xvfb-run -a npm run test:package
