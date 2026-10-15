@@ -110,7 +110,11 @@ suite('Update notifications and guide', () => {
     let read: sinon.SinonStub;
     let panel: vscode.WebviewPanel;
     let disposed: vscode.EventEmitter<void>;
+    let previousPanel: vscode.WebviewPanel | undefined;
     setup(() => {
+        const panels = WelcomeWebviewProvider as unknown as { currentPanel?: vscode.WebviewPanel };
+        previousPanel = panels.currentPanel;
+        panels.currentPanel = undefined;
         sandbox = sinon.createSandbox();
         state = new Map();
         context = { extensionUri: vscode.Uri.file('/extension'), extension: { packageJSON: { version: '0.10.0' } },
@@ -133,6 +137,7 @@ suite('Update notifications and guide', () => {
     teardown(() => {
         panel?.dispose(); disposed?.dispose();
         context?.subscriptions.forEach(subscription => subscription.dispose());
+        (WelcomeWebviewProvider as unknown as { currentPanel?: vscode.WebviewPanel }).currentPanel = previousPanel;
         sandbox.restore();
     });
     test('new users record their initial version without an extra update notification', async () => {

@@ -10,6 +10,7 @@ import { Logger } from '../utils/logger';
 export class SensitiveWordDiagnosticProvider {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private service: SensitiveWordService;
+    private snapshots = new Map<string, { document: vscode.TextDocument; version: number; diagnostics: vscode.Diagnostic[] }>();
     private debounceTimer: NodeJS.Timeout | null = null;
     private readonly DEBOUNCE_DELAY = 500; // 500ms 防抖
     private statusBarItem: vscode.StatusBarItem | null = null;
@@ -79,6 +80,7 @@ export class SensitiveWordDiagnosticProvider {
         context.subscriptions.push(
             vscode.workspace.onDidCloseTextDocument((document) => {
                 this.diagnosticCollection.delete(document.uri);
+                this.snapshots.delete(document.uri.toString());
             })
         );
 
@@ -132,6 +134,7 @@ export class SensitiveWordDiagnosticProvider {
                 diagnostics.push(diagnostic);
             }
 
+            this.snapshots.set(document.uri.toString(), { document, version: document.version, diagnostics });
             this.diagnosticCollection.set(document.uri, diagnostics);
 
             // 更新状态栏
@@ -140,6 +143,13 @@ export class SensitiveWordDiagnosticProvider {
             Logger.error('更新敏感词诊断失败', error);
             this.updateStatusBar(0);
         }
+    }
+
+    public isCurrentDiagnostic(document: vscode.TextDocument, diagnostic: vscode.Diagnostic): boolean {
+        const snapshot = this.snapshots.get(document.uri.toString());
+        return snapshot?.document === document && snapshot.version === document.version
+            && snapshot.diagnostics.some(current => current.message === diagnostic.message
+                && current.range.start.isEqual(diagnostic.range.start) && current.range.end.isEqual(diagnostic.range.end));
     }
 
     /**
@@ -229,6 +239,7 @@ export class SensitiveWordDiagnosticProvider {
      * 清除所有诊断
      */
     public clearAll(): void {
+        this.snapshots.clear();
         this.diagnosticCollection.clear();
         this.sessionIgnoreList.clear();
         this.updateStatusBar(0);
@@ -253,6 +264,7 @@ export class SensitiveWordDiagnosticProvider {
      * 释放资源
      */
     public dispose(): void {
+        this.snapshots.clear();
         this.diagnosticCollection.dispose();
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);

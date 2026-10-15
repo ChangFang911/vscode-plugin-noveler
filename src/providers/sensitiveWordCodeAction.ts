@@ -1,10 +1,34 @@
 import * as vscode from 'vscode';
+import { SensitiveWordDiagnosticProvider } from './sensitiveWordDiagnostic';
+
+export interface SensitiveWordFix {
+    uri: string;
+    version: number;
+    start: number;
+    end: number;
+    word: string;
+    replacement: string;
+}
+
+export async function applySensitiveWordFix(fix: SensitiveWordFix): Promise<void> {
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(fix.uri));
+    if (document.version !== fix.version || document.getText().slice(fix.start, fix.end) !== fix.word) {
+        vscode.window.showWarningMessage('正文已变化，请重新选择敏感词处理操作');
+        return;
+    }
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, new vscode.Range(document.positionAt(fix.start), document.positionAt(fix.end)), fix.replacement);
+    if (!await vscode.workspace.applyEdit(edit)) {
+        throw new Error('敏感词修改未完成，请重试');
+    }
+}
 
 /**
  * 敏感词快速修复提供器
  * 提供敏感词的快速修复建议
  */
 export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvider {
+    constructor(private readonly diagnosticProvider: SensitiveWordDiagnosticProvider) {}
     public static readonly providedCodeActionKinds = [
         vscode.CodeActionKind.QuickFix
     ];
@@ -27,6 +51,7 @@ export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvide
         // 只处理敏感词相关的诊断
         const sensitiveWordDiagnostics = context.diagnostics.filter(
             diag => diag.source === 'Noveler' && diag.code === 'sensitive-word'
+                && this.diagnosticProvider.isCurrentDiagnostic(document, diag)
         );
 
         for (const diagnostic of sensitiveWordDiagnostics) {
@@ -100,8 +125,7 @@ export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvide
             vscode.CodeActionKind.QuickFix
         );
 
-        action.edit = new vscode.WorkspaceEdit();
-        action.edit.delete(document.uri, diagnostic.range);
+        action.command = this.createFixCommand(document, diagnostic, '');
         action.diagnostics = [diagnostic];
 
         return action;
@@ -124,11 +148,19 @@ export class SensitiveWordCodeActionProvider implements vscode.CodeActionProvide
             vscode.CodeActionKind.QuickFix
         );
 
-        action.edit = new vscode.WorkspaceEdit();
-        action.edit.replace(document.uri, diagnostic.range, asterisks);
+        action.command = this.createFixCommand(document, diagnostic, asterisks);
         action.diagnostics = [diagnostic];
 
         return action;
+    }
+
+    private createFixCommand(document: vscode.TextDocument, diagnostic: vscode.Diagnostic, replacement: string): vscode.Command {
+        const fix: SensitiveWordFix = {
+            uri: document.uri.toString(), version: document.version,
+            start: document.offsetAt(diagnostic.range.start), end: document.offsetAt(diagnostic.range.end),
+            word: document.getText(diagnostic.range), replacement
+        };
+        return { command: 'noveler.applySensitiveWordFix', title: '处理敏感词', arguments: [fix] };
     }
 
     /**

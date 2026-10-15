@@ -38,7 +38,7 @@ export class TrieTree {
 
         let node = this.root;
 
-        for (const char of word) {
+        for (const char of word.split('')) {
             if (!node.children.has(char)) {
                 node.children.set(char, new TrieNode());
             }
@@ -128,7 +128,7 @@ export class TrieTree {
     has(word: string): boolean {
         let node = this.root;
 
-        for (const char of word) {
+        for (const char of word.split('')) {
             const next = node.children.get(char);
             if (!next) {
                 return false;

@@ -149,7 +149,7 @@ suite('Phase Two Data Safety Integration', () => {
         assert.ok(!getCharacterAliases(await readTestFile(uri)).length);
         await panel.close();
         await vscode.window.showTextDocument(document);
-        await vscode.commands.executeCommand('undo');
+        await undoDocumentChange(document, original);
         assert.strictEqual(document.getText(), original);
     });
     test('alias edits merge changes made during input and do not edit the active other profile', async () => {
@@ -270,6 +270,54 @@ suite('Phase Two Data Safety Integration', () => {
             await applyDocumentChange(uri, text => patchFrontMatter(text, { aliases: [] }));
             assert.deepStrictEqual(await refresh(), ['王明']);
         } finally { provider.dispose(); }
+    });
+    test('a character refresh waits for newer overlapping loads before returning', async () => {
+        const uri = await aliasFixture('---\nname: 王明\naliases: [小王]\n---\n# 王明');
+        (ConfigService.getInstance as sinon.SinonStub).returns({ getHighlightStyle: () => ({}), getCharacters: () => [] } as unknown as ConfigService);
+        const provider = new NovelHighlightProvider();
+        await provider.refreshCharacterNames();
+        let firstStarted!: () => void;
+        let newestStarted!: () => void;
+        let releaseFirst!: () => void;
+        let releaseNewest!: () => void;
+        const first = new Promise<void>(resolve => { firstStarted = resolve; });
+        const newest = new Promise<void>(resolve => { newestStarted = resolve; });
+        const firstGate = new Promise<void>(resolve => { releaseFirst = resolve; });
+        const newestGate = new Promise<void>(resolve => { releaseNewest = resolve; });
+        const read = documentIO.readFile;
+        let reads = 0;
+        sandbox.stub(documentIO, 'readFile').callsFake(async candidate => {
+            const bytes = await read(candidate);
+            if (candidate.toString() === uri.toString()) {
+                if (++reads === 1) { firstStarted(); await firstGate; }
+                else { newestStarted(); await newestGate; }
+            }
+            return bytes;
+        });
+        let completed = false;
+        const earlier = provider.refreshCharacterNames().then(() => { completed = true; });
+        let later: Promise<void> | undefined;
+        try {
+            await first;
+            await writeTestFile(uri, '---\nname: 王明\naliases: [小王子]\n---\n# 王明');
+            later = provider.refreshCharacterNames();
+            await newest;
+            releaseFirst();
+            await new Promise<void>(resolve => setImmediate(resolve));
+            assert.strictEqual(completed, false, '刷新必须等待更新一轮的加载完成');
+            releaseNewest();
+            await Promise.all([earlier, later]);
+            const chapterUri = file('chapters', '并发高亮.md');
+            await writeTestFile(chapterUri, '小王子 小王');
+            const chapter = await vscode.workspace.openTextDocument(chapterUri);
+            const decorations = sinon.spy();
+            await provider.updateHighlights({ document: chapter, setDecorations: decorations } as unknown as vscode.TextEditor);
+            assert.deepStrictEqual((decorations.lastCall.args[1] as vscode.Range[]).map(range => chapter.getText(range)), ['小王子']);
+        } finally {
+            releaseFirst(); releaseNewest();
+            await Promise.all([earlier, later]);
+            provider.dispose();
+        }
     });
     test('sidebar tooltip reflects unsaved aliases without adding extra people', async () => {
         const uri = await aliasFixture();
@@ -566,7 +614,7 @@ suite('Phase Two Data Safety Integration', () => {
         await updateReadme(true);
         assert.ok(document.getText().includes('未保存备注ABC123'));
         assert.ok(document.getText().includes('[开篇](chapters/第01章.md)'));
-        await vscode.commands.executeCommand('undo');
+        await undoDocumentChange(document, before);
         assert.strictEqual(document.getText(), before);
     });
     test('README example headings, comments and unrelated sections are preserved', async () => {

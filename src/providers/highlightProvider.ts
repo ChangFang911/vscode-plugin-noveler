@@ -35,6 +35,7 @@ export class NovelHighlightProvider {
     private characterNamesCache: string[] = [];
     private lastCacheUpdate = 0;
     private loadGeneration = 0;
+    private characterNamesLoad?: Promise<void>;
 
     // Trie 树缓存（替代正则）
     private cachedCharacterTrie: SimpleTrieTree | null = null;
@@ -89,7 +90,20 @@ export class NovelHighlightProvider {
     }
 
     // 从 characters/ 目录加载所有人物名称
-    private async loadCharacterNames() {
+    private loadCharacterNames(): Promise<void> {
+        this.characterNamesLoad = this.readCharacterNames();
+        return this.characterNamesLoad;
+    }
+
+    private async waitForCharacterNames(): Promise<void> {
+        let pending: Promise<void> | undefined;
+        do {
+            pending = this.characterNamesLoad;
+            await pending;
+        } while (pending !== this.characterNamesLoad);
+    }
+
+    private async readCharacterNames() {
         const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
@@ -116,7 +130,7 @@ export class NovelHighlightProvider {
                     const fileUri = vscode.Uri.joinPath(charactersFolderUri, fileName);
                     const document = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === fileUri.toString());
                     const fileContent = document ? document.getText()
-                        : Buffer.from(await vscode.workspace.fs.readFile(fileUri)).toString('utf8');
+                        : Buffer.from(await documentIO.readFile(fileUri)).toString('utf8');
 
                     // 解析 Front Matter
                     const parsed = parseFrontMatter(fileContent);
@@ -186,7 +200,8 @@ export class NovelHighlightProvider {
     }
 
     public async refreshCharacterNames(): Promise<void> {
-        await this.loadCharacterNames();
+        this.loadCharacterNames();
+        await this.waitForCharacterNames();
         await Promise.all(vscode.window.visibleTextEditors
             .filter(editor => editor.document.languageId === 'markdown')
             .map(editor => this.updateHighlights(editor)));
@@ -198,6 +213,7 @@ export class NovelHighlightProvider {
         if (this.characterNamesCache.length === 0 && this.lastCacheUpdate === 0) {
             await this.loadCharacterNames();
         }
+        await this.waitForCharacterNames();
         return this.characterNamesCache;
     }
 

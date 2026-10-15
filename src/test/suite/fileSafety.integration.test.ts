@@ -12,7 +12,7 @@ import { registerAllCommands, CommandRegistrarDeps } from '../../commands/comman
 import { registerDoubtMarkCommands } from '../../commands/doubtMarkCommands';
 import { DoubtMarkNodesProvider } from '../../views/nodes/doubtMarkNodes';
 import { DoubtMarkCodeLensProvider } from '../../providers/doubtMarkCodeLensProvider';
-import { createTestWorkspace, readTestFile, removeTestWorkspace, writeTestFile } from './testWorkspace';
+import { createTestWorkspace, readTestFile, removeTestWorkspace, undoDocumentChange, writeTestFile } from './testWorkspace';
 
 suite('File Safety Integration', () => {
     let root: vscode.Uri;
@@ -50,7 +50,7 @@ suite('File Safety Integration', () => {
             const document = await vscode.workspace.openTextDocument(uri);
             assert.strictEqual(document.getText(), enabled ? '  正文\n下一段\n未保存内容' : '  正文 <!--✓ 检查伏笔 -->\n下一段\n未保存内容');
             await vscode.window.showTextDocument(document);
-            await vscode.commands.executeCommand('undo');
+            await undoDocumentChange(document, original + '\n未保存内容');
             assert.strictEqual(document.getText(), original + '\n未保存内容');
         });
     }
@@ -104,7 +104,7 @@ suite('File Safety Integration', () => {
         await service.deleteMark(marks()[2]);
         assert.strictEqual(document.getText(), '  正文 <!--? 重复 --> <!--✓ 已完成 -->\n结尾');
         await vscode.window.showTextDocument(document);
-        await vscode.commands.executeCommand('undo');
+        await undoDocumentChange(document, original);
         assert.strictEqual(document.getText(), original);
     });
 
@@ -121,7 +121,7 @@ suite('File Safety Integration', () => {
             assert.strictEqual(document.getText(), autoDelete ? '正文 <!--✓ 保留 -->\n结尾'
                 : '正文 <!--✓ 第一项 --> <!--✓ 保留 --> <!--✓ 第三项 -->\n<!--✓ 第四项 --> <!--✓ 第五项 -->\n结尾');
             await vscode.window.showTextDocument(document);
-            await vscode.commands.executeCommand('undo');
+            await undoDocumentChange(document, original);
             assert.strictEqual(document.getText(), original);
         });
     }
@@ -137,7 +137,7 @@ suite('File Safety Integration', () => {
         await service.deleteAllResolved();
         assert.strictEqual(document.getText(), '正文 <!--? 保留 --> 结尾\n末段');
         await vscode.window.showTextDocument(document);
-        await vscode.commands.executeCommand('undo');
+        await undoDocumentChange(document, original);
         assert.strictEqual(document.getText(), original);
     });
 
@@ -420,7 +420,7 @@ suite('File Safety Integration', () => {
         await applyDocumentChange(source, text => mergeRecommendedSettings(text, { 'editor.fontSize': 14, 'files.autoSave': 'afterDelay' }));
         assert.ok(document.getText().includes('20'));
         assert.ok(document.getText().includes('// 用户配置'));
-        await vscode.commands.executeCommand('undo');
+        await undoDocumentChange(document, before);
         assert.strictEqual(document.getText(), before);
     });
 });

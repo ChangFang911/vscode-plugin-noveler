@@ -1,4 +1,5 @@
 import { manageCharacterAliases } from './manageCharacterAliases';
+import { applySensitiveWordFix } from '../providers/sensitiveWordCodeAction';
 /**
  * 命令注册模块
  * 将所有命令注册逻辑集中管理
@@ -294,7 +295,7 @@ function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
 
     // 添加选中文本到白名单
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.addSelectedToWhitelist', addToWhitelist)
+        vscode.commands.registerCommand('noveler.addSelectedToWhitelist', () => addToWhitelist())
     );
 
     // 重新加载敏感词库
@@ -303,6 +304,10 @@ function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
             try {
                 const sensitiveWordService = SensitiveWordService.getInstance();
                 await sensitiveWordService.reload();
+                const diagnostic = getSensitiveWordDiagnostic();
+                if (diagnostic && vscode.window.activeTextEditor) {
+                    diagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
+                }
                 vscode.window.showInformationMessage('敏感词库已重新加载');
             } catch (error) {
                 handleError('重新加载敏感词库失败', error, ErrorSeverity.Error);
@@ -310,15 +315,11 @@ function registerSensitiveWordCommands(deps: CommandRegistrarDeps): void {
         })
     );
 
-    // 添加到白名单
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.addToWhitelist', async (word: string) => {
-            try {
-                const sensitiveWordService = SensitiveWordService.getInstance();
-                await addWordToWhitelistSimple(word, sensitiveWordService);
-            } catch (error) {
-                handleError('添加到白名单失败', error, ErrorSeverity.Error);
-            }
+        vscode.commands.registerCommand('noveler.addToWhitelist', (word: string) => addToWhitelist(word)),
+        vscode.commands.registerCommand('noveler.applySensitiveWordFix', async fix => {
+            try { await applySensitiveWordFix(fix); }
+            catch (error) { handleError('处理敏感词失败', error, ErrorSeverity.Error); }
         })
     );
 
@@ -500,59 +501,4 @@ async function formatCurrentDocument(uri?: vscode.Uri): Promise<void> {
     } catch (error) {
         vscode.window.showErrorMessage(`格式化失败: ${error}`);
     }
-}
-
-/**
- * 添加词汇到白名单（简化版，不需要诊断提供器）
- */
-async function addWordToWhitelistSimple(
-    word: string,
-    sensitiveWordService: SensitiveWordService
-): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        vscode.window.showErrorMessage('请先打开一个工作区');
-        return;
-    }
-
-    const whitelistDirUri = vscode.Uri.joinPath(workspaceFolder.uri, '.noveler', 'sensitive-words');
-    const whitelistUri = vscode.Uri.joinPath(whitelistDirUri, 'whitelist.jsonc');
-
-    // 确保目录存在
-    try {
-        await vscode.workspace.fs.stat(whitelistDirUri);
-    } catch {
-        await vscode.workspace.fs.createDirectory(whitelistDirUri);
-    }
-
-    // 读取或创建白名单文件
-    interface WhitelistFile {
-        description: string;
-        words: string[];
-    }
-
-    let whitelist: WhitelistFile;
-    try {
-        const content = await vscode.workspace.fs.readFile(whitelistUri);
-        whitelist = JSON.parse(Buffer.from(content).toString('utf8'));
-    } catch {
-        whitelist = {
-            description: '用户自定义白名单',
-            words: []
-        };
-    }
-
-    if (whitelist.words.includes(word)) {
-        vscode.window.showInformationMessage(`"${word}" 已在白名单中`);
-        return;
-    }
-
-    whitelist.words.push(word);
-
-    const encoder = new TextEncoder();
-    await vscode.workspace.fs.writeFile(whitelistUri, encoder.encode(JSON.stringify(whitelist, null, 2)));
-
-    await sensitiveWordService.reload();
-
-    vscode.window.showInformationMessage(`已将 "${word}" 添加到白名单`);
 }
