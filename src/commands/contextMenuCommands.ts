@@ -8,8 +8,8 @@ import { parseFrontMatter } from '../utils/frontMatterParser';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { sanitizeFileName } from '../utils/inputValidator';
 import { NovelerTreeItem } from '../views/novelerViewProvider';
-import { COMPLETED_STATUS, IN_PROGRESS_STATUS } from '../constants';
-import { applyDocumentChange, patchFrontMatter } from '../utils/documentOperations';
+import { COMPLETED_STATUS, IN_PROGRESS_STATUS, CHARACTERS_FOLDER, CHARACTER_IMPORTANCE_OPTIONS } from '../constants';
+import { applyDocumentChange, patchFrontMatter, documentIO } from '../utils/documentOperations';
 
 /**
  * 重命名章节
@@ -282,5 +282,55 @@ export async function deleteCharacter(item: NovelerTreeItem): Promise<void> {
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
         handleError('删除人物失败', error, ErrorSeverity.Error);
+    }
+}
+
+export async function setCharacterImportance(
+    target?: vscode.Uri | { resourceUri?: vscode.Uri },
+    onChanged?: () => void
+): Promise<void> {
+    const uri = target instanceof vscode.Uri ? target : target ? target.resourceUri : vscode.window.activeTextEditor?.document.uri;
+    const folder = documentIO.workspaceFolder();
+    const prefix = folder && vscode.Uri.joinPath(folder.uri, CHARACTERS_FOLDER).toString() + '/';
+    if (!uri || !prefix || !uri.toString().startsWith(prefix) || !uri.path.endsWith('.md')) {
+        vscode.window.showWarningMessage('请从人物档案或侧边栏人物菜单设置定位');
+        return;
+    }
+    try {
+        const document = await vscode.workspace.openTextDocument(uri);
+        const original = parseFrontMatter(document.getText()).data.importance;
+        const selected = await vscode.window.showQuickPick(CHARACTER_IMPORTANCE_OPTIONS.map(value => ({
+            label: value, value, picked: value === original
+        })), { title: '设置人物定位', placeHolder: `当前：${typeof original === 'string' && original.trim() ? original : '未设置'}` });
+        if (!selected || selected.value === original) { return; }
+        let before = '';
+        let after = '';
+        await applyDocumentChange(uri, text => {
+            if (JSON.stringify(parseFrontMatter(text).data.importance) !== JSON.stringify(original)) {
+                throw new Error('人物定位已变化，请重新选择');
+            }
+            before = text;
+            after = patchFrontMatter(text, { importance: selected.value });
+            return after;
+        });
+        const version = document.version;
+        onChanged?.();
+        const name = String(parseFrontMatter(before).data.name ?? path.basename(uri.fsPath, '.md'));
+        const action = await vscode.window.showInformationMessage(`“${name}”的定位已设为${selected.value}`, '撤销');
+        if (action === '撤销') {
+            try {
+                await applyDocumentChange(uri, text => {
+                    if (document.isClosed || document.version !== version || text !== after) {
+                        throw new Error('人物档案已有新修改，未覆盖；可通过“编辑 → 撤销”逐步恢复');
+                    }
+                    return before;
+                });
+                onChanged?.();
+            } catch (error) {
+                handleError('撤销人物定位失败', error, ErrorSeverity.Warning);
+            }
+        }
+    } catch (error) {
+        handleError('设置人物定位失败', error, ErrorSeverity.Error);
     }
 }

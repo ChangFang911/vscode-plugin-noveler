@@ -408,7 +408,7 @@ export class WelcomeWebviewProvider {
             <div class="feature-card">
                 <div class="icon">🎨</div>
                 <h3>对话和人物高亮</h3>
-                <p>自动高亮对话内容和人物名称，让阅读和编辑更加清晰</p>
+                <p>高亮对话和人物称呼，侧栏按定位整理人物</p>
             </div>
             <div class="feature-card">
                 <div class="icon">✨</div>
@@ -430,7 +430,7 @@ export class WelcomeWebviewProvider {
         <!-- 操作按钮 -->
         <div class="actions">
             <button class="btn btn-primary" onclick="createSampleProject()">
-                🚀 创建示例项目
+                🚀 新建小说项目
             </button>
             <button class="btn btn-secondary" onclick="openExistingProject()">
                 📂 打开现有项目

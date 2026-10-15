@@ -12,6 +12,7 @@ import { CHAPTERS_FOLDER, VOLUME_TYPE_NAMES, VOLUME_STATUS_NAMES } from '../../c
 import { VolumeInfo } from '../../types/volume';
 import { convertToChineseNumber } from '../../utils/chineseNumber';
 import { convertToRomanNumber } from '../../utils/volumeHelper';
+import { documentIO } from '../../utils/documentOperations';
 import { Logger } from '../../utils/logger';
 
 export class ChapterNodesProvider {
@@ -44,13 +45,13 @@ export class ChapterNodesProvider {
         if (volumes.length === 0) {
             return [
                 new NovelerTreeItem(
-                    '还没有卷，请在 chapters/ 下创建卷文件夹',
+                    '创建第一卷',
                     NodeType.EmptyHint,
                     vscode.TreeItemCollapsibleState.None,
-                    undefined,
+                    { command: 'noveler.createVolume', title: '创建第一卷' },
                     'emptyHint',
                     undefined,
-                    '创建卷文件夹示例：chapters/第一卷-崛起/'
+                    '点击创建第一卷'
                 ).withIcon(new vscode.ThemeIcon('info')),
             ];
         }
@@ -89,7 +90,7 @@ export class ChapterNodesProvider {
             return [];
         }
 
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return [];
         }
@@ -189,18 +190,16 @@ export class ChapterNodesProvider {
             }
         }
 
-        if (items.length === 0) {
-            return [
-                new NovelerTreeItem(
-                    '该卷还没有章节',
-                    NodeType.EmptyHint,
-                    vscode.TreeItemCollapsibleState.None,
-                    undefined,
-                    'emptyHint',
-                    undefined,
-                    '在该卷文件夹中创建 Markdown 文件'
-                ).withIcon(new vscode.ThemeIcon('info')),
-            ];
+        if (!items.some(item => item.nodeType === NodeType.ChapterItem)) {
+            items.push(new NovelerTreeItem(
+                '在本卷创建章节',
+                NodeType.EmptyHint,
+                vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.createChapterInVolume', title: '在本卷创建章节', arguments: [volumeNode] },
+                'emptyHint',
+                undefined,
+                '点击在本卷创建章节'
+            ).withIcon(new vscode.ThemeIcon('info')));
         }
 
         return items;
@@ -210,7 +209,7 @@ export class ChapterNodesProvider {
      * 获取扁平的章节列表
      */
     private async getFlatChapterItems(): Promise<NovelerTreeItem[]> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return [];
         }
@@ -224,13 +223,13 @@ export class ChapterNodesProvider {
             if (mdFiles.length === 0) {
                 return [
                     new NovelerTreeItem(
-                        '还没有章节，点击右侧 ➕ 创建',
+                        '创建第一章',
                         NodeType.EmptyHint,
                         vscode.TreeItemCollapsibleState.None,
-                        undefined,
+                        { command: 'noveler.createChapter', title: '创建第一章' },
                         'emptyHint',
                         undefined,
-                        '点击章节列表标题右侧的 ➕ 按钮创建你的第一个章节'
+                        '点击创建第一章'
                     ).withIcon(new vscode.ThemeIcon('info')),
                 ];
             }
@@ -315,7 +314,7 @@ export class ChapterNodesProvider {
                     undefined,
                     undefined,
                     undefined,
-                    '请先运行 "Noveler: 初始化小说项目"'
+                    '请先在侧栏点击“新建小说项目”'
                 ),
             ];
         }

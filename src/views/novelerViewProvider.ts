@@ -89,7 +89,7 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
     getTreeItem(element: NovelerTreeItem): vscode.TreeItem {
         if (element.nodeType === NodeType.CharacterItem && element.resourceUri) {
             // 文件路径留在操作对象中，避免 VS Code 给人物提示追加文件状态。
-            return { ...element, resourceUri: undefined, iconPath: new vscode.ThemeIcon('person') };
+            return { ...element, resourceUri: undefined, iconPath: element.iconPath ?? new vscode.ThemeIcon('person') };
         }
         return element;
     }
@@ -160,16 +160,16 @@ export class NovelerViewProvider implements vscode.TreeDataProvider<NovelerTreeI
             // 未初始化，显示初始化引导
             return [
                 new NovelerTreeItem(
-                    '初始化小说项目',
+                    '新建小说项目',
                     NodeType.InitProject,
                     vscode.TreeItemCollapsibleState.None,
                     {
                         command: 'noveler.initProject',
-                        title: '初始化小说项目',
+                        title: '新建小说项目',
                     },
                     'initProject',
                     undefined,
-                    '点击此处在当前工作区初始化小说项目结构'
+                    '点击在当前文件夹中新建小说项目'
                 ).withIcon(new vscode.ThemeIcon('add'))
             ];
         }

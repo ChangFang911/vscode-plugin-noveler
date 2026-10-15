@@ -19,7 +19,8 @@ export async function readTestFile(uri: vscode.Uri): Promise<string> {
 }
 
 export async function undoDocumentChange(document: vscode.TextDocument, expected: string): Promise<void> {
-    await vscode.window.showTextDocument(document);
+    await vscode.window.showTextDocument(document, { preview: false, preserveFocus: false });
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
     await new Promise<void>((resolve, reject) => {
         let settled = false;
         const finish = (error?: unknown) => {
@@ -35,7 +36,7 @@ export async function undoDocumentChange(document: vscode.TextDocument, expected
         const listener = vscode.workspace.onDidChangeTextDocument(event => {
             if (event.document === document) { check(); }
         });
-        const timer = setTimeout(() => finish(new Error('撤销未恢复预期文档内容')), 3000);
+        const timer = setTimeout(() => finish(new Error(`撤销未恢复预期文档内容，实际内容：${JSON.stringify(document.getText())}`)), 3000);
         vscode.commands.executeCommand('undo').then(check, finish);
     });
 }

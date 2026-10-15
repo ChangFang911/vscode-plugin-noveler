@@ -214,12 +214,14 @@ suite('Sensitive Word Safety Integration', () => {
         assert.deepStrictEqual(parse(whitelist.getText()).words, ['旧词', '小王子']);
     });
     test('invalid whitelist stops rather than overwriting existing content', async () => {
-        const uri = file('.noveler', 'sensitive-words', 'whitelist.jsonc');
         await vscode.workspace.fs.createDirectory(file('.noveler', 'sensitive-words'));
-        for (const original of ['{ bad', '[]', '{ "words": "旧词" }', '{ "words": [1] }']) {
+        const samples = ['{ bad', '[]', '{ "words": "旧词" }', '{ "words": [1] }'];
+        for (const [index, original] of samples.entries()) {
+            const name = `whitelist-invalid-${index}.jsonc`;
+            service.getConfig().whitelist!.path = `.noveler/sensitive-words/${name}`;
+            const uri = file('.noveler', 'sensitive-words', name);
             await writeTestFile(uri, original);
             const document = await vscode.workspace.openTextDocument(uri);
-            await applyDocumentChange(uri, () => original);
             await addToWhitelist('小王子');
             assert.strictEqual(document.getText(), original);
         }

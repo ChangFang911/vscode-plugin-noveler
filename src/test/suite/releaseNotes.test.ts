@@ -185,7 +185,7 @@ suite('Update notifications and guide', () => {
         assert.strictEqual((vscode.window.createWebviewPanel as sinon.SinonStub).callCount, 1);
         assert.ok(panel.webview.html.includes('未发布（开发预览）'));
         assert.ok(panel.webview.html.includes('人物别名'));
-        assert.ok(panel.webview.html.includes('创建示例项目'));
+        assert.ok(panel.webview.html.includes('新建小说项目'));
         assert.ok(panel.webview.html.includes('打开现有项目'));
     });
     test('a downgrade does not replace the remembered newer version', async () => {
@@ -206,7 +206,7 @@ suite('Update notifications and guide', () => {
         assert.strictEqual(state.get('noveler.lastNotifiedVersion'), undefined);
         await provider.show();
         assert.ok(panel.webview.html.includes('更新日志暂时无法读取'));
-        assert.ok(panel.webview.html.includes('创建示例项目'));
+        assert.ok(panel.webview.html.includes('新建小说项目'));
     });
     test('reads the lowercase changelog filename produced by VSIX packaging on case-sensitive systems', async () => {
         read.restore();

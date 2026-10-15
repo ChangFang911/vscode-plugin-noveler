@@ -17,7 +17,14 @@ import { applyDocumentChange, fileExists, createDocument, documentIO } from '../
 export async function initProject(context: vscode.ExtensionContext): Promise<void> {
     const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('Noveler: 请先打开一个文件夹作为工作区');
+        const selected = await vscode.window.showInformationMessage(
+            '先选择存放小说的文件夹，打开后点击“新建小说项目”。', '选择小说文件夹'
+        );
+        if (selected === '选择小说文件夹') {
+            const folders = await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true,
+                canSelectMany: false, openLabel: '选择小说文件夹' });
+            if (folders?.[0]) { await vscode.commands.executeCommand('vscode.openFolder', folders[0], false); }
+        }
         return;
     }
 
@@ -38,15 +45,15 @@ export async function initProject(context: vscode.ExtensionContext): Promise<voi
 
     const volumeOptions: VolumeOption[] = [
         {
-            label: '$(folder) 启用分卷功能',
+            label: '$(folder) 按卷组织',
             description: '适合长篇小说，按卷组织章节',
-            detail: '章节会被组织到不同的卷文件夹中（如：chapters/第一卷-崛起/第001章.md）',
+            detail: '先创建卷，再在卷内创建章节',
             value: true
         },
         {
-            label: '$(file) 不启用分卷',
-            description: '适合短篇或中篇，扁平章节结构',
-            detail: '所有章节直接放在 chapters/ 目录下（如：chapters/第001章.md）',
+            label: '$(file) 按章节组织',
+            description: '章节依次排列，适合直接开始写作',
+            detail: '以后也可以切换为按卷组织',
             value: false
         }
     ];

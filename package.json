@@ -45,7 +45,7 @@
     "commands": [
       {
         "command": "noveler.initProject",
-        "title": "Noveler: 初始化小说项目"
+        "title": "Noveler: 新建小说项目"
       },
       {
         "command": "noveler.formatDocument",
@@ -102,6 +102,10 @@
       {
         "command": "noveler.manageCharacterAliases",
         "title": "管理人物别名"
+      },
+      {
+        "command": "noveler.setCharacterImportance",
+        "title": "设置人物定位"
       },
       {
         "command": "noveler.renameCharacter",
@@ -314,6 +318,11 @@
           "command": "noveler.manageCharacterAliases",
           "when": "view == novelerView && viewItem == character",
           "group": "1_modification@2"
+        },
+        {
+          "command": "noveler.setCharacterImportance",
+          "when": "view == novelerView && viewItem == character",
+          "group": "1_modification@3"
         },
         {
           "command": "noveler.renameCharacter",

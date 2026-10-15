@@ -81,7 +81,9 @@ suite('CodeLensProvider Test Suite', () => {
         test('shows formatting and alias management above the real character title', () => {
             const document = new MockTextDocument(MockUri.file('/novel/characters/林舟.md'), '---\n# 人物备注\nname: 林舟\n---\n<!--\n# 隐藏标题\n-->\n# 林舟\n## 人物设定', 'markdown');
             const lenses = new ChapterCodeLensProvider(new WordCountService()).provideCodeLenses(document as unknown as vscode.TextDocument, {} as vscode.CancellationToken) as vscode.CodeLens[];
-            assert.strictEqual(lenses.length, 2);
+            assert.strictEqual(lenses.length, 3);
+            assert.strictEqual(lenses[2].command?.command, 'noveler.setCharacterImportance');
+            assert.strictEqual(lenses[2].command?.arguments?.[0], document.uri);
             assert.strictEqual(lenses[1].command?.command, 'noveler.manageCharacterAliases');
             assert.strictEqual(lenses[1].command?.arguments?.[0], document.uri);
             assert.strictEqual(lenses[0].range.start.line, 7);

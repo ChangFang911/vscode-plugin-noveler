@@ -90,7 +90,7 @@ export class OutlineNodesProvider {
                     undefined,
                     undefined,
                     undefined,
-                    '请先运行 "Noveler: 初始化小说项目"'
+                    '请先在侧栏点击“新建小说项目”'
                 ),
             ];
         }

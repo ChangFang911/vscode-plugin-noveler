@@ -133,8 +133,9 @@ suite('Phase Two Data Safety Integration', () => {
     }
     test('alias insertion into an old profile preserves dirty prose, comments and CRLF and is undoable', async () => {
         const uri = await aliasFixture();
-        await applyDocumentChange(uri, text => text + '\r\n未保存正文');
         const document = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(document);
+        await applyDocumentChange(uri, text => text + '\r\n未保存正文');
         const original = document.getText();
         const input = sandbox.spy(vscode.window, 'showInputBox');
         const panel = await openAliasPanel(uri);

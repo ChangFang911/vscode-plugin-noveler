@@ -78,6 +78,13 @@ export const STATUS_EMOJI_MAP: Record<string, string> = {
     'completed': '✅'
 };
 
+export const CHARACTER_IMPORTANCE_ICONS: Record<string, string> = {
+    '主角': 'star-full',
+    '重要配角': 'debug-stop',
+    '次要配角': 'triangle-up',
+    '路人': 'person'
+};
+
 /** 重要性排序权重 */
 export const IMPORTANCE_ORDER: Record<string, number> = {
     '主角': 1,

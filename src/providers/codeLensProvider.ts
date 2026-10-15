@@ -1,3 +1,4 @@
+import { parseFrontMatter } from '../utils/frontMatterParser';
 import { getCharacterAliases } from '../utils/characterAliases';
 /**
  * Code Lens Provider - 在章节标题上方显示快捷操作
@@ -73,6 +74,12 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
                             tooltip: aliases.length ? aliases.join('、') : '添加、修改或删除人物别名',
                             command: 'noveler.manageCharacterAliases',
                             arguments: [document.uri]
+                        }));
+                        const value = parseFrontMatter(text).data.importance;
+                        const importance = typeof value === 'string' && value.trim() ? value.trim() : '未设置';
+                        codeLenses.push(new vscode.CodeLens(range, {
+                            title: `定位：${importance}`, tooltip: '设置主角、重要配角、次要配角或路人',
+                            command: 'noveler.setCharacterImportance', arguments: [document.uri]
                         }));
                     }
                     break;

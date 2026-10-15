@@ -70,8 +70,8 @@ export async function createCharacter(characterName: string): Promise<void> {
         title: `设置人物「${sanitizedName}」的角色定位`
     });
 
-    // 如果用户取消选择,使用默认值"重要配角"
-    const importance = selectedImportance?.value || '重要配角';
+    if (!selectedImportance) { return; }
+    const importance = selectedImportance.value;
 
     const frontMatter = { ...(characterTemplate?.frontMatter || {
         gender: "",

@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
+import { documentIO, fileExists } from '../utils/documentOperations';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { SensitiveWordService } from '../services/sensitiveWordService';
@@ -14,13 +14,12 @@ import { SensitiveWordService } from '../services/sensitiveWordService';
  */
 export async function openSensitiveWordsConfig(): Promise<void> {
     try {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
+        const workspaceFolder = documentIO.workspaceFolder();
+        if (!workspaceFolder) {
             vscode.window.showWarningMessage('请先打开一个 Noveler 项目');
             return;
         }
 
-        const projectPath = workspaceFolders[0].uri.fsPath;
 
         // 显示选项菜单
         const options = [
@@ -30,13 +29,13 @@ export async function openSensitiveWordsConfig(): Promise<void> {
                 action: 'quickLevel'
             },
             {
-                label: '➕ 管理自定义敏感词',
-                description: '添加您想要检测的敏感词汇',
+                label: '编辑自定义词库文件（高级）',
+                description: '打开词库文件；也可选中文字后右键添加',
                 action: 'custom'
             },
             {
-                label: '➖ 管理白名单',
-                description: '排除误报的词汇（人物名、地名等）',
+                label: '编辑白名单文件（高级）',
+                description: '打开白名单文件；也可通过正文灯泡或右键添加',
                 action: 'whitelist'
             },
             {
@@ -59,7 +58,7 @@ export async function openSensitiveWordsConfig(): Promise<void> {
             await quickSwitchLevel();
         } else if (selected.action === 'config') {
             // 打开 novel.jsonc 并跳转到 sensitiveWords 配置
-            const novelConfigPath = path.join(projectPath, 'novel.jsonc');
+            const novelConfigPath = vscode.Uri.joinPath(workspaceFolder.uri, 'novel.jsonc');
             const doc = await vscode.workspace.openTextDocument(novelConfigPath);
             const editor = await vscode.window.showTextDocument(doc);
 
@@ -77,24 +76,25 @@ export async function openSensitiveWordsConfig(): Promise<void> {
             } else {
                 vscode.window.showWarningMessage('未找到敏感词配置部分，请检查 novel.jsonc 文件格式');
             }
-        } else if (selected.action === 'custom') {
-            // 打开自定义敏感词文件
-            const customWordsPath = path.join(projectPath, '.noveler', 'sensitive-words', 'custom-words.jsonc');
-            try {
-                const doc = await vscode.workspace.openTextDocument(customWordsPath);
-                await vscode.window.showTextDocument(doc);
-            } catch (error) {
-                vscode.window.showWarningMessage('自定义敏感词文件不存在。请先初始化项目或手动创建 .noveler/sensitive-words/custom-words.jsonc');
+        } else if (selected.action === 'custom' || selected.action === 'whitelist') {
+            const config = SensitiveWordService.getInstance().getConfig();
+            const whitelist = selected.action === 'whitelist';
+            const configuredPath = (whitelist ? config.whitelist?.path : config.customLibrary?.path)
+                || `.noveler/sensitive-words/${whitelist ? 'whitelist' : 'custom-words'}.jsonc`;
+            let uri = vscode.Uri.joinPath(workspaceFolder.uri, configuredPath);
+            if (!await fileExists(uri)) {
+                const fallbackPath = configuredPath.endsWith('.jsonc') ? configuredPath.replace(/\.jsonc$/, '.json')
+                    : configuredPath.endsWith('.json') ? configuredPath.replace(/\.json$/, '.jsonc') : undefined;
+                if (fallbackPath) {
+                    const fallback = vscode.Uri.joinPath(workspaceFolder.uri, fallbackPath);
+                    if (await fileExists(fallback)) { uri = fallback; }
+                }
             }
-        } else if (selected.action === 'whitelist') {
-            // 打开白名单文件
-            const whitelistPath = path.join(projectPath, '.noveler', 'sensitive-words', 'whitelist.jsonc');
-            try {
-                const doc = await vscode.workspace.openTextDocument(whitelistPath);
-                await vscode.window.showTextDocument(doc);
-            } catch (error) {
-                vscode.window.showWarningMessage('白名单文件不存在。请先初始化项目或手动创建 .noveler/sensitive-words/whitelist.jsonc');
+            if (!await fileExists(uri)) {
+                vscode.window.showWarningMessage(`${whitelist ? '白名单' : '自定义词库'}文件尚未创建，可在正文中选中文字后右键添加。`);
+                return;
             }
+            await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
         }
 
         Logger.info('已打开敏感词配置');

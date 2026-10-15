@@ -34,6 +34,7 @@ import {
     updateChapterStatusWithDialog,
     deleteChapter,
     renameCharacter,
+    setCharacterImportance,
     deleteCharacter
 } from './contextMenuCommands';
 import {
@@ -202,7 +203,7 @@ function registerChapterCommands(deps: CommandRegistrarDeps): void {
  * 注册人物相关命令
  */
 function registerCharacterCommands(deps: CommandRegistrarDeps): void {
-    const { context } = deps;
+    const { context, novelerViewProvider } = deps;
 
     // 创建人物
     context.subscriptions.push(
@@ -226,7 +227,9 @@ function registerCharacterCommands(deps: CommandRegistrarDeps): void {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.manageCharacterAliases', manageCharacterAliases)
+        vscode.commands.registerCommand('noveler.manageCharacterAliases', manageCharacterAliases),
+        vscode.commands.registerCommand('noveler.setCharacterImportance', target =>
+            setCharacterImportance(target, () => novelerViewProvider.refresh()))
     );
 
     // 人物右键菜单命令
