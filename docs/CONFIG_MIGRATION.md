@@ -1,212 +1,45 @@
-# 配置自动迁移系统
+# 配置升级机制
 
-> 本文说明开发时的配置版本升级机制，示例版本和功能仅供说明。章节目录迁移请参考 README；当前配置版本见 CURRENT_CONFIG_VERSION。
+本文面向开发维护。章节目录在扁平与分卷之间迁移，是独立流程，请参阅 README 的项目模式说明。
 
-## 功能说明
+## 版本与触发
 
-当你更新 Noveler 插件后，如果插件引入了新的配置项或功能，**配置迁移系统**会自动检测并升级你的项目配置，无需手动修改或重新初始化项目。
+- `package.json` 记录插件版本，`novel.jsonc` 的 `version` 记录配置版本，两者独立。
+- 配置目标版本由 `src/constants.ts` 的 `CURRENT_CONFIG_VERSION` 定义，模板与之保持一致。
+- 插件启动时检查当前项目；旧配置和缺失版本号的配置会升级，当前或更高版本保持不变。
+- 配置结构、旧字段的解释规则或必须补充的字段发生变化时，应评估并提升配置版本；仅修改插件版本不会强制迁移项目。
 
-## 工作原理
+## 升级行为
 
-### 1. 版本检测
-- 配置文件中有一个 `version` 字段，记录当前配置版本
-- 扩展启动时自动检查版本号
-- 如果版本低于当前插件版本，触发自动升级
+`MigrationService.checkAndMigrate(context)` 使用 `context.extensionUri` 读取安装包内的配置模板，避免依赖源码或编译目录结构。
 
-### 2. 增量升级
-支持从任意旧版本升级到最新版本，按顺序执行所有中间版本的升级脚本。
+升级读取编辑器中的最新内容，包括未保存修改，严格验证 JSONC 后使用现有合并函数补充缺失字段：
 
-**示例**：
-```
-用户配置：v0.3.0
-插件版本：v0.4.0
+- 保留原有值、自定义字段、注释、尾逗号和换行风格。
+- 仅补充缺失配置，不覆盖用户已经设置的值。
+- 缺少分卷配置时采用关闭分卷、扁平布局，不移动章节、不改变已有目录关系。
+- 保留旧版敏感词 `levels` 的选择，补充新版内置词库配置时沿用这些值。
+- 成功保存后才报告升级完成，并重新加载运行配置。
+- 升级通知中的“查看配置”和“查看更新日志”复用现有入口。
+- 用户提示不展示内部配置版本号；详细版本写入日志。升级失败时可点击“打开配置”查看文件。
 
-执行升级：
-0.3.0 → 0.3.4 （添加敏感词配置）
-0.3.4 → 0.4.0 （添加分卷和段落缩进配置）
-```
+JSONC 无效、版本格式无效、模板不可读、编辑失败或保存失败时，停止升级。保存失败时，若文档没有后续修改，恢复升级前内容；若用户已经继续编辑，保留最新内容并提示失败，不覆盖新修改。
 
-### 3. 非侵入式升级
-- ✅ **只添加**新配置项
-- ✅ **保留**用户已有的自定义配置
-- ✅ **保持**配置文件的注释格式
-- ❌ **不会覆盖**用户修改的值
+升级不新增永久备份目录。工程备份、系统废纸篓和章节目录迁移各有独立用途，不作为配置升级的替代写入路径。
 
-### 4. 用户通知
-升级完成后会显示通知，用户可以：
-- 查看配置文件
-- 查看更新日志
-- 了解新增功能
+## 配置交互写入
 
-## 升级历史
+快速设置、护眼模式、专注模式等通过 `ConfigService.updateConfig()` 修改配置：
 
-### v0.3.4 → v0.4.0
-**新增配置**：
-```jsonc
-{
-  // 分卷功能
-  "volumes": {
-    "enabled": false,
-    "folderStructure": "flat",
-    "numberFormat": "arabic"
-  },
+- 同一服务的修改按顺序执行，后续操作读取最新文档内容。
+- 逐项应用 JSONC 编辑，避免缺失对象时多个插入位置重叠。
+- 保留未保存修改；配置无效时拒绝写入。
+- 确认保存成功后重新加载配置，保存失败时拒绝报告设置成功，修改保留在编辑器中供处理。
 
-  // 段落缩进
-  "paragraphIndent": {
-    "value": false
-  }
-}
-```
+## 维护与验证
 
-### v0.3.0 → v0.3.4
-**新增配置**：
-```jsonc
-{
-  // 敏感词检测
-  "sensitiveWords": {
-    "enabled": true,
-    "builtInLibrary": {
-      "enabled": true,
-      "levels": {
-        "high": true,
-        "medium": false,
-        "low": false
-      }
-    },
-    "customLibrary": {
-      "enabled": true,
-      "path": ".noveler/sensitive-words/custom-words.jsonc"
-    },
-    "whitelist": {
-      "enabled": true,
-      "path": ".noveler/sensitive-words/whitelist.jsonc"
-    },
-    "checkOnType": true,
-    "checkOnSave": true,
-    "display": {
-      "severity": "Warning",
-      "showInProblems": true,
-      "showWordCount": true
-    }
-  }
-}
-```
+增加配置字段时同步模板、运行默认值和类型定义，并根据兼容性更新 `CURRENT_CONFIG_VERSION`。需要特殊值转换的升级应显式实现，并增加对应历史配置测试。
 
-## 开发者指南
+`npm test` 覆盖无版本号、早期版本、0.6.1 至 0.6.3 的跨版本升级，以及取消或失败保存、并发设置、未保存修改和后续编辑保护。
 
-### 如何添加新的迁移脚本
-
-当你需要在新版本中添加配置项时：
-
-**步骤 1**：更新 `CURRENT_CONFIG_VERSION`
-```typescript
-// src/constants.ts
-export const CURRENT_CONFIG_VERSION = '0.6.0';  // 更新为新版本号
-```
-
-**步骤 2**：添加迁移函数
-```typescript
-// 升级到 0.6.0（示例：添加 AI 辅助写作功能）
-if (this.compareVersions(fromVersion, '0.6.0') < 0) {
-    Logger.info('应用 0.6.0 升级：添加 AI 辅助写作配置');
-    const updates = this.getMigration_0_6_0(config);
-    this.deepMerge(config, updates);  // 使用深度合并，不是浅合并
-    modified = true;
-}
-```
-
-**步骤 3**：实现迁移逻辑（注意嵌套结构）
-```typescript
-private static getMigration_0_6_0(config: any): any {
-    const updates: any = {};
-
-    // 确保 noveler 配置存在
-    if (!config.noveler) {
-        config.noveler = {};
-    }
-
-    // 如果没有 AI 配置，添加默认配置
-    // ⚠️ 重要：新配置应该添加到 updates.noveler 下，而不是 updates 直接下
-    if (!config.noveler.aiAssistant) {
-        if (!updates.noveler) {
-            updates.noveler = {};
-        }
-        updates.noveler.aiAssistant = {
-            enabled: false,
-            provider: 'openai',
-            model: 'gpt-4'
-        };
-    }
-
-    return updates;
-}
-```
-
-**步骤 4**：更新更新日志
-```typescript
-'0.6.0': `# v0.6.0 新功能
-
-## AI 辅助写作
-- 集成 GPT-4 模型
-- 智能续写功能
-- 情节建议
-- 人物对话润色`
-```
-
-### 迁移系统架构说明
-
-#### 1. 深度合并 vs 浅合并
-
-**错误示例（浅合并）**：
-```typescript
-config = { ...config, ...updates };  // ❌ 会覆盖整个 noveler 对象
-```
-
-**正确示例（深度合并）**：
-```typescript
-this.deepMerge(config, updates);  // ✅ 递归合并，保留现有配置
-```
-
-#### 2. 配置结构规范
-
-新配置项必须添加到 `noveler` 对象内部：
-```typescript
-// ❌ 错误：添加到顶层
-updates.newFeature = { ... };
-
-// ✅ 正确：添加到 noveler 内部
-if (!updates.noveler) {
-    updates.noveler = {};
-}
-updates.noveler.newFeature = { ... };
-```
-
-#### 3. 使用 jsonc-parser 保留注释
-
-迁移系统使用 `jsonc-parser` 的 `modify` API：
-- ✅ 保留所有注释
-- ✅ 保持原有格式
-- ✅ 正确处理嵌套对象
-- ✅ 自动添加逗号和缩进
-
-不需要手动处理 JSON 格式，`jsonc-parser` 会自动处理。
-
-## 注意事项
-
-1. **版本号格式**：使用语义化版本号 `major.minor.patch`
-2. **向后兼容**：新配置项应该有合理的默认值
-3. **测试**：在发布前测试从各个旧版本升级
-4. **日志**：记录详细的升级日志，方便排��问题
-
-## 故障排除
-
-### 如果升级失败
-1. 查看 VSCode 输出面板（选择 "Noveler" 通道）
-2. 检查配置文件语法是否正确
-3. 手动备份配置文件后重新初始化项目
-
-### 如何禁用自动升级
-目前不支持禁用（因为这可能导致功能异常）。如果你需要保持旧配置，建议：
-1. 备份当前配置文件
-2. 允许自动升级
-3. 手动恢复需要的自定义配置
+`npm run test:package` 将 VSIX 解包后启动真实 VS Code，分别验证全新项目、0.3.0 和 0.6.1 旧配置升级，确保正式安装包也能找到模板并保留用户设置。

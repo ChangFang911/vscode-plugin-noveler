@@ -152,7 +152,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // 执行配置迁移（如果需要）
         try {
-            await MigrationService.checkAndMigrate(context);
+            if (await MigrationService.checkAndMigrate(context)) {
+                await configService.reloadConfig();
+            }
         } catch (migrationError) {
             Logger.error('[Noveler] 配置迁移失败，但不影响基本功能', migrationError);
         }

@@ -57,6 +57,7 @@ suite('Project Creation Real Files Integration', () => {
             const config = await initialize(enabled, format);
             assert.strictEqual(config.name, '空目录中的小说');
             assert.strictEqual(config.version, CURRENT_CONFIG_VERSION);
+            assert.ok((await readTestFile(file('novel.jsonc'))).includes('由插件管理，与插件版本不同，无需手动修改'));
             assert.strictEqual(config.noveler.volumes.enabled, enabled);
             assert.strictEqual(config.noveler.volumes.folderStructure, enabled ? 'nested' : 'flat');
             assert.strictEqual(config.noveler.volumes.numberFormat, format);

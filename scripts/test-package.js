@@ -16,11 +16,15 @@ try {
     run(vsce ? process.execPath : process.platform === 'win32' ? 'npx.cmd' : 'npx',
         vsce ? [vsce, 'package', '--out', archive] : ['--yes', '@vscode/vsce@3.9.2', 'package', '--out', archive]);
     run('unzip', ['-q', archive, '-d', temporary]);
-    run(process.execPath, [path.join(root, 'out/test/runTest.js')], {
-        ...process.env,
-        NOVELER_TEST_EXTENSION_PATH: path.join(temporary, 'extension'),
-        NOVELER_TEST_SMOKE_ONLY: '1'
-    });
+    for (const version of ['', '0.3.0', '0.6.1']) {
+        console.log(`验证打包插件：${version ? '升级配置 ' + version : '全新项目'}`);
+        run(process.execPath, [path.join(root, 'out/test/runTest.js')], {
+            ...process.env,
+            NOVELER_TEST_EXTENSION_PATH: path.join(temporary, 'extension'),
+            NOVELER_TEST_SMOKE_ONLY: '1',
+            NOVELER_TEST_LEGACY_VERSION: version
+        });
+    }
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
 }

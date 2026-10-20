@@ -4,6 +4,8 @@ import { CONFIG_FILE_NAME, DEFAULT_TARGET_WORDS } from '../constants';
 import * as jsoncParser from 'jsonc-parser';
 import { validateConfig, fixConfig } from '../utils/configValidator';
 import { Logger } from '../utils/logger';
+import { applyDocumentChange, documentIO } from '../utils/documentOperations';
+import { parseJsoncObject } from '../utils/settingsHelper';
 import { SensitiveWordConfig } from '../types/sensitiveWord';
 import { VolumesConfig } from '../types/volume';
 import type { FocusModeConfig, TypingSoundType, TypewriterPosition } from './focusModeService';
@@ -128,6 +130,7 @@ export class ConfigService {
     private config: NovelConfig = {};
     private fileWatcher?: vscode.FileSystemWatcher;
     private configLoadPromise?: Promise<void>; // 配置加载的 Promise，避免竞态条件
+    private configUpdatePromise?: Promise<void>;
     private isLoading = false; // 加载锁，防止并发加载
 
     // 配置变更事件发射器
@@ -195,7 +198,7 @@ export class ConfigService {
     }
 
     private async forceLoadConfig(): Promise<void> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
@@ -206,9 +209,9 @@ export class ConfigService {
             const fileData = await vscode.workspace.fs.readFile(configUri);
             const configText = Buffer.from(fileData).toString('utf8');
 
-            let fullConfig;
+            let fullConfig: { noveler?: NovelConfig };
             try {
-                fullConfig = jsoncParser.parse(configText);
+                fullConfig = parseJsoncObject(configText);
             } catch (parseError) {
                 handleError('novel.jsonc 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
                 return;
@@ -239,7 +242,7 @@ export class ConfigService {
         this.isLoading = true;
 
         try {
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const workspaceFolder = documentIO.workspaceFolder();
             if (!workspaceFolder) {
                 return;
             }
@@ -250,10 +253,10 @@ export class ConfigService {
                 const fileData = await vscode.workspace.fs.readFile(configUri);
                 const configText = Buffer.from(fileData).toString('utf8');
 
-                let fullConfig;
+                let fullConfig: { noveler?: NovelConfig };
                 try {
                     // 使用 jsonc-parser 解析 JSONC（支持注释）
-                    fullConfig = jsoncParser.parse(configText);
+                    fullConfig = parseJsoncObject(configText);
                 } catch (parseError) {
                     handleError('novel.jsonc 解析失败，请检查 JSON 格式', parseError, ErrorSeverity.Warning);
                     return;
@@ -348,7 +351,7 @@ export class ConfigService {
     }
 
     private watchConfig() {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const workspaceFolder = documentIO.workspaceFolder();
         if (!workspaceFolder) {
             return;
         }
@@ -622,72 +625,53 @@ export class ConfigService {
      * 使用回调函数修改配置，保留 JSONC 注释
      * @param updater 配置更新回调，接收当前配置的副本进行修改
      */
-    public async updateConfig(updater: (draft: { noveler?: NovelConfig }) => void): Promise<void> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            throw new Error('未找到工作区文件夹');
-        }
+    public updateConfig(updater: (draft: { noveler?: NovelConfig }) => void): Promise<void> {
+        const operation = (this.configUpdatePromise ?? Promise.resolve()).then(() => this.applyConfigUpdate(updater));
+        this.configUpdatePromise = operation.catch(() => undefined);
+        return operation;
+    }
 
+    private async applyConfigUpdate(updater: (draft: { noveler?: NovelConfig }) => void): Promise<void> {
+        const workspaceFolder = documentIO.workspaceFolder();
+        if (!workspaceFolder) { throw new Error('未找到工作区文件夹'); }
         const configUri = vscode.Uri.joinPath(workspaceFolder.uri, CONFIG_FILE_NAME);
-
-        // 读取当前配置文件
-        let configText: string;
-        try {
-            const fileData = await vscode.workspace.fs.readFile(configUri);
-            configText = Buffer.from(fileData).toString('utf8');
-        } catch {
-            throw new Error('无法读取配置文件 novel.jsonc');
-        }
-
-        // 解析当前配置
-        const currentConfig = jsoncParser.parse(configText) || {};
-
-        // 创建副本并应用更新
-        const draft = JSON.parse(JSON.stringify(currentConfig));
-        updater(draft);
-
-        // 计算需要修改的路径和值
-        const edits: jsoncParser.EditResult = [];
-
-        // 比较并生成编辑操作
-        const generateEdits = (path: (string | number)[], oldObj: unknown, newObj: unknown) => {
-            if (typeof newObj !== 'object' || newObj === null) {
-                // 原始值，直接设置
-                if (oldObj !== newObj) {
-                    edits.push(...jsoncParser.modify(configText, path, newObj, {
-                        formattingOptions: { tabSize: 2, insertSpaces: true }
-                    }));
-                }
-            } else if (Array.isArray(newObj)) {
-                // 数组，直接替换
-                if (JSON.stringify(oldObj) !== JSON.stringify(newObj)) {
-                    edits.push(...jsoncParser.modify(configText, path, newObj, {
-                        formattingOptions: { tabSize: 2, insertSpaces: true }
-                    }));
-                }
-            } else {
-                // 对象，递归处理
-                const oldRecord = (oldObj as Record<string, unknown>) || {};
-                const newRecord = newObj as Record<string, unknown>;
-                for (const key of Object.keys(newRecord)) {
-                    generateEdits([...path, key], oldRecord[key], newRecord[key]);
-                }
+        const document = await vscode.workspace.openTextDocument(configUri);
+        let changed = false;
+        await applyDocumentChange(configUri, text => {
+            const current = parseJsoncObject(text);
+            if (current.noveler !== undefined && (!current.noveler || typeof current.noveler !== 'object' || Array.isArray(current.noveler))) {
+                throw new Error('noveler 配置必须为对象，原文件未修改');
             }
-        };
-
-        generateEdits([], currentConfig, draft);
-
-        // 应用编辑
-        if (edits.length > 0) {
-            const newText = jsoncParser.applyEdits(configText, edits);
-            const encoder = new TextEncoder();
-            await vscode.workspace.fs.writeFile(configUri, encoder.encode(newText));
-
-            // 重置加载锁，确保 loadConfig 不被跳过
-            this.isLoading = false;
-            await this.loadConfig();
-            Logger.info('配置已更新');
+            const draft = JSON.parse(JSON.stringify(current));
+            updater(draft);
+            let result = text;
+            const update = (keys: string[], before: unknown, after: unknown) => {
+                if (JSON.stringify(before) === JSON.stringify(after)) { return; }
+                if (before && after && typeof before === 'object' && typeof after === 'object'
+                    && !Array.isArray(before) && !Array.isArray(after)) {
+                    const oldObject = before as Record<string, unknown>;
+                    const newObject = after as Record<string, unknown>;
+                    for (const key of new Set([...Object.keys(oldObject), ...Object.keys(newObject)])) {
+                        update([...keys, key], oldObject[key], newObject[key]);
+                    }
+                } else {
+                    result = jsoncParser.applyEdits(result, jsoncParser.modify(result, keys, after, {
+                        formattingOptions: { tabSize: 2, insertSpaces: true, eol: text.includes('\r\n') ? '\r\n' : '\n' }
+                    }));
+                }
+            };
+            update([], current, draft);
+            parseJsoncObject(result);
+            changed = result !== text;
+            return result;
+        });
+        if (!changed && !document.isDirty) { return; }
+        if (!await documentIO.save(document) || document.isDirty) {
+            throw new Error('配置未保存，修改仍保留在编辑器中，请检查后重试');
         }
+        this.isLoading = false;
+        await this.loadConfig();
+        Logger.info('配置已更新');
     }
 
     /**

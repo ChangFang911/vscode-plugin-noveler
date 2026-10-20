@@ -173,32 +173,34 @@ async function updateChapterStatus(item: NovelerTreeItem, status: string): Promi
  * 删除章节
  */
 export async function deleteChapter(item: NovelerTreeItem): Promise<void> {
-    if (!item.resourceUri) {
-        vscode.window.showErrorMessage('无法获取章节文件路径');
-        return;
-    }
+    await deleteWritingFile(item, '章节', 'chapters');
+}
 
+async function deleteWritingFile(item: NovelerTreeItem, kind: string, folder: string): Promise<void> {
     try {
-        const fileName = path.basename(item.resourceUri.fsPath);
-
-        // 确认删除
-        const result = await vscode.window.showWarningMessage(
-            `确定要删除章节 "${fileName}" 吗？此操作不可恢复！`,
-            { modal: true },
-            '删除', '取消'
-        );
-
-        if (result !== '删除') {
-            return;
+        const uri = item?.resourceUri;
+        const workspace = documentIO.workspaceFolder();
+        if (!uri || !workspace || !uri.toString().startsWith(vscode.Uri.joinPath(workspace.uri, folder).toString() + '/')) {
+            throw new Error(`只能删除当前小说项目中的${kind}文件`);
         }
-
-        // 删除文件
-        await vscode.workspace.fs.delete(item.resourceUri);
-
-        vscode.window.showInformationMessage(`已删除章节：${fileName}`);
+        const name = path.basename(uri.fsPath);
+        const selected = await vscode.window.showWarningMessage(
+            `确定要将${kind}“${name}”移入废纸篓吗？恢复时可将文件拖回原目录。`,
+            { modal: true }, '删除', '取消'
+        );
+        if (selected !== '删除') { return; }
+        const document = await vscode.workspace.openTextDocument(uri);
+        if (document.isDirty && (!await documentIO.save(document) || document.isDirty)) {
+            throw new Error(`${kind}未保存，已停止删除`);
+        }
+        await documentIO.delete(uri, { useTrash: true });
+        vscode.window.showInformationMessage(`已移入废纸篓：${name}。恢复时将文件拖回原目录后刷新。`, '定位恢复目录')
+            .then(choice => {
+                if (choice === '定位恢复目录') { return vscode.commands.executeCommand('revealFileInOS', vscode.Uri.joinPath(uri, '..')); }
+            }).then(undefined, error => handleError('定位恢复目录失败', error, ErrorSeverity.Warning));
         await vscode.commands.executeCommand('noveler.refresh');
     } catch (error) {
-        handleError('删除章节失败', error, ErrorSeverity.Error);
+        handleError(`删除${kind}失败`, error, ErrorSeverity.Error);
     }
 }
 
@@ -256,33 +258,7 @@ export async function renameCharacter(item: NovelerTreeItem): Promise<void> {
  * 删除人物
  */
 export async function deleteCharacter(item: NovelerTreeItem): Promise<void> {
-    if (!item.resourceUri) {
-        vscode.window.showErrorMessage('无法获取人物文件路径');
-        return;
-    }
-
-    try {
-        const fileName = path.basename(item.resourceUri.fsPath);
-
-        // 确认删除
-        const result = await vscode.window.showWarningMessage(
-            `确定要删除人物 "${fileName}" 吗？此操作不可恢复！`,
-            { modal: true },
-            '删除', '取消'
-        );
-
-        if (result !== '删除') {
-            return;
-        }
-
-        // 删除文件
-        await vscode.workspace.fs.delete(item.resourceUri);
-
-        vscode.window.showInformationMessage(`已删除人物：${fileName}`);
-        await vscode.commands.executeCommand('noveler.refresh');
-    } catch (error) {
-        handleError('删除人物失败', error, ErrorSeverity.Error);
-    }
+    await deleteWritingFile(item, '人物', CHARACTERS_FOLDER);
 }
 
 export async function setCharacterImportance(

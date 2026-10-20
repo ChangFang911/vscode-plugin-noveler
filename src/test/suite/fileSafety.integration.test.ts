@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { applyDocumentChange, copyDocument, documentIO, fileExists, patchFrontMatter } from '../../utils/documentOperations';
-import { renameChapter, renameCharacter, updateChapterStatusWithDialog } from '../../commands/contextMenuCommands';
+import { renameChapter, renameCharacter, updateChapterStatusWithDialog, deleteChapter, deleteCharacter } from '../../commands/contextMenuCommands';
 import { NovelerTreeItem } from '../../views/novelerViewProvider';
 import { ConfigService } from '../../services/configService';
 import { ChineseNovelFormatProvider } from '../../providers/formatProvider';
@@ -32,6 +32,55 @@ suite('File Safety Integration', () => {
         sandbox.restore();
         await removeTestWorkspace(root);
     });
+
+    for (const [folder, remove] of [['chapters', deleteChapter], ['characters', deleteCharacter]] as const) {
+        test(`${folder} deletion saves dirty content before requesting trash and provides a recovery entrance`, async () => {
+            sandbox.stub(documentIO, 'workspaceFolder').returns({ uri: root, name: '删除验证', index: 0 });
+            const uri = vscode.Uri.joinPath(root, folder, '删除验证.md');
+            await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, folder));
+            await writeTestFile(uri, '# 原正文');
+            await applyDocumentChange(uri, text => text + '\n未保存内容');
+            (vscode.window.showWarningMessage as sinon.SinonStub).resolves('删除');
+            const trash = sandbox.stub(documentIO, 'delete').callsFake(async (target, options) => {
+                assert.strictEqual(target.toString(), uri.toString());
+                assert.strictEqual(options.useTrash, true);
+                assert.ok((await readTestFile(uri)).includes('未保存内容'));
+            });
+            await remove({ resourceUri: uri } as NovelerTreeItem);
+            assert.ok(trash.calledOnce);
+            assert.ok((vscode.window.showInformationMessage as sinon.SinonStub).calledWithMatch(sinon.match.string, '定位恢复目录'));
+        });
+        test(`${folder} deletion cancellation and failed saves never request trash`, async () => {
+            sandbox.stub(documentIO, 'workspaceFolder').returns({ uri: root, name: '删除验证', index: 0 });
+            const uri = vscode.Uri.joinPath(root, folder, '取消删除.md');
+            await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, folder));
+            await writeTestFile(uri, '# 原正文');
+            await applyDocumentChange(uri, text => text + '\n未保存内容');
+            const trash = sandbox.stub(documentIO, 'delete').resolves();
+            (vscode.window.showWarningMessage as sinon.SinonStub).resolves('取消');
+            await remove({ resourceUri: uri } as NovelerTreeItem);
+            assert.ok(trash.notCalled);
+            (vscode.window.showWarningMessage as sinon.SinonStub).resolves('删除');
+            sandbox.stub(documentIO, 'save').resolves(false);
+            await remove({ resourceUri: uri } as NovelerTreeItem);
+            assert.ok(trash.notCalled);
+            assert.strictEqual(await readTestFile(uri), '# 原正文');
+            assert.ok((vscode.window.showInformationMessage as sinon.SinonStub).notCalled);
+        });
+        test(`${folder} trash failures never fall back to permanent deletion`, async () => {
+            sandbox.stub(documentIO, 'workspaceFolder').returns({ uri: root, name: '删除验证', index: 0 });
+            const uri = vscode.Uri.joinPath(root, folder, '失败删除.md');
+            await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, folder));
+            await writeTestFile(uri, '# 保留正文');
+            (vscode.window.showWarningMessage as sinon.SinonStub).resolves('删除');
+            const trash = sandbox.stub(documentIO, 'delete').rejects(new Error('废纸篓不可用'));
+            await remove({ resourceUri: uri } as NovelerTreeItem);
+            assert.ok(trash.calledOnce);
+            assert.strictEqual(trash.firstCall.args[1].useTrash, true);
+            assert.strictEqual(await readTestFile(uri), '# 保留正文');
+            assert.ok((vscode.window.showInformationMessage as sinon.SinonStub).notCalled);
+        });
+    }
 
     for (const enabled of [true, false, undefined]) {
         test(`completing an inline todo honors deleteOnResolve=${enabled} and preserves the body`, async () => {

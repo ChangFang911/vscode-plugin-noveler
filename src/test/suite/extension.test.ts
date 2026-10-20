@@ -2,8 +2,30 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { readFileSync, existsSync } from 'fs';
 import * as path from 'path';
+import { parse } from 'jsonc-parser';
+import { CURRENT_CONFIG_VERSION } from '../../constants';
 
 suite('Extension Test Suite', () => {
+    if (process.env.NOVELER_TEST_LEGACY_VERSION) {
+        test('packaged extension upgrades a legacy project without losing user settings', async () => {
+            const ext = vscode.extensions.getExtension('chang.chinese-novel-writer');
+            assert.ok(ext);
+            await ext.activate();
+            const folder = vscode.workspace.workspaceFolders?.[0];
+            assert.ok(folder);
+            const text = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(folder.uri, 'novel.jsonc'))).toString('utf8');
+            const result = parse(text);
+            assert.strictEqual(result.version, CURRENT_CONFIG_VERSION);
+            assert.strictEqual(result.custom, '必须保留');
+            assert.strictEqual(result.noveler.targetWords.default, 4321);
+            assert.strictEqual(result.noveler.paragraphIndent.value, false);
+            assert.strictEqual(result.noveler.volumes.enabled, false);
+            assert.strictEqual(result.noveler.volumes.folderStructure, 'flat');
+            assert.strictEqual(result.noveler.sensitiveWords.builtInLibrary.levels.high, false);
+            assert.strictEqual(result.noveler.sensitiveWords.builtInLibrary.levels.medium, true);
+            assert.ok(text.includes('// 打包升级验证备注'));
+        });
+    }
     test('Extension should be present', () => {
         // 使用正确的扩展 ID: publisher.name
         assert.ok(vscode.extensions.getExtension('chang.chinese-novel-writer'));

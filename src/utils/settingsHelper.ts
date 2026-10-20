@@ -1,11 +1,16 @@
 import { applyEdits, modify, parse, ParseError } from 'jsonc-parser';
 
-export function patchJsoncFields(text: string, fields: Record<string, unknown>): string {
+export function parseJsoncObject(text: string): Record<string, unknown> {
     const errors: ParseError[] = [];
     const value = parse(text, errors, { allowTrailingComma: true });
     if (errors.length || !value || typeof value !== 'object' || Array.isArray(value)) {
         throw new Error('JSONC 格式无效，原文件未修改');
     }
+    return value;
+}
+
+export function patchJsoncFields(text: string, fields: Record<string, unknown>): string {
+    parseJsoncObject(text);
     let result = text;
     for (const [key, field] of Object.entries(fields)) {
         result = applyEdits(result, modify(result, [key], field, {

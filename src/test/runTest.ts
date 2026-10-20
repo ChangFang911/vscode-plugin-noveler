@@ -16,6 +16,15 @@ async function main() {
             'workbench.localHistory.enabled': false,
             'files.autoSave': 'off'
         }));
+        if (process.env.NOVELER_TEST_LEGACY_VERSION) {
+            await writeFile(path.join(workspace, 'novel.jsonc'), `{
+ // 打包升级验证备注
+ "version": ${JSON.stringify(process.env.NOVELER_TEST_LEGACY_VERSION)},
+ "custom": "必须保留",
+ "noveler": {"targetWords":{"default":4321},"paragraphIndent":{"value":false},
+ "sensitiveWords":{"levels":{"high":false,"medium":true}}}
+}`);
+        }
         // The folder containing the Extension Manifest package.json
         const extensionDevelopmentPath = process.env.NOVELER_TEST_EXTENSION_PATH || path.resolve(__dirname, '../../');
 
