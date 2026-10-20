@@ -1,3 +1,4 @@
+import { isChapterFile } from '../../utils/volumeHelper';
 /**
  * 章节和卷节点提供器
  */
@@ -218,7 +219,7 @@ export class ChapterNodesProvider {
 
         try {
             const files = await vscode.workspace.fs.readDirectory(folderPath);
-            const mdFiles = files.filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'));
+            const mdFiles = files.filter(([name, type]) => type === vscode.FileType.File && isChapterFile(name));
 
             if (mdFiles.length === 0) {
                 return [

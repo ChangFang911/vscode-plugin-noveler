@@ -33,8 +33,7 @@ import {
     MIN_AVG_CHAPTERS_PER_VOLUME,
     MIN_VOLUME_COVERAGE_RATIO,
     README_FILE_NAME,
-    DEFAULT_TARGET_WORDS,
-    MINIMUM_COMPLETED_WORD_COUNT
+    DEFAULT_TARGET_WORDS
 } from '../../constants';
 
 suite('Constants Test Suite', () => {
@@ -578,10 +577,6 @@ suite('Constants Test Suite', () => {
 
         test('DEFAULT_TARGET_WORDS should be 2500', () => {
             assert.strictEqual(DEFAULT_TARGET_WORDS, 2500);
-        });
-
-        test('MINIMUM_COMPLETED_WORD_COUNT should be 100', () => {
-            assert.strictEqual(MINIMUM_COMPLETED_WORD_COUNT, 100);
         });
     });
 

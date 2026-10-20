@@ -216,24 +216,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
         // 订阅配置变更事件
         context.subscriptions.push(
-            configService.onDidChangeConfig(async () => {
+            configService.onDidChangeConfig(() => {
                 vscode.commands.executeCommand('noveler.refresh');
                 codeLensProvider?.refresh();
                 // 自动重载高亮配置
                 highlightProvider.reloadDecorations();
                 updateHighlights(vscode.window.activeTextEditor);
-                // 自动重载敏感词配置
-                if (sensitiveWordService) {
-                    try {
-                        await sensitiveWordService.reload();
-                        Logger.info('[Noveler] 敏感词配置已自动重新加载');
-                        if (vscode.window.activeTextEditor) {
-                            sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
-                        }
-                    } catch (error) {
-                        Logger.error('[Noveler] 自动重新加载敏感词配置失败', error);
-                    }
-                }
             })
         );
 
@@ -410,32 +398,13 @@ function registerFileSystemWatchers(
     });
     context.subscriptions.push(configWatcher);
 
-    // 监听敏感词配置文件变化
-    const sensitiveWordsPattern = new vscode.RelativePattern(
-        workspaceFolder,
-        '.noveler/sensitive-words/{custom-words.jsonc,whitelist.jsonc}'
-    );
-    const sensitiveWordsWatcher = vscode.workspace.createFileSystemWatcher(sensitiveWordsPattern);
-
-    const reloadSensitiveWords = async () => {
-        if (!sensitiveWordService) {
-            return;
-        }
-        try {
-            await sensitiveWordService.reload();
-            Logger.info('[Noveler] 敏感词库已自动重新加载');
+    if (sensitiveWordService) {
+        context.subscriptions.push(sensitiveWordService.watchLibraries(() => {
             if (vscode.window.activeTextEditor && sensitiveWordDiagnostic) {
                 sensitiveWordDiagnostic.updateDiagnostics(vscode.window.activeTextEditor.document);
             }
-        } catch (error) {
-            Logger.error('[Noveler] 自动重新加载敏感词库失败', error);
-        }
-    };
-
-    sensitiveWordsWatcher.onDidCreate(reloadSensitiveWords);
-    sensitiveWordsWatcher.onDidChange(reloadSensitiveWords);
-    sensitiveWordsWatcher.onDidDelete(reloadSensitiveWords);
-    context.subscriptions.push(sensitiveWordsWatcher);
+        }));
+    }
 
     // 监听目录变化
     const dirPattern = new vscode.RelativePattern(workspaceFolder, '{chapters,characters}');

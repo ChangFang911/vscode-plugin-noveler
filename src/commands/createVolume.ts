@@ -6,14 +6,14 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
 import { generateVolumeFolderName } from '../utils/volumeHelper';
-import { formatDateTime } from '../utils/dateFormatter';
+import { documentIO } from '../utils/documentOperations';
 import { DEFAULT_VOLUME_TARGET_WORDS } from '../constants';
 
 /**
  * 创建新卷
  */
 export async function createVolume(): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('请先打开一个工作区');
         return;
@@ -25,27 +25,13 @@ export async function createVolume(): Promise<void> {
     // 检查是否启用分卷功能（嵌套结构）
     // isVolumesEnabled() 已经同时检查 enabled=true 和 folderStructure=nested
     if (!configService.isVolumesEnabled()) {
-        const volumesConfig = configService.getVolumesConfig();
-
-        if (volumesConfig.enabled && volumesConfig.folderStructure === 'flat') {
-            // 启用了分卷但使用扁平结构
-            vscode.window.showErrorMessage('当前文件夹结构为 flat（扁平），无法创建卷。请在配置中将 folderStructure 设置为 nested');
-            return;
-        }
-
-        // 分卷功能未启用
         const enable = await vscode.window.showWarningMessage(
-            '分卷功能未启用。是否要启用分卷功能？',
-            '启用', '取消'
+            '创建卷前需要切换为按卷组织。已有章节将通过迁移向导整理。',
+            '开始切换', '取消'
         );
-
-        if (enable !== '启用') {
-            return;
+        if (enable === '开始切换') {
+            await vscode.commands.executeCommand('noveler.migrateToVolumeStructure');
         }
-
-        // 启用分卷功能
-        await enableVolumes(workspaceFolder);
-        vscode.window.showInformationMessage('已启用分卷功能，请重新运行创建卷命令');
         return;
     }
 
@@ -288,45 +274,4 @@ async function createVolumeOutline(volumeFolderPath: string, volumeTitle: string
     const outlinePath = path.join(volumeFolderPath, 'outline.md');
     fs.writeFileSync(outlinePath, outlineContent, 'utf-8');
     Logger.info(`创建 outline.md: ${outlinePath}`);
-}
-
-/**
- * 启用分卷功能
- */
-async function enableVolumes(workspaceFolder: vscode.WorkspaceFolder): Promise<void> {
-    const configPath = path.join(workspaceFolder.uri.fsPath, 'novel.jsonc');
-
-    if (!fs.existsSync(configPath)) {
-        vscode.window.showErrorMessage('未找到 novel.jsonc 配置文件');
-        return;
-    }
-
-    try {
-        let configText = fs.readFileSync(configPath, 'utf-8');
-
-        // 简单替换：将 "enabled": false 改为 "enabled": true
-        configText = configText.replace(
-            /"volumes":\s*\{[^}]*"enabled":\s*false/,
-            (match) => match.replace('"enabled": false', '"enabled": true')
-        );
-
-        // 将 folderStructure 从 flat 改为 nested
-        configText = configText.replace(
-            /"folderStructure":\s*"flat"/,
-            '"folderStructure": "nested"'
-        );
-
-        // 更新 modified 时间戳
-        const now = formatDateTime(new Date());
-        configText = configText.replace(
-            /"modified":\s*"[^"]*"/,
-            `"modified": "${now}"`
-        );
-
-        fs.writeFileSync(configPath, configText, 'utf-8');
-        Logger.info('已启用分卷功能');
-    } catch (error) {
-        Logger.error('启用分卷功能失败', error);
-        throw error;
-    }
 }

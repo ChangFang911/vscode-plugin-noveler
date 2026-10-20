@@ -4,7 +4,8 @@ import { parseFrontMatter } from '../utils/frontMatterParser';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
-import { generateVolumeFolderName } from '../utils/volumeHelper';
+import { documentIO } from '../utils/documentOperations';
+import { generateVolumeFolderName, isChapterFile } from '../utils/volumeHelper';
 import { formatDateTime } from '../utils/dateFormatter';
 import { ChapterMove, MigrationFile, migrateChapters, saveMigrationDocuments } from '../utils/chapterMigration';
 
@@ -32,17 +33,15 @@ interface VolumeGroup {
  *
  */
 export async function migrateToVolumeStructure(): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('请先打开一个工作区');
         return;
     }
 
     const configService = ConfigService.getInstance();
-    const volumesConfig = configService.getVolumesConfig();
-
     // 检查当前结构
-    if (volumesConfig.folderStructure === 'nested') {
+    if (configService.isVolumesEnabled()) {
         vscode.window.showInformationMessage('当前已是嵌套结构（分卷模式）');
         return;
     }
@@ -64,7 +63,11 @@ export async function migrateToVolumeStructure(): Promise<void> {
         await saveMigrationDocuments(workspaceFolder.uri);
         const chapters = await scanChapterFiles(chaptersPath);
         if (chapters.length === 0) {
-            vscode.window.showInformationMessage('chapters 目录下没有章节文件');
+            await migrateChapters(workspaceFolder.uri, [], [], 'nested');
+            await configService.reloadConfig();
+            await VolumeService.getInstance().scanVolumes(true);
+            await vscode.commands.executeCommand('noveler.refresh');
+            vscode.window.showInformationMessage('已切换为按卷组织，可在侧边栏创建第一卷');
             return;
         }
 
@@ -117,7 +120,7 @@ async function scanChapterFiles(chaptersPath: string): Promise<ChapterInfo[]> {
     const folder = vscode.Uri.file(chaptersPath);
     const entries = await vscode.workspace.fs.readDirectory(folder);
     for (const [name, type] of entries) {
-        if (type !== vscode.FileType.File || !name.endsWith('.md') || name === 'outline.md' || name === 'README.md') {
+        if (type !== vscode.FileType.File || !isChapterFile(name)) {
             continue;
         }
         const uri = vscode.Uri.joinPath(folder, name);
@@ -290,7 +293,7 @@ async function executeMigration(
 }
 
 export async function rollbackToFlatStructure(): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = documentIO.workspaceFolder();
     if (!workspaceFolder) {
         vscode.window.showErrorMessage('请先打开一个工作区');
         return;

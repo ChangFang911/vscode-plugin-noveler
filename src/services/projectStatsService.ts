@@ -1,5 +1,8 @@
+import { isChapterFile } from '../utils/volumeHelper';
+import { isCompletedStatus } from '../utils/statusHelper';
+import { documentIO } from '../utils/documentOperations';
 import * as vscode from 'vscode';
-import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, COMPLETED_STATUS } from '../constants';
+import { CHAPTERS_FOLDER, CHARACTERS_FOLDER } from '../constants';
 import { WordCountService } from './wordCountService';
 import { handleError, ErrorSeverity } from '../utils/errorHandler';
 import { parseFrontMatter } from '../utils/frontMatterParser';
@@ -62,7 +65,7 @@ export class ProjectStatsService {
      */
     public async getStats(): Promise<ProjectStats | null> {
         try {
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            const workspaceFolder = documentIO.workspaceFolder();
             if (!workspaceFolder) {
                 Logger.debug('未找到工作区文件夹');
                 return null;
@@ -105,7 +108,7 @@ export class ProjectStatsService {
 
         try {
             // 递归扫描所有 .md 文件（支持扁平结构和分卷嵌套结构）
-            const mdFilePaths = await this.scanForMdFiles(chaptersPath);
+            const mdFilePaths = await this.scanForMdFiles(chaptersPath, true);
 
             stats.chapterCount = mdFilePaths.length;
 
@@ -137,7 +140,7 @@ export class ProjectStatsService {
      * 递归扫描目录中的所有 .md 文件（支持扁平结构和嵌套结构）
      * 排除 outline.md 等非章节文件
      */
-    private async scanForMdFiles(dirPath: vscode.Uri): Promise<vscode.Uri[]> {
+    private async scanForMdFiles(dirPath: vscode.Uri, chaptersOnly = false): Promise<vscode.Uri[]> {
         const mdFiles: vscode.Uri[] = [];
 
         try {
@@ -147,11 +150,11 @@ export class ProjectStatsService {
                 if (type === vscode.FileType.Directory) {
                     // 递归扫描子目录（支持分卷结构）
                     const subDirPath = vscode.Uri.joinPath(dirPath, name);
-                    const subFiles = await this.scanForMdFiles(subDirPath);
+                    const subFiles = await this.scanForMdFiles(subDirPath, chaptersOnly);
                     mdFiles.push(...subFiles);
-                } else if (type === vscode.FileType.File && name.endsWith('.md')) {
+                } else if (type === vscode.FileType.File && name.toLowerCase().endsWith('.md')) {
                     // 排除 outline.md 等非章节文件
-                    if (name === 'outline.md' || name === 'README.md') {
+                    if (chaptersOnly ? !isChapterFile(name) : ['outline.md', 'readme.md'].includes(name.toLowerCase())) {
                         continue;
                     }
                     mdFiles.push(vscode.Uri.joinPath(dirPath, name));
@@ -188,7 +191,7 @@ export class ProjectStatsService {
     private removeFrontMatter(text: string): string {
         try {
             const parsed = parseFrontMatter(text);
-            return parsed.content || text;
+            return parsed.content;
         } catch (error) {
             // 解析失败，降级到正则匹配
             const frontMatterRegex = /^---\n[\s\S]*?\n---\n/;
@@ -208,21 +211,6 @@ export class ProjectStatsService {
      * 检查章节是否完成
      */
     private isChapterCompleted(text: string): boolean {
-        try {
-            const parsed = parseFrontMatter(text);
-            const data = parsed.data as Record<string, unknown>;
-            if (data && data.status) {
-                const status = String(data.status).trim();
-                return status === COMPLETED_STATUS || status === 'completed';
-            }
-        } catch (error) {
-            // 解析失败，降级到正则匹配
-            const statusMatch = text.match(/^status:\s*["']?(.+?)["']?$/m);
-            if (statusMatch) {
-                const status = statusMatch[1].trim();
-                return status === COMPLETED_STATUS || status === 'completed';
-            }
-        }
-        return false;
+        return isCompletedStatus(parseFrontMatter(text).data.status);
     }
 }

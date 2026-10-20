@@ -108,7 +108,7 @@ export function getContentWithoutFrontMatter(document: vscode.TextDocument): str
     try {
         const text = document.getText();
         const parsed = parseFrontMatter(text);
-        return parsed.content || text;
+        return parsed.content;
     } catch (error) {
         Logger.error('Front Matter 解析失败', error);
         return document.getText();

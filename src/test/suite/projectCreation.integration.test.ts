@@ -136,7 +136,7 @@ suite('Project Creation Real Files Integration', () => {
         }
     });
 
-    test('real volume scan excludes outlines, orders chapters and computes completion at the boundary', async () => {
+    test('real volume scan excludes outlines, orders chapters and uses explicit completion status regardless of word count', async () => {
         const config = await initialize(true);
         const serviceConfig = Object.create(ConfigService.prototype) as ConfigService;
         serviceConfig['config'] = config.noveler;
@@ -148,8 +148,8 @@ suite('Project Creation Real Files Integration', () => {
         await vscode.workspace.fs.createDirectory(folder);
         await writeTestFile(vscode.Uri.joinPath(folder, 'outline.md'), '# 不应计为章节');
         await writeTestFile(vscode.Uri.joinPath(folder, 'README.md'), '# 说明');
-        await writeTestFile(vscode.Uri.joinPath(folder, 'A.md'), '---\nchapter: 2\n---\n' + '文'.repeat(101));
-        await writeTestFile(vscode.Uri.joinPath(folder, 'Z.md'), '---\nchapter: 1\n---\n' + '字'.repeat(100));
+        await writeTestFile(vscode.Uri.joinPath(folder, 'A.md'), '---\nchapter: 2\nstatus: 草稿\n---\n' + '文'.repeat(101));
+        await writeTestFile(vscode.Uri.joinPath(folder, 'Z.md'), '---\nchapter: 1\nstatus: completed\n---\n' + '字'.repeat(100));
         const volumes = await service.scanVolumes(true);
         assert.strictEqual(volumes.length, 1);
         assert.deepStrictEqual(volumes[0].chapters, ['Z.md', 'A.md']);

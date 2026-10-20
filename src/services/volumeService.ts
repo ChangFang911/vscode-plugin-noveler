@@ -1,3 +1,5 @@
+import { isChapterFile } from '../utils/volumeHelper';
+import { isCompletedStatus } from '../utils/statusHelper';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as jsoncParser from 'jsonc-parser';
@@ -7,7 +9,7 @@ import { ConfigService } from './configService';
 import { Logger } from '../utils/logger';
 import { WordCountService } from './wordCountService';
 import { getContentWithoutFrontMatter } from '../utils/frontMatterHelper';
-import { VOLUME_TYPE_OFFSETS, MINIMUM_COMPLETED_WORD_COUNT } from '../constants';
+import { VOLUME_TYPE_OFFSETS } from '../constants';
 import { fileExists, documentIO } from '../utils/documentOperations';
 
 /**
@@ -371,17 +373,8 @@ export class VolumeService {
             const entries = await vscode.workspace.fs.readDirectory(folderUri);
 
             for (const [name, type] of entries) {
-                // 只处理 .md 文件，排除特殊文件
-                if (type === vscode.FileType.File && name.endsWith('.md')) {
-                    // 排除以下特殊文件：
-                    // - outline.md (卷大纲)
-                    // - README.md (说明文档)
-                    // - volume.md (卷元信息)
-                    const excludedFiles = ['outline.md', 'README.md', 'readme.md', 'volume.md', 'VOLUME.md'];
-
-                    if (!excludedFiles.includes(name)) {
-                        chapters.push(name);
-                    }
+                if (type === vscode.FileType.File && isChapterFile(name)) {
+                    chapters.push(name);
                 }
             }
 
@@ -446,7 +439,7 @@ export class VolumeService {
                     const contentWithoutFM = getContentWithoutFrontMatter({ getText: () => content } as vscode.TextDocument);
                     const wordCount = WordCountService.getSimpleWordCount(contentWithoutFM, true);
 
-                    return { wordCount, isCompleted: wordCount > MINIMUM_COMPLETED_WORD_COUNT };
+                    return { wordCount, isCompleted: isCompletedStatus(parseFrontMatter(content).data.status) };
                 } catch (error) {
                     Logger.warn(`读取章节文件失败: ${chapterPath}`, error);
                     return { wordCount: 0, isCompleted: false };
@@ -555,7 +548,7 @@ export class VolumeService {
             if (!await fileExists(folder)) { continue; }
             const files = await vscode.workspace.fs.readDirectory(folder);
             for (const [name, type] of files) {
-                if (type !== vscode.FileType.File || !name.endsWith('.md')) { continue; }
+                if (type !== vscode.FileType.File || !isChapterFile(name)) { continue; }
                 const match = name.match(/^第(.+?)章[-_]/) || name.match(/^(\d+)-/);
                 const filenameNumber = match ? (/^[IVXLCDM]+$/.test(match[1])
                     ? this.parseRomanNumber(match[1]) : this.parseNumber(match[1])) : 0;

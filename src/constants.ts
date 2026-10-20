@@ -189,8 +189,5 @@ export const DEFAULT_AUTO_EMPTY_LINE = true;
 /** 默认段落缩进 */
 export const DEFAULT_PARAGRAPH_INDENT = true;
 
-/** 判断章节完成的最小字数 */
-export const MINIMUM_COMPLETED_WORD_COUNT = 100;
-
 /** 侧边栏刷新延迟（毫秒），避免抢夺编辑器焦点 */
 export const SIDEBAR_REFRESH_DELAY = 500;

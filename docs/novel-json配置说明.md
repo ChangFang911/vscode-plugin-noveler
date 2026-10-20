@@ -262,7 +262,7 @@ chapters/
 ```
 
 `severity` 支持 `Error`、`Warning`、`Information`。自定义词库和白名单使用 `words` 数组，
-它们的文件路径支持 `.jsonc` 与 `.json` 回退；这一规则不适用于主配置文件。
+它们的文件路径支持 `.jsonc` 与 `.json` 回退；保存词库或修改配置中的词库路径后自动刷新，无需重启。这一回退规则不适用于主配置文件。
 详见 [敏感词库说明](../templates/sensitive-words/README.md)。
 
 ## VS Code 项目设置

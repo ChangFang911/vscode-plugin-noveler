@@ -212,6 +212,7 @@ suite('Chapter Migration Safety Integration', () => {
         await writeTestFile(moves[1].target, '---\ntitle: 第二卷原章节\nchapter: 2\nvolume: 2\n---\n正文');
         sandbox.stub(vscode.workspace, 'workspaceFolders').value([{ uri: root, name: '测试', index: 0 }]);
         sandbox.stub(ConfigService, 'getInstance').returns({
+            isVolumesEnabled: () => false,
             getVolumesConfig: () => ({ enabled: false, folderStructure: 'flat', numberFormat: 'arabic' }),
             reloadConfig: async () => undefined
         } as unknown as ConfigService);

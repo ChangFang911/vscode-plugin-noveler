@@ -5,7 +5,8 @@ import { ConfigService } from '../services/configService';
 import { VolumeService } from '../services/volumeService';
 import { CHAPTERS_FOLDER, CHARACTERS_FOLDER, STATUS_EMOJI_MAP } from '../constants';
 import { Logger } from './logger';
-import { getStatusDisplayName } from './statusHelper';
+import { isChapterFile } from './volumeHelper';
+import { getStatusDisplayName, isCompletedStatus } from './statusHelper';
 import { applyDocumentChange, documentIO, fileExists } from './documentOperations';
 
 interface ChapterInfo {
@@ -123,7 +124,7 @@ export async function scanChapters(): Promise<ProjectStats> {
                 volumeTotalWords += chapterInfo.wordCount;
                 totalWords += chapterInfo.wordCount;
 
-                if (chapterInfo.status === '已完成') {
+                if (isCompletedStatus(chapterInfo.status)) {
                     volumeCompletedChapters++;
                     completedChapters++;
                 }
@@ -160,7 +161,7 @@ export async function scanChapters(): Promise<ProjectStats> {
 
         const files = await vscode.workspace.fs.readDirectory(chaptersFolderUri);
         const mdFiles = files
-            .filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.md'))
+            .filter(([name, type]) => type === vscode.FileType.File && isChapterFile(name))
             .map(([name]) => name)
             .sort(); // 按文件名排序
 
@@ -206,7 +207,7 @@ export async function scanChapters(): Promise<ProjectStats> {
             totalWords += chapterInfo.wordCount;
 
             // 统计完成的章节（状态为"已完成"）
-            if (chapterInfo.status === '已完成') {
+            if (isCompletedStatus(chapterInfo.status)) {
                 completedChapters++;
             }
         }

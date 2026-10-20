@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as jsoncParser from 'jsonc-parser';
+import { documentIO } from '../utils/documentOperations';
 import { TrieTree } from '../utils/trieTree';
 import {
     SensitiveWordConfig,
@@ -30,6 +31,7 @@ export class SensitiveWordService {
     private whitelist: Set<string> = new Set();
     private config!: SensitiveWordConfig;
     private context!: vscode.ExtensionContext;
+    private reloadQueue: Promise<void> = Promise.resolve();
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     private constructor() {}
@@ -248,7 +250,7 @@ export class SensitiveWordService {
      * 优先加载 .jsonc 文件，如果不存在则尝试 .json 文件（向后兼容）
      */
     private async loadCustomSensitiveLibrary(): Promise<void> {
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceRoot = documentIO.workspaceFolder()?.uri.fsPath;
         if (!workspaceRoot) {
             return;
         }
@@ -297,7 +299,7 @@ export class SensitiveWordService {
      * 优先加载 .jsonc 文件，如果不存在则尝试 .json 文件（向后兼容）
      */
     private async loadWhitelist(): Promise<void> {
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceRoot = documentIO.workspaceFolder()?.uri.fsPath;
         if (!workspaceRoot) {
             return;
         }
@@ -344,7 +346,7 @@ export class SensitiveWordService {
      * 加载黑名单/白名单（用于微调内置词库）
      */
     private async loadCustomLibrary(): Promise<void> {
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceRoot = documentIO.workspaceFolder()?.uri.fsPath;
         if (!workspaceRoot) {
             return;
         }
@@ -425,9 +427,62 @@ export class SensitiveWordService {
      * 重新加载配置和词库
      */
     public async reload(): Promise<void> {
-        Logger.info('重新加载敏感词检测服务...');
-        this.loadConfig();
-        await this.initializeAsync();
+        const reload = (this.reloadQueue ?? Promise.resolve()).then(async () => {
+            this.loadConfig();
+            await this.initializeAsync();
+        });
+        this.reloadQueue = reload.catch(error => Logger.error('重新加载敏感词库失败', error));
+        await reload;
+    }
+
+    public watchLibraries(onReloaded: () => void): vscode.Disposable {
+        let watchers: vscode.FileSystemWatcher[] = [];
+        let disposed = false;
+        const reload = () => {
+            this.reload().then(() => {
+                if (!disposed) { onReloaded(); }
+            }).catch(error => Logger.error('自动刷新敏感词库失败', error));
+        };
+        const rebuild = () => {
+            watchers.forEach(watcher => watcher.dispose());
+            watchers = [];
+            this.loadConfig();
+            const root = documentIO.workspaceFolder()?.uri.fsPath;
+            if (!root || !this.config.enabled) { return; }
+            const paths: string[] = [];
+            for (const library of [this.config.customLibrary, this.config.whitelist]) {
+                if (!library?.enabled) { continue; }
+                paths.push(library.path);
+                if (/\.jsonc?$/.test(library.path)) {
+                    paths.push(library.path.endsWith('.jsonc') ? library.path.slice(0, -1) : library.path + 'c');
+                }
+            }
+            if (this.config.customWords?.enabled) {
+                paths.push(this.config.customWords.blacklistPath, this.config.customWords.whitelistPath);
+            }
+            const targets = new Set(paths.map(file => vscode.Uri.file(path.join(root, file)).toString()));
+            const parents = new Set(paths.map(file => path.dirname(path.join(root, file))));
+            for (const parent of parents) {
+                const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(parent), '*'));
+                const changed = (uri: vscode.Uri) => {
+                    if (!disposed && targets.has(uri.toString())) { reload(); }
+                };
+                watcher.onDidCreate(changed);
+                watcher.onDidChange(changed);
+                watcher.onDidDelete(changed);
+                watchers.push(watcher);
+            }
+        };
+        rebuild();
+        const configuration = ConfigService.getInstance().onDidChangeConfig(() => {
+            rebuild();
+            reload();
+        });
+        return new vscode.Disposable(() => {
+            disposed = true;
+            configuration.dispose();
+            watchers.forEach(watcher => watcher.dispose());
+        });
     }
 
     /**

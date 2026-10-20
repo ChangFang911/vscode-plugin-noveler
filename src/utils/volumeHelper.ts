@@ -142,3 +142,8 @@ export function getVolumeStatusName(status: string): string {
 export function getVolumeTypeName(type: string): string {
     return VOLUME_TYPE_NAMES[type as VolumeType] || type;
 }
+
+export function isChapterFile(name: string): boolean {
+    return name.toLowerCase().endsWith('.md')
+        && !['outline.md', 'readme.md', 'volume.md'].includes(name.toLowerCase());
+}

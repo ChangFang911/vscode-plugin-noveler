@@ -42,3 +42,7 @@ export function getStatusOptions(): string[] {
 export function getStatusDisplayOptions(): string[] {
     return ['草稿', '初稿', '修改中', '已完成'];
 }
+
+export function isCompletedStatus(status: unknown): boolean {
+    return typeof status === 'string' && getStatusDisplayName(status.trim()) === '已完成';
+}

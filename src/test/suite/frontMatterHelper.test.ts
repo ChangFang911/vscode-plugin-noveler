@@ -1,7 +1,20 @@
 import * as assert from 'assert';
-import { extractContentWithoutFrontmatterForMatching, getFrontmatterEndOffsetForMatching } from '../../utils/frontMatterHelper';
+import * as vscode from 'vscode';
+import { getContentWithoutFrontMatter, extractContentWithoutFrontmatterForMatching, getFrontmatterEndOffsetForMatching } from '../../utils/frontMatterHelper';
 
 suite('FrontMatterHelper Test Suite', () => {
+    test('empty parsed bodies stay empty, while ordinary text and invalid headers are preserved', () => {
+        for (const [text, expected] of [
+            ['---\nchapter: 1\nstatus: 已完成\n---\n', ''],
+            ['---\r\nchapter: 1\r\n---', ''],
+            ['普通正文', '普通正文'],
+            ['---\n未闭合属性', '---\n未闭合属性'],
+            ['---\ninvalid: [\n---\n正文', '---\ninvalid: [\n---\n正文']
+        ]) {
+            assert.strictEqual(getContentWithoutFrontMatter({ getText: () => text } as vscode.TextDocument), expected);
+        }
+    });
+
 
     suite('extractContentWithoutFrontmatterForMatching', () => {
 
