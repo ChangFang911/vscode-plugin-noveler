@@ -335,7 +335,7 @@ suite('Phase Two Data Safety Integration', () => {
         assert.strictEqual(shown.command?.arguments?.[0].toString(), uri.toString());
         assert.strictEqual(shown.contextValue, 'character');
         assert.strictEqual(items[0].resourceUri?.toString(), uri.toString());
-        assert.strictEqual((shown.iconPath as vscode.ThemeIcon).id, 'person');
+        assert.strictEqual((shown.iconPath as vscode.ThemeIcon).id, 'circle-filled');
     });
     test('character renaming preserves aliases and does not add the old name automatically', async () => {
         const uri = await aliasFixture('---\nname: 王明\naliases: [小王, William]\n---\n# 王明\n正文');

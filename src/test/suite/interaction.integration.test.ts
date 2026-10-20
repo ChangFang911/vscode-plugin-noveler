@@ -62,8 +62,9 @@ suite('Simple Writing Interactions Integration', () => {
             const shown = NovelerViewProvider.prototype.getTreeItem.call({} as NovelerViewProvider, item);
             assert.strictEqual(shown.resourceUri, undefined);
             const icons: Record<string, string> = { 'A主角': 'star-full', 'Z主角': 'star-full',
-                '重要人物': 'debug-stop', '次要人物': 'triangle-up', '普通人物': 'person' };
-            assert.strictEqual((shown.iconPath as vscode.ThemeIcon).id, icons[item.label] ?? 'person');
+                '重要人物': 'debug-stop', '次要人物': 'triangle-up', '普通人物': 'circle-filled' };
+            assert.strictEqual((shown.iconPath as vscode.ThemeIcon).id, icons[item.label] ?? 'circle-filled');
+            assert.strictEqual((shown.iconPath as vscode.ThemeIcon).color?.id, 'icon.foreground');
             assert.strictEqual(shown.id, item.resourceUri?.toString());
             assert.ok(item.tooltip?.includes('身份：剑修'));
             assert.ok(item.tooltip?.includes('别名：小名'));
@@ -143,7 +144,7 @@ suite('Simple Writing Interactions Integration', () => {
         (vscode.window.showInformationMessage as sinon.SinonStub).callsFake(async () => {
             await Promise.all(refreshes);
             assert.deepStrictEqual(order[0], ['重要人物', '原主角']);
-            assert.strictEqual(((await nodes())[1].iconPath as vscode.ThemeIcon).id, 'person');
+            assert.strictEqual(((await nodes())[1].iconPath as vscode.ThemeIcon).id, 'circle-filled');
             return '撤销';
         });
         await setCharacterImportance(uri, refresh);

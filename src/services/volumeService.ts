@@ -1,4 +1,4 @@
-import { isChapterFile } from '../utils/volumeHelper';
+import { isChapterFile, compareChapterOrder } from '../utils/volumeHelper';
 import { isCompletedStatus } from '../utils/statusHelper';
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -198,7 +198,7 @@ export class VolumeService {
      * 解析卷文件夹名称
      * 支持多种命名格式
      */
-    private parseVolumeName(folderName: string): { volume: number; volumeType: VolumeType; title: string } | null {
+    public parseVolumeName(folderName: string): { volume: number; volumeType: VolumeType; title: string } | null {
         // 前传格式：前传一-起源, 前传1-起源, 前传I-起源
         const prequelMatch = folderName.match(/^前传([一二三四五六七八九十\d]+|[IVX]+)[-_](.+)$/);
         if (prequelMatch) {
@@ -386,15 +386,7 @@ export class VolumeService {
                 }))
             );
 
-            chapterNumbers.sort((a, b) => {
-                // 如果都有章节号，按章节号排序
-                if (a.number && b.number) {
-                    return a.number - b.number;
-                }
-
-                // 否则按文件名字母顺序排序
-                return a.name.localeCompare(b.name);
-            });
+            chapterNumbers.sort(compareChapterOrder);
 
             return chapterNumbers.map(item => item.name);
         } catch (error) {

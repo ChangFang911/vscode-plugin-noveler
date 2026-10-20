@@ -83,3 +83,10 @@ node_modules/**/*.map
 node_modules/**/esm/**
 node_modules/**/dist/**
 node_modules/**/argparse/**
+
+# 已合入生产 bundle 的导出解析器，仅保留根目录第三方许可说明
+node_modules/commonmark/**
+node_modules/entities/**
+node_modules/mdurl/**
+node_modules/minimist/**
+docs/导入导出开发计划.md

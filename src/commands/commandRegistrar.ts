@@ -1,3 +1,4 @@
+import { exportNovel } from './exportNovel';
 import { manageCharacterAliases } from './manageCharacterAliases';
 import { applySensitiveWordFix } from '../providers/sensitiveWordCodeAction';
 /**
@@ -76,6 +77,7 @@ export interface CommandRegistrarDeps {
  */
 export function registerAllCommands(deps: CommandRegistrarDeps): void {
     registerCoreCommands(deps);
+    deps.context.subscriptions.push(vscode.commands.registerCommand('noveler.exportNovel', exportNovel));
     registerChapterCommands(deps);
     registerCharacterCommands(deps);
     registerVolumeCommands(deps);

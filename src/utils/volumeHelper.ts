@@ -147,3 +147,11 @@ export function isChapterFile(name: string): boolean {
     return name.toLowerCase().endsWith('.md')
         && !['outline.md', 'readme.md', 'volume.md'].includes(name.toLowerCase());
 }
+
+export function compareChapterOrder(a: { number: number | null; name: string }, b: { number: number | null; name: string }): number {
+    const validA = Number.isSafeInteger(a.number) && Number(a.number) > 0;
+    const validB = Number.isSafeInteger(b.number) && Number(b.number) > 0;
+    if (validA && validB && a.number !== b.number) { return Number(a.number) - Number(b.number); }
+    if (validA !== validB) { return validA ? -1 : 1; }
+    return a.name.localeCompare(b.name, 'zh-CN', { numeric: true }) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+}

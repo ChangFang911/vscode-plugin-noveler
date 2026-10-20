@@ -85,7 +85,7 @@ export class CharacterNodesProvider {
                     item.resourceUri = filePath;
                     item.id = filePath.toString();
                     const icon = CHARACTER_IMPORTANCE_ICONS[importance];
-                    item.iconPath = new vscode.ThemeIcon(typeof icon === 'string' ? icon : 'person');
+                    item.iconPath = new vscode.ThemeIcon(typeof icon === 'string' ? icon : 'circle-filled', new vscode.ThemeColor('icon.foreground'));
                     items.push({ item, priority: typeof priority === 'number' ? priority : 99, filename });
                 } catch (error) {
                     Logger.error(`读取人物文件失败 ${filename}`, error);

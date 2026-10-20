@@ -1,4 +1,4 @@
-import { isChapterFile } from '../../utils/volumeHelper';
+import { isChapterFile, compareChapterOrder } from '../../utils/volumeHelper';
 /**
  * 章节和卷节点提供器
  */
@@ -251,17 +251,8 @@ export class ChapterNodesProvider {
             }
 
             // 排序
-            filesWithMeta.sort(([aName, aChapter], [bName, bChapter]) => {
-                if (aChapter !== null && bChapter !== null) {
-                    return aChapter - bChapter;
-                } else if (aChapter !== null) {
-                    return -1;
-                } else if (bChapter !== null) {
-                    return 1;
-                } else {
-                    return aName.localeCompare(bName);
-                }
-            });
+            filesWithMeta.sort(([aName, aChapter], [bName, bChapter]) => compareChapterOrder(
+                { name: aName, number: aChapter }, { name: bName, number: bChapter }));
 
             const items: NovelerTreeItem[] = [];
 

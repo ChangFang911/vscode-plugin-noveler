@@ -1,4 +1,8 @@
 import * as assert from 'assert';
+import * as sinon from 'sinon';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { createRequire } from 'module';
 import * as vscode from 'vscode';
 import { readFileSync, existsSync } from 'fs';
 import * as path from 'path';
@@ -74,4 +78,61 @@ suite('Extension Test Suite', () => {
         assert.ok(icon.readUInt32BE(16) > 0 && icon.readUInt32BE(16) <= 1024);
         assert.ok(icon.readUInt32BE(20) > 0 && icon.readUInt32BE(20) <= 1024);
     });
+    if (process.env.NOVELER_TEST_SMOKE_ONLY === '1') {
+        test('packaged TXT export runs through the registered command without changing the original', async () => {
+            const sandbox = sinon.createSandbox();
+            const folder = await mkdtemp(path.join(tmpdir(), 'noveler-vsix-export-'));
+            try {
+                const root = vscode.workspace.workspaceFolders![0].uri;
+                const chapters = vscode.Uri.joinPath(root, 'chapters');
+                await vscode.workspace.fs.createDirectory(chapters);
+                await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(root, 'novel.jsonc'), Buffer.from(JSON.stringify({
+                    version: CURRENT_CONFIG_VERSION, name: '安装包验证', noveler: { volumes: { enabled: false, folderStructure: 'flat' } }
+                })));
+                const original = '---\nchapter: 1\ntitle: 初遇\nstatus: 草稿\n---\n\n# 第一章 初遇\n\n　　正文<!--✓ 不导出注释 -->';
+                const chapter = vscode.Uri.joinPath(chapters, '第一章.md');
+                await vscode.workspace.fs.writeFile(chapter, Buffer.from(original));
+                const extension = vscode.extensions.getExtension('chang.chinese-novel-writer')!;
+                await extension.activate();
+                const api = createRequire(path.join(extension.extensionPath, 'package.json'))('vscode') as typeof vscode;
+                sandbox.stub(api.window, 'showOpenDialog').resolves([vscode.Uri.file(folder)]);
+                sandbox.stub(api.window, 'showInputBox').resolves('验收导出');
+                sandbox.stub(api.window, 'showWarningMessage').resolves();
+                sandbox.stub(api.window, 'showInformationMessage').resolves();
+                const errors = sandbox.stub(api.window, 'showErrorMessage').resolves();
+                await vscode.commands.executeCommand('noveler.exportNovel');
+                assert.ok(errors.notCalled, errors.firstCall?.args[0]);
+                const output = await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(folder, '验收导出', '安装包验证.txt')));
+                assert.strictEqual(Buffer.from(output).toString('utf8'), '安装包验证\n\n第一章 初遇\n\n　　正文\n');
+                assert.strictEqual(Buffer.from(await vscode.workspace.fs.readFile(chapter)).toString('utf8'), original);
+                const secondVolume = vscode.Uri.joinPath(chapters, '第02卷-远行');
+                const firstVolume = vscode.Uri.joinPath(chapters, '第01卷-初遇');
+                await vscode.workspace.fs.createDirectory(secondVolume);
+                await vscode.workspace.fs.createDirectory(firstVolume);
+                const movedChapter = vscode.Uri.joinPath(firstVolume, '第一章.md');
+                await vscode.workspace.fs.rename(chapter, movedChapter, { overwrite: false });
+                const secondChapter = vscode.Uri.joinPath(secondVolume, '第一章.md');
+                const secondOriginal = original.replace(/初遇/g, '远行').replace('正文', '第二卷正文');
+                await vscode.workspace.fs.writeFile(secondChapter, Buffer.from(secondOriginal));
+                await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(root, 'novel.jsonc'), Buffer.from(JSON.stringify({
+                    version: CURRENT_CONFIG_VERSION, name: '安装包验证', noveler: {
+                        volumes: { enabled: true, folderStructure: 'nested', chapterNumbering: 'volume' }
+                    }
+                })));
+                (api.window.showInputBox as sinon.SinonStub).resolves('分卷验收');
+                await vscode.commands.executeCommand('noveler.exportNovel');
+                assert.ok(errors.notCalled, errors.firstCall?.args[0]);
+                const nestedOutput = await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(folder, '分卷验收', '安装包验证.txt')));
+                assert.strictEqual(Buffer.from(nestedOutput).toString('utf8'),
+                    '安装包验证\n\n第1卷 初遇\n\n第一章 初遇\n\n　　正文\n\n第2卷 远行\n\n第一章 远行\n\n　　第二卷正文\n');
+                assert.strictEqual(Buffer.from(await vscode.workspace.fs.readFile(movedChapter)).toString('utf8'), original);
+                assert.strictEqual(Buffer.from(await vscode.workspace.fs.readFile(secondChapter)).toString('utf8'), secondOriginal);
+                assert.deepStrictEqual(await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(folder, '验收导出', '安装包验证.txt'))), output);
+            } finally {
+                sandbox.restore();
+                await rm(folder, { recursive: true, force: true });
+            }
+        });
+    }
+
 });

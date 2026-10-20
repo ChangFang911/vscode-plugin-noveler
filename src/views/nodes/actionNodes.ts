@@ -42,6 +42,11 @@ export class ActionNodesProvider {
     getToolItems(): NovelerTreeItem[] {
         return [
             new NovelerTreeItem(
+                '导出小说', NodeType.OtherActionItem, vscode.TreeItemCollapsibleState.None,
+                { command: 'noveler.exportNovel', title: '导出小说为 TXT' },
+                'otherActionItem', undefined, '将全书导出为 TXT，保留原稿'
+            ).withIcon(new vscode.ThemeIcon('export')),
+            new NovelerTreeItem(
                 '使用指南',
                 NodeType.OtherActionItem,
                 vscode.TreeItemCollapsibleState.None,

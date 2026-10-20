@@ -82,7 +82,7 @@ export const CHARACTER_IMPORTANCE_ICONS: Record<string, string> = {
     '主角': 'star-full',
     '重要配角': 'debug-stop',
     '次要配角': 'triangle-up',
-    '路人': 'person'
+    '路人': 'circle-filled'
 };
 
 /** 重要性排序权重 */
