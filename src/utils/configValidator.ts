@@ -65,7 +65,7 @@ export function validateConfig(config: NovelConfig): ValidationError[] {
 
     // 验证 format.chineseQuoteStyle
     if (config.format?.chineseQuoteStyle) {
-        const validStyles = ['「」', '""', '""'];
+        const validStyles = ['「」', '“”', '""'];
         if (!validStyles.includes(config.format.chineseQuoteStyle)) {
             errors.push({
                 field: 'format.chineseQuoteStyle',

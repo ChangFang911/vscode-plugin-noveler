@@ -17,9 +17,6 @@ export const README_UPDATE_DEBOUNCE_DELAY = 5000;
 
 // ==================== 正则表达式 ====================
 
-/** 对话引号匹配正则 */
-export const DIALOGUE_REGEX = /「[^」]*」|"[^"]*"|"[^"]*"|'[^']*'|"[^"]*"|\u201c[^\u201d]*\u201d|\u2018[^\u2019]*\u2019/g;
-
 /** 心理描写匹配正则（全角括号） */
 export const THOUGHT_REGEX = /（[^）]*）/g;
 

@@ -26,13 +26,14 @@ suite('ConfigService actual accessors', () => {
 
     test('explicit false settings are respected instead of replaced by defaults', () => {
         service['config'] = {
-            format: { autoFormat: false, convertQuotes: false, chineseQuoteStyle: '“”' },
+            format: { autoFormat: false, convertQuotes: false, smartQuotes: false, chineseQuoteStyle: '“”' },
             wordCount: { showInStatusBar: false }, autoEmptyLine: { value: false },
             paragraphIndent: { value: false }, autoUpdateReadmeOnCreate: { value: 'never' },
             targetWords: { default: 4000 }, characters: { list: ['王明', '小王'] }
         };
         assert.strictEqual(service.shouldAutoFormat(), false);
         assert.strictEqual(service.shouldConvertQuotes(), false);
+        assert.strictEqual(service.shouldSmartQuotes(), false);
         assert.strictEqual(service.shouldAutoEmptyLine(), false);
         assert.strictEqual(service.shouldParagraphIndent(), false);
         assert.strictEqual(service.shouldShowWordCountInStatusBar(), false);

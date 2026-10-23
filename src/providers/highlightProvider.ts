@@ -3,13 +3,10 @@ import { getCharacterAliases } from '../utils/characterAliases';
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { parseFrontMatter } from '../utils/frontMatterParser';
-import {
-    DIALOGUE_REGEX,
-    HTML_COMMENT_REGEX,
-    CHARACTERS_FOLDER
-} from '../constants';
+import { CHARACTERS_FOLDER } from '../constants';
 import { Logger } from '../utils/logger';
 import { getFrontmatterEndOffsetForMatching } from '../utils/frontMatterHelper';
+import { findDialogueRanges } from '../utils/smartQuotes';
 import { SimpleTrieTree } from '../utils/simpleTrieTree';
 
 /**
@@ -285,22 +282,19 @@ export class NovelHighlightProvider {
             const allCharacterNames = [...new Set([...characterNamesFromFiles, ...characterNamesFromConfig])];
             const characterNames = allCharacterNames;
 
-            // 匹配对话（所有常见引号格式）
-            let match;
-            const dialogueRegex = new RegExp(DIALOGUE_REGEX.source, 'g');
-            while ((match = dialogueRegex.exec(text)) !== null) {
-                const startPos = editor.document.positionAt(match.index);
-                const endPos = editor.document.positionAt(match.index + match[0].length);
-                dialogueRanges.push(new vscode.Range(startPos, endPos));
-            }
-
-            // 匹配 HTML 注释（用于排除范围）
             const htmlCommentRanges: vscode.Range[] = [];
-            const commentRegex = new RegExp(HTML_COMMENT_REGEX.source, 'g');
-            while ((match = commentRegex.exec(text)) !== null) {
-                const startPos = editor.document.positionAt(match.index);
-                const endPos = editor.document.positionAt(match.index + match[0].length);
-                htmlCommentRanges.push(new vscode.Range(startPos, endPos));
+            const body = text.slice(frontmatterEndOffset).replace(/<!--[\s\S]*?(?:-->|$)/g, (comment, offset: number) => {
+                htmlCommentRanges.push(new vscode.Range(
+                    editor.document.positionAt(frontmatterEndOffset + offset),
+                    editor.document.positionAt(frontmatterEndOffset + offset + comment.length)
+                ));
+                return comment.replace(/[^\r\n]/g, ' ');
+            });
+            for (const range of findDialogueRanges(body)) {
+                dialogueRanges.push(new vscode.Range(
+                    editor.document.positionAt(frontmatterEndOffset + range.start),
+                    editor.document.positionAt(frontmatterEndOffset + range.end)
+                ));
             }
 
             // 使用 Trie 树匹配人物名（排除对话、注释和 frontmatter 范围）

@@ -171,9 +171,9 @@ suite('ConfigValidator Test Suite', () => {
                 assert.strictEqual(quoteErrors.length, 0);
             });
 
-            test('should pass for valid quote style ""', () => {
+            test('should pass for valid quote style “”', () => {
                 const config: NovelConfig = {
-                    format: { chineseQuoteStyle: '""' }
+                    format: { chineseQuoteStyle: '“”' }
                 };
                 const errors = validateConfig(config);
                 const quoteErrors = errors.filter(e => e.field.includes('chineseQuoteStyle'));

@@ -28,6 +28,7 @@ import { Logger, LogLevel } from './utils/logger';
 import { DoubtMarkService } from './services/doubtMarkService';
 import { DoubtMarkDecorationProvider } from './providers/doubtMarkDecorationProvider';
 import { DoubtMarkCodeLensProvider } from './providers/doubtMarkCodeLensProvider';
+import { SmartQuotesService } from './services/smartQuotesService';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
@@ -124,6 +125,9 @@ export async function activate(context: vscode.ExtensionContext) {
             updateHighlights
         });
         Logger.info('[Noveler] 命令已注册');
+        const smartQuotes = new SmartQuotesService(configService);
+        context.subscriptions.push(smartQuotes,
+            vscode.commands.registerCommand('noveler.jumpOutOfQuote', () => smartQuotes.jumpOut()));
 
         // 注册事件监听器
         registerEventListeners(context, novelerViewProvider, statsWebviewProvider);

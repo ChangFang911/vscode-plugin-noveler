@@ -1,6 +1,6 @@
 # novel.jsonc 配置说明
 
-本文按插件 0.8.8 和当前工作区实现校对。插件版本与配置版本分别管理，当前配置版本是 0.6.4。
+本文按插件 1.3.0 实现校对。插件版本与配置版本分别管理，当前配置版本是 0.6.4。
 项目配置必须使用根目录的 `novel.jsonc`，支持注释和尾逗号；主配置不会回退读取 `novel.json`。
 可通过 `Noveler: 打开配置文件` 或侧边栏「项目设置」打开。
 
@@ -53,7 +53,8 @@
     },
     "format": {
       "chineseQuoteStyle": "「」",
-      "convertQuotes": true
+      "convertQuotes": true,
+      "smartQuotes": true
     }
   }
 }
@@ -87,7 +88,8 @@
 | `highlight.character` | 样式对象 | 人物高亮 |
 | `characters.list` | 字符串数组 | 补充人物名称；也会读取 `characters/` 文件中的名称 |
 | `format.convertQuotes` | 布尔值 | 是否转换引号 |
-| `format.chineseQuoteStyle` | `「」` 或两个直双引号 | 引号输出样式，双引号值在 JSON 中写作 `"\"\""` |
+| `format.smartQuotes` | 布尔值，缺失时默认 true | 章节正文自动补齐引号和书名号，Tab 跳出；快速设置可关闭 |
+| `format.chineseQuoteStyle` | `「」`、`“”` 或两个直双引号 | 引号输出样式，双引号值在 JSON 中写作 `"\"\""` |
 | `wordCount.showInStatusBar` | 布尔值，默认 true | 状态栏统计显示 |
 | `autoEmptyLine.value` | 布尔值，默认 true | 段落空行 |
 | `paragraphIndent.value` | 布尔值，默认 true | 段首两个全角空格 |
@@ -229,6 +231,7 @@ chapters/
 - 状态栏显示总计、正文和标点，章节悬停也可以查看统计。
 - `autoEmptyLine.value` 控制章节编辑时的自动空行，`paragraphIndent.value` 控制两个全角空格缩进，两项可同时开启。
 - `format.convertQuotes` 为 false 时保持原引号；为 true 时按 `chineseQuoteStyle` 转换。
+- `format.smartQuotes` 控制输入补齐和 Tab 跳出，与格式化样式独立；输入哪种左引号，就补哪种右引号。仅章节同一行正文生效，修改旧对话也可使用；属性、注释、代码、表格和列表保留原操作。
 
 ## 敏感词配置
 

@@ -55,6 +55,12 @@ suite('FormatProvider Test Suite', () => {
     });
 
     suite('Quote Conversion', () => {
+        test('curved quotes are a distinct selectable style and all styles preserve apostrophes', () => {
+            assert.strictEqual(formatLine('「你好」 "再见"', '“”', true), '“你好” “再见”');
+            assert.strictEqual(formatLine('“你好”', '「」', true), '「你好」');
+            assert.strictEqual(formatLine('“你好”', '""', true), '"你好"');
+            assert.strictEqual(formatLine("don't ‘改动’", '“”', true), "don't ‘改动’");
+        });
         test('should convert English quotes to 「」', () => {
             const result = formatLine('"对话内容"', '「」', true);
             assert.strictEqual(result, '「对话内容」');

@@ -1,6 +1,6 @@
+import { findDialogueRanges } from '../../utils/smartQuotes';
 import * as assert from 'assert';
 import {
-    DIALOGUE_REGEX,
     THOUGHT_REGEX,
     ELLIPSIS_REGEX,
     HTML_COMMENT_REGEX,
@@ -38,53 +38,53 @@ import {
 
 suite('Constants Test Suite', () => {
 
-    suite('DIALOGUE_REGEX', () => {
+    suite('Dialogue matching', () => {
 
         test('should match 「」 quotes', () => {
             const text = '他说「你好」';
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.deepStrictEqual(matches, ['「你好」']);
         });
 
         test('should match "" double quotes', () => {
             const text = '他说"你好"';
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.deepStrictEqual(matches, ['"你好"']);
         });
 
-        test('should match "" curly double quotes', () => {
-            const text = '他说"你好"';
-            const matches = text.match(DIALOGUE_REGEX);
-            assert.deepStrictEqual(matches, ['"你好"']);
+        test('should match curly double quotes', () => {
+            const text = '他说“你好”';
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
+            assert.deepStrictEqual(matches, ['“你好”']);
         });
 
         test('should match \'\' single quotes', () => {
             const text = "他说'你好'";
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.deepStrictEqual(matches, ["'你好'"]);
         });
 
         test('should match multiple dialogues', () => {
             const text = '「第一句」他说完后，她回答"第二句"';
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.strictEqual(matches?.length, 2);
         });
 
         test('should not match unclosed quotes', () => {
             const text = '他说「你好';
-            const matches = text.match(DIALOGUE_REGEX);
-            assert.strictEqual(matches, null);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
+            assert.deepStrictEqual(matches, []);
         });
 
         test('should match empty dialogue', () => {
             const text = '他说「」';
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.deepStrictEqual(matches, ['「」']);
         });
 
         test('should match dialogue with punctuation inside', () => {
             const text = '「你好！怎么了？」';
-            const matches = text.match(DIALOGUE_REGEX);
+            const matches = findDialogueRanges(text).map(range => text.slice(range.start, range.end));
             assert.deepStrictEqual(matches, ['「你好！怎么了？」']);
         });
     });

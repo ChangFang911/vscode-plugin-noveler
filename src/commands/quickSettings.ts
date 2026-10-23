@@ -50,6 +50,12 @@ export async function quickSettings(): Promise<void> {
                 detail: '格式化时使用的中文引号',
             },
             {
+                id: 'smartQuotes',
+                label: '$(symbol-string) 智能引号',
+                description: statusLabel(configService.shouldSmartQuotes()),
+                detail: '章节正文自动补齐引号、书名号，Tab 跳出；修改旧内容也适用',
+            },
+            {
                 id: 'autoEmptyLine',
                 label: '$(list-flat) 自动空行',
                 description: statusLabel(configService.shouldAutoEmptyLine()),
@@ -118,6 +124,7 @@ export async function quickSettings(): Promise<void> {
         switch (item.id) {
             case 'targetWords':      await configureTargetWords(); break;
             case 'quoteStyle':       await configureQuoteStyle(); break;
+            case 'smartQuotes':      await toggleBoolSetting('smartQuotes'); break;
             case 'autoEmptyLine':    await toggleBoolSetting('autoEmptyLine'); break;
             case 'paragraphIndent':  await toggleBoolSetting('paragraphIndent'); break;
             case 'dialogueColor':    await configureColor('dialogue', '对话高亮颜色'); break;
@@ -166,7 +173,7 @@ async function configureQuoteStyle(): Promise<void> {
 
     const styles = [
         { label: '「」', description: '直角引号（日式）', value: '「」' },
-        { label: '""', description: '弯引号', value: '""' },
+        { label: '“”', description: '弯引号', value: '“”' },
         { label: '""', description: '直引号', value: '""' },
     ].map(s => ({ ...s, picked: s.value === current }));
 
@@ -185,10 +192,10 @@ async function configureQuoteStyle(): Promise<void> {
     vscode.window.showInformationMessage(`已设置引号样式为 ${selected.label}`);
 }
 
-async function toggleBoolSetting(key: 'autoEmptyLine' | 'paragraphIndent'): Promise<void> {
+async function toggleBoolSetting(key: 'autoEmptyLine' | 'paragraphIndent' | 'smartQuotes'): Promise<void> {
     const configService = ConfigService.getInstance();
-    const labelMap = { autoEmptyLine: '自动空行', paragraphIndent: '段落首行缩进' } as const;
-    const currentEnabled = key === 'autoEmptyLine'
+    const labelMap = { autoEmptyLine: '自动空行', paragraphIndent: '段落首行缩进', smartQuotes: '智能引号' } as const;
+    const currentEnabled = key === 'smartQuotes' ? configService.shouldSmartQuotes() : key === 'autoEmptyLine'
         ? configService.shouldAutoEmptyLine()
         : configService.shouldParagraphIndent();
 
@@ -205,7 +212,10 @@ async function toggleBoolSetting(key: 'autoEmptyLine' | 'paragraphIndent'): Prom
 
     await configService.updateConfig((draft) => {
         if (!draft.noveler) { draft.noveler = {}; }
-        if (key === 'autoEmptyLine') {
+        if (key === 'smartQuotes') {
+            if (!draft.noveler.format) { draft.noveler.format = {}; }
+            draft.noveler.format.smartQuotes = selected.value;
+        } else if (key === 'autoEmptyLine') {
             draft.noveler.autoEmptyLine = { value: selected.value };
         } else {
             draft.noveler.paragraphIndent = { value: selected.value };

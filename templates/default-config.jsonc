@@ -32,9 +32,10 @@
     "format": {
       // 是否自动转换引号为中文引号
       "convertQuotes": true,
+      "smartQuotes": true,
       // 保留兼容字段；保存格式化由 .vscode/settings.json 的 editor.formatOnSave 控制
       "autoFormat": true,
-      // 中文引号样式：「」或两个直双引号
+      // 中文引号样式：「」、弯双引号或两个直双引号
       "chineseQuoteStyle": "\"\""
     },
 

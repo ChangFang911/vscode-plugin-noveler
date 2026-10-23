@@ -178,10 +178,12 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
         if (configService.shouldConvertQuotes()) {
             if (quoteStyle === '「」') {
                 // 将英文引号转为中文引号
-                formatted = formatted.replace(/"([^"]*)"/g, '「$1」');
+                formatted = formatted.replace(/"([^"]*)"|“([^”]*)”/g, (_match, straight: string | undefined, curved: string | undefined) => `「${straight ?? curved}」`);
+            } else if (quoteStyle === '“”') {
+                formatted = formatted.replace(/"([^"]*)"|「([^」]*)」/g, (_match, straight: string | undefined, corner: string | undefined) => `“${straight ?? corner}”`);
             } else {
                 // 将中文引号转为英文引号
-                formatted = formatted.replace(/「([^」]*)」/g, '"$1"');
+                formatted = formatted.replace(/「([^」]*)」|“([^”]*)”/g, (_match, corner: string | undefined, curved: string | undefined) => `"${corner ?? curved}"`);
             }
         }
 

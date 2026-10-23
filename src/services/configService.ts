@@ -43,12 +43,13 @@ export interface NovelConfig {
     };
     /** 格式化配置 */
     format?: {
-        /** 中文引号样式（「」或""） */
+        /** 中文引号样式（「」、弯双引号或直双引号） */
         chineseQuoteStyle?: string;
         /** 是否自动格式化 */
         autoFormat?: boolean;
         /** 是否转换引号 */
         convertQuotes?: boolean;
+        smartQuotes?: boolean;
     };
     /** 字数统计配置 */
     wordCount?: {
@@ -425,6 +426,10 @@ export class ConfigService {
      */
     public shouldConvertQuotes(): boolean {
         return this.config.format?.convertQuotes !== false;
+    }
+
+    public shouldSmartQuotes(): boolean {
+        return this.config.format?.smartQuotes !== false;
     }
 
     /**
