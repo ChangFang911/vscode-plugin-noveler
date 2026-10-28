@@ -34,7 +34,7 @@ export function markdownToText(markdown: string, indentParagraphs = false): { ti
         if (checked[index] === '\\') { index += 2; continue; }
         if (checked.startsWith('<!--', index)) {
             const end = checked.indexOf('-->', index + 4);
-            if (end < 0) { throw new Error('正文存在未闭合注释，请修复后导出'); }
+            if (end < 0) { throw new Error('正文存在未闭合注释，请先修复'); }
             index = end + 3;
         } else if (checked[index] === '`') {
             const start = index;

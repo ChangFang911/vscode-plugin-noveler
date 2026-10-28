@@ -82,6 +82,9 @@ suite('CodeLensProvider Test Suite', () => {
                 assert.ok(lenses.some(lens => lens.command?.command === 'noveler.formatDocument'));
                 const format = lenses.find(lens => lens.command?.command === 'noveler.formatDocument');
                 assert.strictEqual(format?.command?.arguments?.[0], document.uri);
+                const copy = lenses.find(lens => lens.command?.command === 'noveler.copyChapterBody');
+                assert.strictEqual(copy?.command?.title, '复制正文');
+                assert.strictEqual(copy?.command?.arguments?.[0], document.uri);
                 const status = lenses.find(lens => lens.command?.command === 'noveler.updateChapterStatus');
                 assert.strictEqual(status?.command?.arguments?.[0], document.uri);
             });

@@ -1,4 +1,5 @@
 import { exportNovel } from './exportNovel';
+import { copyChapterBody } from './copyChapterBody';
 import { manageCharacterAliases } from './manageCharacterAliases';
 import { applySensitiveWordFix } from '../providers/sensitiveWordCodeAction';
 /**
@@ -184,6 +185,9 @@ function registerChapterCommands(deps: CommandRegistrarDeps): void {
     );
 
     // 章节右键菜单命令
+    context.subscriptions.push(
+        vscode.commands.registerCommand('noveler.copyChapterBody', copyChapterBody)
+    );
     context.subscriptions.push(
         vscode.commands.registerCommand('noveler.renameChapter', renameChapter)
     );

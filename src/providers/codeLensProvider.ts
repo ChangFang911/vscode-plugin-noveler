@@ -130,6 +130,13 @@ export class ChapterCodeLensProvider implements vscode.CodeLensProvider {
                     arguments: [document.uri]
                 }));
 
+                codeLenses.push(new vscode.CodeLens(range, {
+                    title: '复制正文',
+                    tooltip: '复制发布用正文，去掉章节标题、属性和注释，包含未保存内容',
+                    command: 'noveler.copyChapterBody',
+                    arguments: [document.uri]
+                }));
+
                 // 只处理第一个标题
                 break;
             }
