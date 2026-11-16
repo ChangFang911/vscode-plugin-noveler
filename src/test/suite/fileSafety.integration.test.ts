@@ -307,6 +307,36 @@ suite('File Safety Integration', () => {
         assert.strictEqual((await vscode.workspace.openTextDocument(uri)).getText(), text);
     });
 
+    test('formatting a chapter with autosave enabled persists its formatted body', async () => {
+        const config = vscode.workspace.getConfiguration('files');
+        const mode = config.inspect<string>('autoSave')?.workspaceValue;
+        const delay = config.inspect<number>('autoSaveDelay')?.workspaceValue;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let listener: vscode.Disposable | undefined;
+        try {
+            await config.update('autoSaveDelay', 200, vscode.ConfigurationTarget.Workspace);
+            await config.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
+            const uri = vscode.Uri.joinPath(root, 'chapters', '格式化自动保存.md');
+            await writeTestFile(uri, '---\nchapter: 1\nwordCount: 0\nmodified: 2000-01-01 00:00:00\n---\n# 第一章\n\n中文,正文');
+            const document = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(document, { preview: false });
+            const saved = new Promise<void>((resolve, reject) => {
+                listener = vscode.workspace.onDidSaveTextDocument(candidate => {
+                    if (candidate.uri.toString() === uri.toString() && candidate.getText().includes('中文，正文')) { resolve(); }
+                });
+                timer = setTimeout(() => reject(new Error('格式化结果未在 8 秒内自动保存')), 8000);
+            });
+            await vscode.commands.executeCommand('noveler.formatDocument', uri);
+            await saved;
+            assert.ok(!document.isDirty);
+            assert.ok((await readTestFile(uri)).includes('中文，正文'));
+        } finally {
+            listener?.dispose();
+            clearTimeout(timer);
+            await config.update('autoSave', mode, vscode.ConfigurationTarget.Workspace);
+            await config.update('autoSaveDelay', delay, vscode.ConfigurationTarget.Workspace);
+        }
+    });
     test('formatting uses the clicked document even when another editor is active', async () => {
         const target = vscode.Uri.joinPath(root, 'characters', '林舟.md');
         await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, 'characters'));

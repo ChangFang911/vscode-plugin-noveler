@@ -1,16 +1,17 @@
 import * as vscode from 'vscode';
 import { ConfigService } from './configService';
 import { isChapterFile } from '../utils/volumeHelper';
-import { findQuoteExit, proseQuoteLine, quoteInput, QUOTE_CHARACTERS } from '../utils/smartQuotes';
+import { parse } from 'jsonc-parser';
+import { findQuoteExit, proseQuoteLine, quoteInput, QUOTE_PAIRS, QUOTE_CHARACTERS } from '../utils/smartQuotes';
 import { Logger } from '../utils/logger';
 
 export class SmartQuotesService implements vscode.Disposable {
     private readonly subscriptions: vscode.Disposable[] = [];
-    private typing?: vscode.Disposable;
+    private pairing?: vscode.Disposable;
+    private pairingKey = '';
+    private basePairs?: vscode.AutoClosingPair[];
     private novel = false;
     private disposed = false;
-    private failedEditor?: string;
-    private conflictNotified = false;
     private lastContext?: boolean;
     private contextQueue: PromiseLike<unknown> = Promise.resolve();
     private cache?: { document: vscode.TextDocument; version: number; offset: number; value: ReturnType<typeof proseQuoteLine> };
@@ -24,13 +25,36 @@ export class SmartQuotesService implements vscode.Disposable {
             vscode.workspace.onDidChangeTextDocument(() => this.refresh()),
             config.onDidChangeConfig(() => { this.refresh(); void this.checkProject(); })
         );
-        this.ready = this.checkProject();
+        this.ready = Promise.all([this.checkProject(), this.loadMarkdownConfiguration()]).then(() => this.refresh());
     }
 
     private async checkProject(): Promise<void> {
         try { this.novel = !!this.root && (await vscode.workspace.fs.stat(vscode.Uri.joinPath(this.root, 'novel.jsonc'))).type === vscode.FileType.File; }
         catch { this.novel = false; }
         this.refresh();
+    }
+
+    private async loadMarkdownConfiguration(): Promise<void> {
+        try {
+            const markdown = vscode.extensions.getExtension('vscode.markdown') ?? vscode.extensions.getExtension('vscode.markdown-basics');
+            const configuration = markdown?.packageJSON.contributes?.languages?.find((language: { id: string }) => language.id === 'markdown')?.configuration;
+            if (!markdown || typeof configuration !== 'string') { throw new Error('Markdown 原生语言配置不可用'); }
+            const bytes = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(markdown.extensionUri, configuration));
+            const errors: import('jsonc-parser').ParseError[] = [];
+            const base = parse(Buffer.from(bytes).toString('utf8'), errors) as {
+                autoClosingPairs?: ({ open: string; close: string; notIn?: string[] } | [string, string])[];
+            };
+            if (errors.length || !Array.isArray(base?.autoClosingPairs)) { throw new Error('Markdown 原生配对配置无效'); }
+            const tokenTypes: Record<string, vscode.SyntaxTokenType> = {
+                string: vscode.SyntaxTokenType.String, comment: vscode.SyntaxTokenType.Comment, regex: vscode.SyntaxTokenType.RegEx
+            };
+            this.basePairs = base.autoClosingPairs.map(pair => {
+                if (Array.isArray(pair)) { return { open: pair[0], close: pair[1] }; }
+                return { open: pair.open, close: pair.close, notIn: pair.notIn?.map(token => tokenTypes[token]) };
+            });
+        } catch (error) {
+            Logger.warn(`智能引号保留原生输入：${String(error)}`);
+        }
     }
 
     private editor(): vscode.TextEditor | undefined {
@@ -57,45 +81,27 @@ export class SmartQuotesService implements vscode.Disposable {
 
     refresh(): void {
         const editor = this.editor();
-        if (!editor) {
-            this.typing?.dispose(); this.typing = undefined; this.failedEditor = undefined;
-        } else if (!this.typing && this.failedEditor !== editor.document.uri.toString()) {
-            try { this.typing = vscode.commands.registerCommand('type', args => this.type(args)); }
-            catch (error) {
-                this.failedEditor = editor.document.uri.toString();
-                Logger.warn(`智能引号未接管已有输入扩展：${String(error)}`);
-                if (!this.conflictNotified) {
-                    this.conflictNotified = true;
-                    void vscode.window.showWarningMessage('智能引号自动补齐未启用：另一个输入扩展正在处理键盘。已有引号仍可用 Tab 跳出。');
-                }
+        const line = editor && this.line(editor, true);
+        const pairs = line ? Object.entries(QUOTE_PAIRS)
+            .filter(([open, close]) => quoteInput(line.line, line.column, open).text.length === 2 || line.line[line.column] === close)
+            .map(([open, close]): vscode.AutoClosingPair => ({ open, close, notIn: [vscode.SyntaxTokenType.String, vscode.SyntaxTokenType.Comment] })) : [];
+        const key = this.basePairs && pairs.length ? pairs.map(pair => pair.open).join('') : '';
+        if (key !== this.pairingKey) {
+            this.pairing?.dispose();
+            this.pairing = undefined;
+            this.pairingKey = key;
+            if (key) {
+                // 原生配对保留输入法同步，避免接管 type 命令后破坏普通中文输入。
+                this.pairing = vscode.languages.setLanguageConfiguration('markdown', {
+                    autoClosingPairs: [...this.basePairs!, ...pairs]
+                });
             }
         }
-        const line = editor && this.line(editor);
         const canJump = !!line && findQuoteExit(line.line, line.column) !== undefined;
         if (canJump !== this.lastContext) {
             this.lastContext = canJump;
             this.contextQueue = this.contextQueue.then(() => vscode.commands.executeCommand('setContext', 'noveler.canJumpQuote', canJump));
         }
-    }
-
-    private async type(args: { text: string }): Promise<void> {
-        if (typeof args?.text !== 'string' || args.text.length !== 1 || !QUOTE_CHARACTERS.has(args.text)) {
-            await vscode.commands.executeCommand('default:type', args); return;
-        }
-        const editor = this.editor();
-        const line = editor && this.line(editor, true);
-        if (!editor || !line) {
-            await vscode.commands.executeCommand('default:type', args); return;
-        }
-        const input = quoteInput(line.line, line.column, args.text);
-        const before = editor.selection.active;
-        await vscode.commands.executeCommand('default:type', { ...args, text: input.text });
-        if (input.text.length === 2 && editor === vscode.window.activeTextEditor
-            && editor.selection.active.isEqual(before.translate(0, 2))) {
-            const middle = before.translate(0, 1);
-            editor.selection = new vscode.Selection(middle, middle);
-        }
-        this.refresh();
     }
 
     async jumpOut(): Promise<void> {
@@ -111,7 +117,9 @@ export class SmartQuotesService implements vscode.Disposable {
 
     dispose(): void {
         this.disposed = true;
-        this.typing?.dispose();
+        this.pairing?.dispose();
+        this.pairing = undefined;
+        this.pairingKey = '';
         this.subscriptions.forEach(item => item.dispose());
         this.lastContext = undefined;
         this.refresh();

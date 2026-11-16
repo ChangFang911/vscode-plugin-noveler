@@ -54,6 +54,16 @@ suite('FormatProvider Test Suite', () => {
         sandbox.restore();
     });
 
+    for (const eol of ['\n', '\r\n']) {
+        test(`formatting preserves the existing final newline ${JSON.stringify(eol)}`, () => {
+            const source = ['# 第一章', '', '正文,测试', ''].join(eol);
+            const result = formatDocument(source);
+            assert.ok(result.endsWith(eol));
+            assert.strictEqual(formatDocument(result), result);
+            assert.ok(result.includes('正文，测试'));
+        });
+    }
+
     suite('Quote Conversion', () => {
         test('curved quotes are a distinct selectable style and all styles preserve apostrophes', () => {
             assert.strictEqual(formatLine('「你好」 "再见"', '“”', true), '“你好” “再见”');

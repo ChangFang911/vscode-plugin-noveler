@@ -65,6 +65,7 @@ export class ChineseNovelFormatProvider implements vscode.DocumentFormattingEdit
             formattedText = formattedText.split(`${tokenPrefix}${index}\uE001`).join(value);
         });
         formattedText = prefix + formattedText;
+        if (text.endsWith('\n') && !formattedText.endsWith(eol)) { formattedText += eol; }
 
         if (formattedText !== text) {
             const fullRange = new vscode.Range(

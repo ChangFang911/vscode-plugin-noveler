@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import { addDoubtMark } from './addDoubtMark';
 import { DoubtMarkService, DoubtMark } from '../services/doubtMarkService';
 import { DoubtMarkTreeItem, DoubtMarkNodesProvider } from '../views/nodes/doubtMarkNodes';
 import { handleError } from '../utils/errorHandler';
@@ -15,38 +16,8 @@ export function registerDoubtMarkCommands(
 ): void {
     const svc = DoubtMarkService.getInstance();
 
-    // 添加疑问标记
     context.subscriptions.push(
-        vscode.commands.registerCommand('noveler.addDoubtMark', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor || editor.document.languageId !== 'markdown') {
-                vscode.window.showWarningMessage('请在 Markdown 文件中使用此功能');
-                return;
-            }
-
-            const content = await vscode.window.showInputBox({
-                prompt: '请输入待办内容',
-                placeHolder: '例如：这里与第三章的设定矛盾',
-                ignoreFocusOut: true,
-            });
-            if (content === undefined) { return; } // 用户取消
-
-            const line = editor.selection.active.line;
-            const lineObj = editor.document.lineAt(line);
-            const lineText = lineObj.text;
-            const marker = `<!--? ${content} -->`;
-
-            const edit = new vscode.WorkspaceEdit();
-            if (lineText.trimEnd() === '') {
-                // 空行：直接写入本行
-                edit.replace(editor.document.uri, lineObj.range, marker);
-            } else {
-                // 有内容：追加到行尾
-                edit.insert(editor.document.uri,
-                    lineObj.range.end, `  ${marker}`);
-            }
-            await vscode.workspace.applyEdit(edit);
-        })
+        vscode.commands.registerCommand('noveler.addDoubtMark', addDoubtMark)
     );
 
     // 标记为已解决

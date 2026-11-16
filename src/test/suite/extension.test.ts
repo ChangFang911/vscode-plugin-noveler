@@ -79,6 +79,50 @@ suite('Extension Test Suite', () => {
         assert.ok(icon.readUInt32BE(20) > 0 && icon.readUInt32BE(20) <= 1024);
     });
     if (process.env.NOVELER_TEST_SMOKE_ONLY === '1') {
+        test('packaged todo insertion survives saving and formatting settles without extra blank lines', async () => {
+            const sandbox = sinon.createSandbox();
+            const files = vscode.workspace.getConfiguration('files');
+            const originalFinalNewline = files.inspect<boolean>('insertFinalNewline')?.workspaceValue;
+            const root = vscode.workspace.workspaceFolders![0].uri;
+            const uri = vscode.Uri.joinPath(root, 'chapters', '打包待办验收.md');
+            const extension = vscode.extensions.getExtension('chang.chinese-novel-writer')!;
+            const api = createRequire(path.join(extension.extensionPath, 'package.json'))('vscode') as typeof vscode;
+            try {
+                // 首次启动的欢迎页延迟一秒打开，先等它完成，避免抢走测试编辑器。
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                await files.update('insertFinalNewline', true, vscode.ConfigurationTarget.Workspace);
+                await vscode.workspace.fs.createDirectory(vscode.Uri.joinPath(root, 'chapters'));
+                await vscode.workspace.fs.writeFile(uri, Buffer.from('---\nchapter: 1\ntitle: 打包待办验收\nstatus: 草稿\n---\n\n正文结尾'));
+                const document = await api.workspace.openTextDocument(uri);
+                const editor = await api.window.showTextDocument(document, { preview: false });
+                await editor.edit(edit => edit.insert(document.positionAt(document.getText().length), '补充'));
+                const position = document.positionAt(document.getText().indexOf('正文') + 2);
+                editor.selection = new vscode.Selection(position, position);
+                const errors = sandbox.stub(api.window, 'showErrorMessage').resolves();
+                const warnings = sandbox.stub(api.window, 'showWarningMessage').resolves();
+                sandbox.stub(api.window, 'showInputBox').callsFake(async () => {
+                    assert.ok(await document.save());
+                    return '核对伏笔';
+                });
+                await vscode.commands.executeCommand('noveler.addDoubtMark');
+                assert.ok(warnings.notCalled, warnings.firstCall?.args[0]);
+                assert.ok(errors.notCalled, errors.firstCall?.args[0]);
+                assert.ok(document.getText().includes('正文<!--? 核对伏笔 -->结尾补充'), document.getText());
+                await vscode.commands.executeCommand('noveler.formatDocument');
+                assert.ok(await document.save());
+                const saved = document.getText();
+                assert.ok(saved.endsWith('结尾补充\n'));
+                await new Promise(resolve => setTimeout(resolve, 600));
+                assert.strictEqual(document.getText(), saved);
+                assert.strictEqual(document.isDirty, false);
+                assert.strictEqual(Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf8'), saved);
+            } finally {
+                sandbox.restore();
+                await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                await vscode.workspace.fs.delete(uri);
+                await files.update('insertFinalNewline', originalFinalNewline, vscode.ConfigurationTarget.Workspace);
+            }
+        });
         test('packaged TXT export runs through the registered command without changing the original', async () => {
             const sandbox = sinon.createSandbox();
             const folder = await mkdtemp(path.join(tmpdir(), 'noveler-vsix-export-'));

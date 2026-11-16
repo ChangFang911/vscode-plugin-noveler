@@ -2,7 +2,7 @@
   "name": "chinese-novel-writer",
   "displayName": "Noveler - 中文小说写作助手",
   "description": "专为中文小说写作设计的 VS Code 插件，提供语法高亮、格式化、字数统计等功能",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "publisher": "chang",
   "author": "Noveler Contributors",
   "license": "MIT",
@@ -219,7 +219,7 @@
       {
         "command": "noveler.addDoubtMark",
         "title": "Noveler: 添加写作待办",
-        "description": "在当前行插入写作待办标记，收集写作过程中需要稍后处理的问题（快捷键：Ctrl+Shift+/）",
+        "description": "在光标处或选区末尾插入写作待办标记，保留原文（快捷键：Ctrl+Shift+/）",
         "icon": "$(question)"
       },
       {

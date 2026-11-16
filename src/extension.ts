@@ -19,7 +19,7 @@ import { initTemplateLoader } from './utils/templateLoader';
 import { updateFrontMatter } from './utils/frontMatterHelper';
 import { handleReadmeAutoUpdate } from './utils/readmeAutoUpdate';
 import { registerAllCommands } from './commands/commandRegistrar';
-import { PARAGRAPH_INDENT, VOLUME_TYPE_NAMES } from './constants';
+import { VOLUME_TYPE_NAMES } from './constants';
 import { MigrationService } from './services/migrationService';
 import { Debouncer } from './utils/debouncer';
 import { handleError, ErrorSeverity } from './utils/errorHandler';
@@ -29,6 +29,7 @@ import { DoubtMarkService } from './services/doubtMarkService';
 import { DoubtMarkDecorationProvider } from './providers/doubtMarkDecorationProvider';
 import { DoubtMarkCodeLensProvider } from './providers/doubtMarkCodeLensProvider';
 import { SmartQuotesService } from './services/smartQuotesService';
+import { AutoParagraphService } from './services/autoParagraphService';
 
 let wordCountStatusBarItem: vscode.StatusBarItem;
 let wordCountService: WordCountService;
@@ -44,7 +45,6 @@ let wordCountDebouncer: Debouncer;
 let highlightDebouncer: Debouncer;
 let characterRefreshDebouncer: Debouncer;
 let readmeUpdateDebouncer: Debouncer;
-let isApplyingAutoLineBreak = false;
 
 export async function activate(context: vscode.ExtensionContext) {
     // 初始化日志系统（最先执行，确保后续能记录日志）
@@ -126,7 +126,7 @@ export async function activate(context: vscode.ExtensionContext) {
         });
         Logger.info('[Noveler] 命令已注册');
         const smartQuotes = new SmartQuotesService(configService);
-        context.subscriptions.push(smartQuotes,
+        context.subscriptions.push(smartQuotes, new AutoParagraphService(configService),
             vscode.commands.registerCommand('noveler.jumpOutOfQuote', () => smartQuotes.jumpOut()));
 
         // 注册事件监听器
@@ -297,7 +297,6 @@ function registerEventListeners(
                 updateHighlightsDebounced(vscode.window.activeTextEditor);
             }
             refreshCharacterDocument(e.document);
-            handleLineBreak(e);
         })
     );
 
@@ -533,95 +532,6 @@ async function updateFrontMatterOnSave(document: vscode.TextDocument): Promise<v
     } catch (error) {
         handleError('保存时更新 Front Matter 失败', error, ErrorSeverity.Silent);
         return [];
-    }
-}
-
-function handleLineBreak(event: vscode.TextDocumentChangeEvent) {
-    // 跳过插件自身 editor.edit 触发的变更，防止循环插入
-    if (isApplyingAutoLineBreak) {
-        return;
-    }
-
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || event.document !== editor.document) {
-        return;
-    }
-
-    if (event.document.languageId !== 'markdown') {
-        return;
-    }
-
-    const filePath = event.document.uri.fsPath;
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    if (!normalizedPath.includes(`/${CHAPTERS_FOLDER}/`)) {
-        return;
-    }
-
-    if (event.contentChanges.length !== 1) {
-        return;
-    }
-
-    const change = event.contentChanges[0];
-
-    if (change.text !== '\n') {
-        return;
-    }
-
-    // 跳过文件末尾添加换行的情况（VS Code 保存时可能自动添加尾部空行）
-    const newLineIndex = change.range.start.line;
-    const totalLines = event.document.lineCount;
-    if (newLineIndex >= totalLines - 1) {
-        return;
-    }
-
-    const line = event.document.lineAt(change.range.start.line);
-    const previousLineText = line.text.trim();
-
-    const autoEmptyLineEnabled = configService.shouldAutoEmptyLine();
-    const paragraphIndentEnabled = configService.shouldParagraphIndent();
-
-    Logger.info(`[换行处理] 空行: ${autoEmptyLineEnabled}, 缩进: ${paragraphIndentEnabled}, 前一行: "${previousLineText}"`);
-
-    if (!autoEmptyLineEnabled && !paragraphIndentEnabled) {
-        return;
-    }
-
-    if (previousLineText.startsWith('#') || previousLineText.startsWith('<!--') || previousLineText === '---') {
-        return;
-    }
-
-    const isPreviousLineEmpty = previousLineText === '';
-
-    if (autoEmptyLineEnabled && !paragraphIndentEnabled && isPreviousLineEmpty) {
-        return;
-    }
-
-    let textToInsert = '';
-
-    if (autoEmptyLineEnabled && !isPreviousLineEmpty) {
-        textToInsert += '\n';
-        Logger.info(`[换行处理] 添加空行`);
-    }
-
-    if (paragraphIndentEnabled) {
-        textToInsert += PARAGRAPH_INDENT;
-        Logger.info(`[换行处理] 添加缩进`);
-    }
-
-    if (textToInsert) {
-        const insertPos = new vscode.Position(change.range.start.line + 1, 0);
-        Logger.info(`[换行处理] 在第 ${change.range.start.line + 1} 行插入: "${textToInsert.replace(/\n/g, '\\n')}"`);
-        isApplyingAutoLineBreak = true;
-        editor.edit((editBuilder) => {
-            editBuilder.insert(insertPos, textToInsert);
-        }, {
-            undoStopBefore: false,
-            undoStopAfter: false
-        }).then(() => {
-            isApplyingAutoLineBreak = false;
-        }, () => {
-            isApplyingAutoLineBreak = false;
-        });
     }
 }
 

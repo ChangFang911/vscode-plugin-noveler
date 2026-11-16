@@ -50,6 +50,48 @@ suite('Smart quote native editor integration', () => {
             assert.strictEqual(editor.selection.active.character, 4);
         });
     }
+    for (const punctuation of ['，', '。', '！', '？', '；', '：', '、']) {
+        test(`issue #11: native punctuation ${punctuation} preserves the preceding Chinese character`, async () => {
+            const editor = await open('我是一个粉刷匠');
+            await type(punctuation);
+            assert.strictEqual(editor.document.getText(), '我是一个粉刷匠' + punctuation);
+            assert.strictEqual(editor.selection.active.character, 8);
+            await vscode.commands.executeCommand('deleteLeft');
+            assert.strictEqual(editor.document.getText(), '我是一个粉刷匠');
+        });
+    }
+    test('rapid punctuation and composition replacements stay on the native input path', async () => {
+        const editor = await open('我是一个粉刷匠');
+        await Promise.all(['，', '。', '！'].map(text => type(text)));
+        assert.strictEqual(editor.document.getText(), '我是一个粉刷匠，。！');
+        await vscode.commands.executeCommand('compositionStart');
+        try {
+            await vscode.commands.executeCommand('compositionType', { text: 'shi', replacePrevCharCnt: 0, replaceNextCharCnt: 0, positionDelta: 0 });
+            await vscode.commands.executeCommand('compositionType', { text: '是', replacePrevCharCnt: 3, replaceNextCharCnt: 0, positionDelta: 0 });
+        } finally { await vscode.commands.executeCommand('compositionEnd'); }
+        await type('，');
+        assert.strictEqual(editor.document.getText(), '我是一个粉刷匠，。！是，');
+    });
+    test('native brackets still pair and project settings are not rewritten', async () => {
+        const configUri = vscode.Uri.joinPath(root, 'novel.jsonc');
+        const before = await vscode.workspace.fs.readFile(configUri);
+        for (const [left, right] of [['(', ')'], ['[', ']'], ['{', '}']]) {
+            const editor = await open('');
+            await type(left);
+            assert.strictEqual(editor.document.getText(), left + right);
+            assert.strictEqual(editor.selection.active.character, 1);
+        }
+        assert.deepStrictEqual(await vscode.workspace.fs.readFile(configUri), before);
+    });
+    test('smart quotes never register a replacement typing command', async () => {
+        service.dispose();
+        const register = sandbox.spy(vscode.commands, 'registerCommand');
+        service = new SmartQuotesService({ shouldSmartQuotes: () => enabled, onDidChangeConfig: changes.event } as ConfigService, root);
+        await service.ready;
+        await open('正文');
+        await type('，');
+        assert.ok(register.getCalls().every(call => !['type', 'compositionType', 'compositionStart', 'compositionEnd', 'replacePreviousChar'].includes(call.args[0])));
+    });
     test('typing a closer keeps native behavior with smart quotes enabled', async () => {
         for (const [left, right] of [['“', '”'], ['「', '」'], ['"', '"'], ["'", "'"]]) {
             const text = left + '旧对话' + right;
@@ -145,13 +187,15 @@ suite('Smart quote native editor integration', () => {
     test('multiple carets and selected text keep their native typing behavior', async () => {
         const editor = await open('甲\n乙');
         editor.selections = [new vscode.Selection(0, 1, 0, 1), new vscode.Selection(1, 1, 1, 1)];
+        service.refresh();
         await type('“');
         assert.strictEqual(editor.document.getText(), '甲“\n乙“');
         editor.selections = [new vscode.Selection(0, 0, 0, 1)];
+        service.refresh();
         await type('「');
         assert.strictEqual(editor.document.getText(), '「“\n乙“');
     });
-    test('an existing input extension is preserved rather than overwritten', async () => {
+    test('native pairing coexists with another input handler without overriding type', async () => {
         const warning = sandbox.stub(vscode.window, 'showWarningMessage').resolves();
         await open('', '其他.md');
         const typing = sandbox.spy(async (args: { text: string }) => vscode.commands.executeCommand('default:type', args));
@@ -159,9 +203,9 @@ suite('Smart quote native editor integration', () => {
         try {
             const editor = await open('');
             await type('“');
-            assert.strictEqual(editor.document.getText(), '“');
+            assert.strictEqual(editor.document.getText(), '“”');
             assert.ok(typing.calledOnce);
-            assert.ok(warning.calledOnce);
+            assert.ok(warning.notCalled);
         } finally { registration.dispose(); }
     });
     test('quick settings writes only the optional smart quote flag and old projects default to enabled', async () => {
